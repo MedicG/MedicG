@@ -711,22 +711,36 @@ const API = {
 };
 
 function repairMojibakeText(){
+  const fix=s=>fixMojibakeString(s);
+  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+  let node; while((node=walker.nextNode())) node.nodeValue=fix(node.nodeValue);
+  document.querySelectorAll('input,textarea,option').forEach(el=>{
+    if(el.placeholder) el.placeholder=fix(el.placeholder);
+    if(el.value) el.value=fix(el.value);
+    if(el.textContent) el.textContent=fix(el.textContent);
+  });
+}
+
+function fixMojibakeString(s){
   const map=[
     ['GestiÃ³n','Gestión'],['MÃ©dica','Médica'],['MÃ©dicas','Médicas'],['MÃ©dico','Médico'],['mÃ©dico','médico'],['mÃ©dicos','médicos'],
     ['ClÃ­nica','Clínica'],['ElectrÃ³nica','Electrónica'],['FacturaciÃ³n','Facturación'],['estadÃ­sticas','estadísticas'],
     ['sesiÃ³n','sesión'],['SesiÃ³n','Sesión'],['electrÃ³nico','electrónico'],['ContraseÃ±a','Contraseña'],['contraseÃ±a','contraseña'],
     ['RecepciÃ³n','Recepción'],['ConfiguraciÃ³n','Configuración'],['dÃ­a','día'],['Â©','©'],['Â·','·'],['â€”','—'],['â€¢','•'],
     ['PediatrÃ­a','Pediatría'],['CardiologÃ­a','Cardiología'],['DermatologÃ­a','Dermatología'],['NeurologÃ­a','Neurología'],
-    ['MarÃ­a','María'],['MuÃ±oz','Muñoz'],['IbÃ¡Ã±ez','Ibáñez'],['RÃ­os','Ríos'],['PÃºblico','Público'],['cirugÃ­as','cirugías'],
+    ['PÃ©rez','Pérez'],['PÃºblico','Público'],['MarÃ­a','María'],['MuÃ±oz','Muñoz'],['IbÃ¡Ã±ez','Ibáñez'],['RÃ­os','Ríos'],['Andrade PÃ©rez','Andrade Pérez'],['cirugÃ­as','cirugías'],
     ['atenciÃ³n','atención'],['corazÃ³n','corazón'],['fÃ­sica','física'],['DiagnÃ³stico','Diagnóstico'],['MÃ­n.','Mín.']
   ];
-  const fix=s=>map.reduce((v,[bad,good])=>v.split(bad).join(good),s);
-  const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-  let node; while((node=walker.nextNode())) node.nodeValue=fix(node.nodeValue);
-  document.querySelectorAll('input,textarea').forEach(el=>{
-    if(el.placeholder) el.placeholder=fix(el.placeholder);
-    if(el.value) el.value=fix(el.value);
-  });
+  return typeof s==='string' ? map.reduce((v,[bad,good])=>v.split(bad).join(good),s) : s;
+}
+
+function normalizeData(value){
+  if(typeof value==='string') return fixMojibakeString(value);
+  if(Array.isArray(value)) return value.map(normalizeData);
+  if(value && typeof value==='object'){
+    Object.keys(value).forEach(k=>{value[k]=normalizeData(value[k]);});
+  }
+  return value;
 }
 
 const DB = {
@@ -734,6 +748,7 @@ const DB = {
   saveTimers:{},
   get(k){return this.cache[k] ?? null;},
   set(k,v){
+    v=normalizeData(v);
     this.cache[k]=v;
     if(API.localMode){localStorage.setItem('mg_'+k,JSON.stringify(v));return;}
     if(!API.token){toast('No hay sesión activa para guardar en la base de datos','err');return;}
@@ -742,7 +757,7 @@ const DB = {
       API.post('/api/data',{key:k,value:v}).catch(err=>toast('No se pudo guardar en la base de datos: '+err.message,'err'));
     },120);
   },
-  load(data){this.cache=data||{};},
+  load(data){this.cache=normalizeData(data||{});},
   loadLocal(){
     ['users','especialidades','seguros','pacientes','medicos','citas','facturas','notas','config','cajas','nextIds'].forEach(k=>{
       try{const v=JSON.parse(localStorage.getItem('mg_'+k));if(v!==null)this.cache[k]=v;}catch{}

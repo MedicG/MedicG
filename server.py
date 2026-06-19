@@ -16,6 +16,42 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@medicg.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin123")
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 SESSIONS = {}
+MOJIBAKE_REPLACEMENTS = {
+    "GestiÃ³n": "Gestión",
+    "MÃ©dica": "Médica",
+    "MÃ©dicas": "Médicas",
+    "MÃ©dico": "Médico",
+    "mÃ©dico": "médico",
+    "mÃ©dicos": "médicos",
+    "ClÃ­nica": "Clínica",
+    "ElectrÃ³nica": "Electrónica",
+    "FacturaciÃ³n": "Facturación",
+    "estadÃ­sticas": "estadísticas",
+    "sesiÃ³n": "sesión",
+    "SesiÃ³n": "Sesión",
+    "electrÃ³nico": "electrónico",
+    "ContraseÃ±a": "Contraseña",
+    "contraseÃ±a": "contraseña",
+    "RecepciÃ³n": "Recepción",
+    "ConfiguraciÃ³n": "Configuración",
+    "dÃ­a": "día",
+    "PediatrÃ­a": "Pediatría",
+    "CardiologÃ­a": "Cardiología",
+    "DermatologÃ­a": "Dermatología",
+    "NeurologÃ­a": "Neurología",
+    "PÃ©rez": "Pérez",
+    "PÃºblico": "Público",
+    "MarÃ­a": "María",
+    "MuÃ±oz": "Muñoz",
+    "IbÃ¡Ã±ez": "Ibáñez",
+    "RÃ­os": "Ríos",
+    "cirugÃ­as": "cirugías",
+    "atenciÃ³n": "atención",
+    "corazÃ³n": "corazón",
+    "fÃ­sica": "física",
+    "DiagnÃ³stico": "Diagnóstico",
+    "MÃ­n.": "Mín.",
+}
 
 
 def db():
@@ -44,12 +80,25 @@ def verify_password(password, stored):
     return secrets.compare_digest(hash_password(password, salt), stored)
 
 
+def fix_text(value):
+    if isinstance(value, str):
+        for bad, good in MOJIBAKE_REPLACEMENTS.items():
+            value = value.replace(bad, good)
+        return value
+    if isinstance(value, list):
+        return [fix_text(v) for v in value]
+    if isinstance(value, dict):
+        return {k: fix_text(v) for k, v in value.items()}
+    return value
+
+
 def get_json_key(conn, key, default=None):
     row = conn.execute("select value from app_data where key = ?", (key,)).fetchone()
     return json.loads(row["value"]) if row else default
 
 
 def set_json_key(conn, key, value):
+    value = fix_text(value)
     conn.execute(
         "insert into app_data(key,value,updated_at) values(?,?,?) "
         "on conflict(key) do update set value=excluded.value, updated_at=excluded.updated_at",
@@ -115,8 +164,17 @@ def init_db():
                 if user.get("pass") and not user.get("passHash"):
                     user["passHash"] = hash_password(user.pop("pass"))
                     changed = True
+            fixed_users = fix_text(users)
+            if fixed_users != users:
+                users = fixed_users
+                changed = True
             if changed:
                 set_json_key(conn, "users", users)
+        for row in conn.execute("select key,value from app_data").fetchall():
+            value = json.loads(row["value"])
+            fixed_value = fix_text(value)
+            if fixed_value != value:
+                set_json_key(conn, row["key"], fixed_value)
         if not get_json_key(conn, "nextIds"):
             set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2})
 
