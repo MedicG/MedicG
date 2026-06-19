@@ -80,6 +80,10 @@ def verify_password(password, stored):
     return secrets.compare_digest(hash_password(password, salt), stored)
 
 
+def token_hash(token):
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def fix_text(value):
     if isinstance(value, str):
         for bad, good in MOJIBAKE_REPLACEMENTS.items():
@@ -143,6 +147,11 @@ def init_db():
             "id integer primary key autoincrement, ts text not null, user_id integer, "
             "email text, action text not null, data_key text, detail text)"
         )
+        conn.execute(
+            "create table if not exists sessions("
+            "token_hash text primary key, user_id integer not null, expires_at real not null, created_at text not null)"
+        )
+        conn.execute("delete from sessions where expires_at < ?", (time.time(),))
         users = get_json_key(conn, "users")
         if not users:
             users = [
@@ -214,10 +223,22 @@ def read_body(handler):
 
 def auth_user(handler):
     token = handler.headers.get("Authorization", "").replace("Bearer ", "").strip()
-    session = SESSIONS.get(token)
-    if not session or session["exp"] < time.time():
+    if not token:
         return None
-    return session["user"]
+    with db() as conn:
+        row = conn.execute(
+            "select user_id, expires_at from sessions where token_hash = ?",
+            (token_hash(token),),
+        ).fetchone()
+        if not row or row["expires_at"] < time.time():
+            if row:
+                conn.execute("delete from sessions where token_hash = ?", (token_hash(token),))
+            return None
+        users = get_json_key(conn, "users", [])
+    user = next((u for u in users if int(u.get("id", 0)) == int(row["user_id"])), None)
+    if not user or user.get("estado", "activo") != "activo":
+        return None
+    return user
 
 
 class MedicGHandler(SimpleHTTPRequestHandler):
@@ -263,18 +284,23 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not user or user.get("estado", "activo") != "activo" or not verify_password(password, user.get("passHash") or user.get("pass")):
                 return make_response(self, 401, {"error": "Correo o contraseña incorrectos"})
             token = secrets.token_urlsafe(32)
-            SESSIONS[token] = {"user": user, "exp": time.time() + 24 * 3600}
+            expires_at = time.time() + 24 * 3600
             with db() as conn:
+                conn.execute(
+                    "insert into sessions(token_hash,user_id,expires_at,created_at) values(?,?,?,?)",
+                    (token_hash(token), user["id"], expires_at, now_iso()),
+                )
                 audit(conn, user, "login", "session")
             return make_response(self, 200, {"token": token, "user": public_user(user)})
 
         if path == "/api/logout":
             token = self.headers.get("Authorization", "").replace("Bearer ", "").strip()
-            session = SESSIONS.get(token)
-            if session:
-                with db() as conn:
-                    audit(conn, session["user"], "logout", "session")
-            SESSIONS.pop(token, None)
+            user = auth_user(self)
+            with db() as conn:
+                if user:
+                    audit(conn, user, "logout", "session")
+                if token:
+                    conn.execute("delete from sessions where token_hash = ?", (token_hash(token),))
             return make_response(self, 200, {"ok": True})
 
         user = auth_user(self)

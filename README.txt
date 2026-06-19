@@ -36,6 +36,7 @@ Seguridad incluida
 - Solo el administrador puede abrir y cerrar caja; los movimientos se guardan en la caja abierta.
 - Gestion de quirofanos, disponibilidad de equipos especializados y stock quirurgico.
 - El backend valida sesion para cada guardado.
+- Las sesiones se guardan en SQLite; si el backend se reinicia, el usuario puede seguir guardando mientras el token no expire.
 - CORS se puede restringir con ALLOWED_ORIGINS.
 - Se agregan cabeceras de seguridad HTTP.
 - Se registra auditoria de login, logout, creacion de usuarios y guardado de datos.

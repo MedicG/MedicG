@@ -309,7 +309,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
     <div class="tb-title" id="tb-title">Dashboard</div>
     <div style="flex:1;"></div>
     <div class="text-xs text-muted" id="tb-date"></div>
-    <button class="btn-p btn-sm flex gap6" onclick="openM('m-cita')"><i class="ti ti-plus"></i>Nueva cita</button>
+    <button class="btn-p btn-sm flex gap6" onclick="openCitaModal()"><i class="ti ti-plus"></i>Nueva cita</button>
   </div>
 
   <div class="content">
@@ -349,7 +349,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
           <button class="btn-s btn-sm" onclick="nextW()"><i class="ti ti-chevron-right"></i></button>
           <button class="btn-s btn-sm" onclick="goToday()">Hoy</button>
           <div style="flex:1;"></div>
-          <button class="btn-p btn-sm flex gap6" onclick="openM('m-cita')"><i class="ti ti-plus"></i>Nueva cita</button>
+          <button class="btn-p btn-sm flex gap6" onclick="openCitaModal()"><i class="ti ti-plus"></i>Nueva cita</button>
         </div>
         <div class="card" style="overflow:hidden;">
           <div class="ag-hdr" id="ag-hdr"></div>
@@ -566,7 +566,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
   <div class="modal lg">
     <div class="modal-hdr"><i class="ti ti-calendar-plus" style="color:var(--primary);font-size:20px;"></i><span class="modal-title" id="m-cita-title">Nueva cita</span><button class="btn-ic" onclick="closeM('m-cita')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body">
-      <div class="form-row"><div class="field"><label class="field-lbl">Paciente <span class="req">*</span></label><select id="c-pac"></select></div><div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="c-esp" onchange="fillMeds()"></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl">Paciente <span class="req">*</span></label><div class="flex gap8"><select id="c-pac"></select><button type="button" class="btn-s btn-sm" style="white-space:nowrap;" onclick="openPacFromCita()"><i class="ti ti-user-plus"></i> Nuevo paciente</button></div></div><div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="c-esp" onchange="fillMeds()"></select></div></div>
       <div class="form-row"><div class="field"><label class="field-lbl">Médico <span class="req">*</span></label><select id="c-med"></select></div><div class="field"><label class="field-lbl">Tipo</label><select id="c-tipo"><option>Primera vez</option><option>Control</option><option>Seguimiento</option><option>Urgencia</option><option>Procedimiento</option></select></div></div>
       <div class="form-row"><div class="field"><label class="field-lbl">Fecha <span class="req">*</span></label><input type="date" id="c-fecha"/></div><div class="field"><label class="field-lbl">Hora <span class="req">*</span></label><select id="c-hora"></select></div></div>
       <div class="field"><label class="field-lbl">Motivo</label><textarea id="c-motivo" rows="2" placeholder="Describe el motivo..."></textarea></div>
@@ -1174,6 +1174,10 @@ function prevW(){weekOff--;renderWeek();}
 function nextW(){weekOff++;renderWeek();}
 function goToday(){weekOff=0;renderWeek();}
 
+function openCitaModal(){
+  openNewCita(today(),'08:00');
+}
+
 function openNewCita(fecha,hora){
   document.getElementById('c-edit-id').value='';
   document.getElementById('m-cita-title').textContent='Nueva cita';
@@ -1211,12 +1215,15 @@ function fillCitaSelects(){
   const horas=['07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
   document.getElementById('c-hora').innerHTML=horas.map(h=>`<option>${h}</option>`).join('');
   if(!document.getElementById('c-fecha').value) document.getElementById('c-fecha').value=today();
+  const espSel=document.getElementById('c-esp');
+  if(!espSel.value && espSel.options.length>1) espSel.selectedIndex=1;
+  fillMeds();
 }
 
 function fillMeds(){
   const esp=document.getElementById('c-esp').value;
   const meds=(DB.get('medicos')||[]).filter(m=>m.esp===esp);
-  document.getElementById('c-med').innerHTML=meds.length?meds.map(m=>`<option value="${m.id}">${m.nombre}</option>`).join(''):'<option>Sin médicos en esta especialidad</option>';
+  document.getElementById('c-med').innerHTML=meds.length?meds.map(m=>`<option value="${m.id}">${m.nombre}</option>`).join(''):'<option value="">Sin médicos en esta especialidad</option>';
 }
 
 function saveCita(){
@@ -1225,7 +1232,7 @@ function saveCita(){
   const med=document.getElementById('c-med').value;
   const fecha=document.getElementById('c-fecha').value;
   const hora=document.getElementById('c-hora').value;
-  if(!pac||!esp||!fecha){toast('Completa los campos obligatorios','err');return;}
+  if(!pac||!esp||!med||!fecha){toast('Completa paciente, especialidad, médico y fecha','err');return;}
   const editId=document.getElementById('c-edit-id').value;
   const citas=DB.get('citas')||[];
   const obj={pac:+pac,med:+med,esp,tipo:document.getElementById('c-tipo').value,fecha,hora,motivo:document.getElementById('c-motivo').value,estado:'Confirmada',notif:document.getElementById('c-notif').value};
@@ -1272,6 +1279,7 @@ function toggleEspFilter(e,on){if(on)filterEsps.add(e);else filterEsps.delete(e)
 // HCE
 // =========================================================
 let selPac=null;
+let returnToCitaAfterPac=false;
 
 function renderPatList(){
   const q=document.getElementById('hce-q')?.value.toLowerCase()||'';
@@ -1603,11 +1611,23 @@ function fillPacEspFilter(){
 }
 
 function openPacModal(){
+  returnToCitaAfterPac=false;
   document.getElementById('p-edit-id').value='';
   document.getElementById('m-pac-title').textContent='Registrar paciente';
   ['p-nombres','p-apellidos','p-cedula','p-tel','p-email','p-dir','p-alergias','p-antec'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('p-fnac').value='';
   fillPacModalSelects();openM('m-pac');
+}
+
+function openPacFromCita(){
+  returnToCitaAfterPac=true;
+  closeM('m-cita');
+  document.getElementById('p-edit-id').value='';
+  document.getElementById('m-pac-title').textContent='Registrar paciente para cita';
+  ['p-nombres','p-apellidos','p-cedula','p-tel','p-email','p-dir','p-alergias','p-antec'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('p-fnac').value='';
+  fillPacModalSelects();
+  openM('m-pac');
 }
 
 function editPacModal(id){
@@ -1648,11 +1668,17 @@ function savePac(){
   const obj={nombres,apellidos,cedula,fnac:document.getElementById('p-fnac').value,genero:document.getElementById('p-genero').value,tel:document.getElementById('p-tel').value,email:document.getElementById('p-email').value,dir:document.getElementById('p-dir').value,esp:document.getElementById('p-esp').value,seguro:document.getElementById('p-seg').value,sangre:document.getElementById('p-sangre').value,alergias:document.getElementById('p-alergias').value,antec:document.getElementById('p-antec').value,ultima:today()};
   const editId=document.getElementById('p-edit-id').value;
   const pacs=DB.get('pacientes')||[];
+  let newId=null;
   if(editId){const i=pacs.findIndex(x=>x.id===+editId);if(i>=0)pacs[i]={...pacs[i],...obj};}
-  else{obj.id=DB.nextId('pac');pacs.push(obj);}
+  else{obj.id=DB.nextId('pac');newId=obj.id;pacs.push(obj);}
   DB.set('pacientes',pacs);
   closeM('m-pac');toast(editId?'Paciente actualizado':'Paciente registrado exitosamente','ok');
   renderPacs();initDashboard();
+  if(returnToCitaAfterPac){
+    returnToCitaAfterPac=false;
+    openCitaModal();
+    setTimeout(()=>{document.getElementById('c-pac').value=newId||'';},50);
+  }
 }
 
 function deletePac(id){
