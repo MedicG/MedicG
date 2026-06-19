@@ -20,7 +20,8 @@ Uso web / hosting
 
 Uso con GitHub Pages
 - GitHub Pages NO ejecuta Python ni SQLite. Solo sirve archivos estáticos.
-- Si subes todo a GitHub, la pantalla cargará, pero el login fallará si no existe un backend.
+- Si config.js queda vacío, el sistema funcionará en modo local del navegador.
+- En modo local el login funciona, pero los datos no son compartidos entre equipos.
 - Solución recomendada:
   1. Sube server.py a Render, Railway o un VPS.
   2. Copia la URL pública del backend, por ejemplo:
@@ -29,6 +30,7 @@ Uso con GitHub Pages
      window.MEDICG_API_BASE = "https://medicg-tu-cliente.onrender.com";
   4. Sube index.html y config.js a GitHub Pages.
 - Si frontend y backend están juntos en el mismo hosting, deja config.js vacío.
+- Revisa PASOS_GITHUB_RENDER.txt para una guía rápida con Render.
 
 Variables de entorno recomendadas
 - PORT: puerto asignado por el hosting.

@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: medicg-backend
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python server.py
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: ADMIN_EMAIL
+        value: admin@medicg.com
+      - key: ADMIN_PASSWORD
+        value: Admin123
+      - key: MEDICG_DB_PATH
+        value: /tmp/medicg.sqlite3

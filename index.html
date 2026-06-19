@@ -106,9 +106,6 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 .auth-right{flex:1;padding:48px 44px;display:flex;flex-direction:column;justify-content:center;}
 .auth-title{font-size:22px;font-weight:700;margin-bottom:4px;}
 .auth-sub{font-size:13px;color:var(--text3);margin-bottom:28px;}
-.auth-toggle{display:flex;gap:8px;margin-bottom:24px;}
-.auth-toggle button{flex:1;padding:10px;border-radius:var(--radius);font-size:13px;font-weight:500;background:var(--gray-lt);color:var(--text2);border:1.5px solid var(--gray-bd);}
-.auth-toggle button.active{background:var(--primary);color:#fff;border-color:var(--primary);}
 .auth-footer{margin-top:14px;font-size:11px;color:var(--text3);text-align:center;}
 
 /* ===== APP ===== */
@@ -232,13 +229,9 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
       </div>
       <div class="text-xs" style="opacity:.45;margin-top:24px;">© 2025 Medic G · Todos los derechos reservados</div>
     </div>
-    <div class="auth-right">
+      <div class="auth-right">
       <div class="auth-title" id="auth-title">Bienvenido de vuelta</div>
       <div class="auth-sub" id="auth-sub">Inicia sesión para continuar</div>
-      <div class="auth-toggle">
-        <button class="active" id="btn-login" onclick="switchAuth('login')">Iniciar sesión</button>
-        
-      </div>
 
       <!-- LOGIN FORM -->
       <div id="login-form">
@@ -246,7 +239,6 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
         <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="••••••••" value="Admin123"/></div>
         <div id="login-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
         <button class="btn-p w100" onclick="doLogin()"><i class="ti ti-login" style="font-size:16px;"></i> Ingresar al sistema</button>
-        <div class="auth-footer mt8">Usuario inicial: admin@medicg.com / Admin123<br/>Solo el administrador puede crear nuevos usuarios.</div>
       </div>
 
       <!-- REGISTER FORM -->
@@ -696,6 +688,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 const API = {
   base:(window.MEDICG_API_BASE || '').replace(/\/$/,''),
   token: localStorage.getItem('mg_token') || '',
+  get localMode(){return !this.base;},
   async req(path, opts={}){
     const headers = {'Content-Type':'application/json'};
     if(this.token) headers.Authorization = 'Bearer '+this.token;
@@ -705,9 +698,6 @@ const API = {
       if(!res.ok) throw new Error(data.error || 'Error de servidor');
       return data;
     }catch(err){
-      if(location.hostname.endsWith('github.io') && !this.base){
-        throw new Error('Backend no configurado. GitHub Pages solo publica la pantalla; configura config.js con la URL del servidor.');
-      }
       throw new Error(err.message || 'No se pudo conectar con el servidor');
     }
   },
@@ -740,6 +730,7 @@ const DB = {
   get(k){return this.cache[k] ?? null;},
   set(k,v){
     this.cache[k]=v;
+    if(API.localMode){localStorage.setItem('mg_'+k,JSON.stringify(v));return;}
     if(!API.token) return;
     clearTimeout(this.saveTimers[k]);
     this.saveTimers[k]=setTimeout(()=>{
@@ -747,6 +738,11 @@ const DB = {
     },120);
   },
   load(data){this.cache=data||{};},
+  loadLocal(){
+    ['users','especialidades','seguros','pacientes','medicos','citas','facturas','notas','config','cajas','nextIds'].forEach(k=>{
+      try{const v=JSON.parse(localStorage.getItem('mg_'+k));if(v!==null)this.cache[k]=v;}catch{}
+    });
+  },
   init(){
     if(!this.get('users')){
       this.set('users',[{id:1,name:'Admin',last:'Sistema',email:'admin@medicg.com',pass:'Admin123',rol:'admin',createdAt:now()}]);
@@ -823,7 +819,7 @@ let currentUser = null;
 function switchAuth(mode){
   document.getElementById('login-form').classList.toggle('hidden', mode!=='login');
   document.getElementById('register-form').classList.toggle('hidden', mode!=='register');
-  document.getElementById('btn-login').classList.toggle('active', mode==='login');
+  document.getElementById('btn-login')?.classList.toggle('active', mode==='login');
   document.getElementById('btn-register')?.classList.toggle('active', mode==='register');
   document.getElementById('auth-title').textContent = mode==='login'?'Bienvenido de vuelta':'Crear cuenta nueva';
   document.getElementById('auth-sub').textContent = mode==='login'?'Inicia sesión para continuar':'Registra tu acceso al sistema';
@@ -833,6 +829,19 @@ async function doLogin(){
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
   try{
+    if(API.localMode){
+      DB.loadLocal();
+      DB.init();
+      const users=DB.get('users')||[];
+      const u=users.find(x=>x.email.toLowerCase()===email.toLowerCase()&&(x.pass===pass || x.password===pass));
+      if(!u) throw new Error('Correo o contraseña incorrectos');
+      currentUser=u;
+      API.token='local';
+      localStorage.setItem('mg_token','local');
+      localStorage.setItem('mg_session',JSON.stringify({userId:u.id,ts:Date.now()}));
+      launchApp();
+      return;
+    }
     const auth = await API.post('/api/login',{email,password:pass});
     API.token = auth.token;
     localStorage.setItem('mg_token',auth.token);
@@ -857,8 +866,9 @@ function showAuthErr(type,msg){
 }
 
 function doLogout(){
-  API.post('/api/logout',{}).catch(()=>{});
+  if(!API.localMode) API.post('/api/logout',{}).catch(()=>{});
   localStorage.removeItem('mg_token');
+  localStorage.removeItem('mg_session');
   API.token='';currentUser=null;DB.cache={};
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -1817,6 +1827,18 @@ async function createSystemUser(){
     rol:document.getElementById('u-rol').value
   };
   try{
+    if(API.localMode){
+      if(!payload.name||!payload.last||!payload.email||payload.password.length<6){throw new Error('Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres');}
+      const users=DB.get('users')||[];
+      if(users.find(u=>u.email.toLowerCase()===payload.email.toLowerCase())) throw new Error('Este correo ya está registrado');
+      const newUser={id:DB.nextId('user'),name:payload.name,last:payload.last,email:payload.email,pass:payload.password,rol:payload.rol,estado:'activo',createdAt:now()};
+      users.push(newUser);
+      DB.set('users',users);
+      ['u-name','u-last','u-email','u-pass'].forEach(id=>document.getElementById(id).value='');
+      loadConfig();
+      toast('Usuario creado correctamente','ok');
+      return;
+    }
     const res=await API.post('/api/users',payload);
     const users=DB.get('users')||[];
     users.push(res.user);
@@ -1846,6 +1868,16 @@ function saveCfg(){
 // =========================================================
 async function initSession(){
   repairMojibakeText();
+  if(API.localMode){
+    DB.loadLocal();
+    DB.init();
+    const sess=JSON.parse(localStorage.getItem('mg_session')||'null');
+    if(sess){
+      const u=(DB.get('users')||[]).find(x=>x.id===sess.userId);
+      if(u&&(Date.now()-sess.ts<24*3600*1000)){API.token='local';currentUser=u;launchApp();}
+    }
+    return;
+  }
   if(!API.token) return;
   try{
     const loaded=await API.get('/api/data');

@@ -1,0 +1,43 @@
+Por qué sale el error
+GitHub Pages solo publica archivos estáticos: HTML, CSS, JS e imágenes.
+No ejecuta Python, no abre SQLite y no responde rutas /api/login.
+
+Ahora el sistema puede funcionar de dos formas:
+
+Opción A: GitHub Pages sin backend
+- Deja config.js así:
+  window.MEDICG_API_BASE = "";
+- El login funcionará con admin@medicg.com / Admin123.
+- Los datos se guardarán en el navegador de cada equipo.
+- Esta opción sirve para demostración o uso en un solo equipo.
+
+Opción B: GitHub Pages + backend real
+- Frontend en GitHub Pages: index.html + config.js.
+- Backend en Render, Railway o VPS: server.py + base SQLite.
+- Esta opción sirve para varios usuarios y datos compartidos.
+
+Pasos rápidos con Render
+1. Entra a https://render.com y crea una cuenta.
+2. Crea un nuevo "Web Service".
+3. Conecta el repositorio donde subiste estos archivos.
+4. Usa:
+   Build Command: vacío
+   Start Command: python server.py
+5. En Environment Variables agrega:
+   HOST=0.0.0.0
+   ADMIN_EMAIL=admin@medicg.com
+   ADMIN_PASSWORD=Admin123
+   MEDICG_DB_PATH=/tmp/medicg.sqlite3
+6. Render te dará una URL parecida a:
+   https://medicg-backend.onrender.com
+7. Edita config.js en GitHub y cambia:
+   window.MEDICG_API_BASE = "";
+   por:
+   window.MEDICG_API_BASE = "https://medicg-backend.onrender.com";
+8. Espera 1 o 2 minutos a que GitHub Pages actualice.
+9. Abre la página otra vez e inicia sesión.
+
+Importante
+- Si usas /tmp/medicg.sqlite3 en Render gratis, la base puede borrarse cuando Render reinicie.
+- Para un cliente real conviene usar un VPS o una base persistente.
+- Cambia ADMIN_PASSWORD antes de entregar el sistema.
