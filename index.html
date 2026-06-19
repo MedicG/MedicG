@@ -689,7 +689,6 @@ const API = {
   base:(window.MEDICG_API_BASE || '').replace(/\/$/,''),
   requireBackend: window.MEDICG_REQUIRE_BACKEND !== false,
   token: localStorage.getItem('mg_token') || '',
-  get localMode(){return !this.base && !this.requireBackend;},
   get missingBackend(){return !this.base && this.requireBackend && (location.hostname.endsWith('github.io') || location.protocol === 'file:');},
   async req(path, opts={}){
     if(this.missingBackend && path.startsWith('/api/')){
@@ -750,7 +749,6 @@ const DB = {
   set(k,v){
     v=normalizeData(v);
     this.cache[k]=v;
-    if(API.localMode){localStorage.setItem('mg_'+k,JSON.stringify(v));return;}
     if(!API.token){toast('No hay sesión activa para guardar en la base de datos','err');return;}
     clearTimeout(this.saveTimers[k]);
     this.saveTimers[k]=setTimeout(()=>{
@@ -758,11 +756,6 @@ const DB = {
     },120);
   },
   load(data){this.cache=normalizeData(data||{});},
-  loadLocal(){
-    ['users','especialidades','seguros','pacientes','medicos','citas','facturas','notas','config','cajas','nextIds'].forEach(k=>{
-      try{const v=JSON.parse(localStorage.getItem('mg_'+k));if(v!==null)this.cache[k]=v;}catch{}
-    });
-  },
   init(){
     if(!this.get('users')){
       this.set('users',[{id:1,name:'Admin',last:'Sistema',email:'admin@medicg.com',pass:'Admin123',rol:'admin',createdAt:now()}]);
@@ -849,19 +842,6 @@ async function doLogin(){
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
   try{
-    if(API.localMode){
-      DB.loadLocal();
-      DB.init();
-      const users=DB.get('users')||[];
-      const u=users.find(x=>x.email.toLowerCase()===email.toLowerCase()&&(x.pass===pass || x.password===pass));
-      if(!u) throw new Error('Correo o contraseña incorrectos');
-      currentUser=u;
-      API.token='local';
-      localStorage.setItem('mg_token','local');
-      localStorage.setItem('mg_session',JSON.stringify({userId:u.id,ts:Date.now()}));
-      launchApp();
-      return;
-    }
     const auth = await API.post('/api/login',{email,password:pass});
     API.token = auth.token;
     localStorage.setItem('mg_token',auth.token);
@@ -886,9 +866,8 @@ function showAuthErr(type,msg){
 }
 
 function doLogout(){
-  if(!API.localMode) API.post('/api/logout',{}).catch(()=>{});
+  API.post('/api/logout',{}).catch(()=>{});
   localStorage.removeItem('mg_token');
-  localStorage.removeItem('mg_session');
   API.token='';currentUser=null;DB.cache={};
   document.getElementById('app-screen').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -1847,18 +1826,6 @@ async function createSystemUser(){
     rol:document.getElementById('u-rol').value
   };
   try{
-    if(API.localMode){
-      if(!payload.name||!payload.last||!payload.email||payload.password.length<6){throw new Error('Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres');}
-      const users=DB.get('users')||[];
-      if(users.find(u=>u.email.toLowerCase()===payload.email.toLowerCase())) throw new Error('Este correo ya está registrado');
-      const newUser={id:DB.nextId('user'),name:payload.name,last:payload.last,email:payload.email,pass:payload.password,rol:payload.rol,estado:'activo',createdAt:now()};
-      users.push(newUser);
-      DB.set('users',users);
-      ['u-name','u-last','u-email','u-pass'].forEach(id=>document.getElementById(id).value='');
-      loadConfig();
-      toast('Usuario creado correctamente','ok');
-      return;
-    }
     const res=await API.post('/api/users',payload);
     const users=DB.get('users')||[];
     users.push(res.user);
@@ -1888,16 +1855,6 @@ function saveCfg(){
 // =========================================================
 async function initSession(){
   repairMojibakeText();
-  if(API.localMode){
-    DB.loadLocal();
-    DB.init();
-    const sess=JSON.parse(localStorage.getItem('mg_session')||'null');
-    if(sess){
-      const u=(DB.get('users')||[]).find(x=>x.id===sess.userId);
-      if(u&&(Date.now()-sess.ts<24*3600*1000)){API.token='local';currentUser=u;launchApp();}
-    }
-    return;
-  }
   if(!API.token) return;
   try{
     const loaded=await API.get('/api/data');
