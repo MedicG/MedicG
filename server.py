@@ -175,8 +175,17 @@ def init_db():
             fixed_value = fix_text(value)
             if fixed_value != value:
                 set_json_key(conn, row["key"], fixed_value)
-        if not get_json_key(conn, "nextIds"):
-            set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2})
+        next_ids = get_json_key(conn, "nextIds")
+        if not next_ids:
+            set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2, "qx": 3, "eq": 3, "st": 3, "caja": 1})
+        else:
+            changed_ids = False
+            for key, value in {"qx": 3, "eq": 3, "st": 3, "caja": 1}.items():
+                if key not in next_ids:
+                    next_ids[key] = value
+                    changed_ids = True
+            if changed_ids:
+                set_json_key(conn, "nextIds", next_ids)
 
 
 def make_response(handler, status, payload):

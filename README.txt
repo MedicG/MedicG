@@ -33,6 +33,8 @@ Seguridad incluida
 - Las contrasenas se guardan con hash PBKDF2, no en texto plano.
 - El registro publico esta desactivado.
 - Solo el administrador puede crear usuarios desde Configuracion > Usuarios del sistema.
+- Solo el administrador puede abrir y cerrar caja; los movimientos se guardan en la caja abierta.
+- Gestion de quirofanos, disponibilidad de equipos especializados y stock quirurgico.
 - El backend valida sesion para cada guardado.
 - CORS se puede restringir con ALLOWED_ORIGINS.
 - Se agregan cabeceras de seguridad HTTP.

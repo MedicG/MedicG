@@ -287,7 +287,8 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
     <div class="nav-item" onclick="showMod('medicos',this)"><i class="ti ti-stethoscope"></i>Médicos</div>
     <div class="nav-item" onclick="showMod('especialidades',this)"><i class="ti ti-clipboard-list"></i>Especialidades</div>
     <div class="nav-item" onclick="showMod('seguros',this)"><i class="ti ti-shield-check"></i>Seguros</div>
-    <div class="nav-item" onclick="showMod('caja',this)"><i class="ti ti-cash"></i>Caja del día</div>
+    <div class="nav-item" onclick="showMod('quirofanos',this)"><i class="ti ti-activity-heartbeat"></i>Quirófanos</div>
+    <div class="nav-item" onclick="showMod('caja',this)"><i class="ti ti-cash"></i>Caja</div>
     <div class="sb-sep"></div>
     <div class="nav-item" onclick="showMod('config',this)"><i class="ti ti-settings"></i>Configuración</div>
     <div class="nav-item" onclick="doLogout()"><i class="ti ti-logout"></i>Cerrar sesión</div>
@@ -448,6 +449,41 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
   <div id="mod-seguros" class="module">
     <div class="flex gap8 mb16"><span class="fw6 text-md" style="flex:1;">Convenios con seguros médicos</span><button class="btn-p btn-sm flex gap6" onclick="openSegModal()"><i class="ti ti-plus"></i>Nuevo convenio</button></div>
     <div class="card"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Aseguradora</th><th>Tipo</th><th>Copago</th><th>Cobertura</th><th>Contacto</th><th>Estado</th><th></th></tr></thead><tbody id="seg-tbody"></tbody></table></div></div>
+  </div>
+
+  <!-- QUIRÓFANOS -->
+  <div id="mod-quirofanos" class="module">
+    <div class="grid3">
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-door" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Gestión de quirófanos</span></div>
+        <div class="card-body">
+          <div class="form-row c1">
+            <div class="field"><label class="field-lbl">Nombre</label><input id="qx-nombre" placeholder="Quirófano 1"/></div>
+            <div class="field"><label class="field-lbl">Estado</label><select id="qx-estado"><option>Disponible</option><option>Ocupado</option><option>Limpieza</option><option>Mantenimiento</option></select></div>
+          </div>
+          <button class="btn-p btn-sm" onclick="addQuirofano()"><i class="ti ti-plus"></i> Agregar quirófano</button>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Quirófano</th><th>Estado</th><th></th></tr></thead><tbody id="qx-tbody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-device-heart-monitor" style="color:var(--secondary);font-size:18px;"></i><span class="card-title">Equipos especializados</span></div>
+        <div class="card-body">
+          <div class="field"><label class="field-lbl">Equipo</label><input id="eq-nombre" placeholder="Torre laparoscópica"/></div>
+          <div class="field"><label class="field-lbl">Disponibilidad</label><select id="eq-estado"><option>Disponible</option><option>En uso</option><option>Mantenimiento</option><option>Fuera de servicio</option></select></div>
+          <button class="btn-p btn-sm" onclick="addEquipo()"><i class="ti ti-plus"></i> Agregar equipo</button>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Equipo</th><th>Estado</th><th></th></tr></thead><tbody id="eq-tbody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-packages" style="color:var(--accent);font-size:18px;"></i><span class="card-title">Stock quirúrgico</span></div>
+        <div class="card-body">
+          <div class="field"><label class="field-lbl">Material</label><input id="st-nombre" placeholder="Guantes estériles"/></div>
+          <div class="form-row"><div class="field"><label class="field-lbl">Cantidad</label><input id="st-cant" type="number" value="0"/></div><div class="field"><label class="field-lbl">Mínimo</label><input id="st-min" type="number" value="5"/></div></div>
+          <button class="btn-p btn-sm" onclick="addStock()"><i class="ti ti-plus"></i> Agregar material</button>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Material</th><th>Cant.</th><th>Mín.</th><th>Estado</th><th></th></tr></thead><tbody id="st-tbody"></tbody></table></div>
+      </div>
+    </div>
   </div>
 
   <!-- CAJA -->
@@ -810,7 +846,15 @@ const DB = {
     if(!this.get('notas')) this.set('notas',{});
     if(!this.get('config')) this.set('config',{nombre:'Centro de Especialidades Medic G',ruc:'1790123456001',dir:'Av. 6 de Diciembre N34-156, Quito',tel:'02-234-5678',wa:'0991234567',email:'admin@medicg.com',color:'#1B4F8A',remind:'24 horas antes',tpl:'Estimado/a {{nombre}}, tiene cita con {{medico}} el {{fecha}} a las {{hora}}.'});
     if(!this.get('cajas')) this.set('cajas',[]);
-    if(!this.get('nextIds')) this.set('nextIds',{pac:6,med:5,cita:6,fac:1845,esp:7,seg:5,user:2});
+    if(!this.get('quirofanos')) this.set('quirofanos',[{id:1,nombre:'Quirófano 1',estado:'Disponible'},{id:2,nombre:'Quirófano 2',estado:'Limpieza'}]);
+    if(!this.get('equipos')) this.set('equipos',[{id:1,nombre:'Torre laparoscópica',estado:'Disponible'},{id:2,nombre:'Monitor multiparámetro',estado:'Disponible'}]);
+    if(!this.get('stockQx')) this.set('stockQx',[{id:1,nombre:'Guantes estériles',cantidad:40,minimo:20},{id:2,nombre:'Suturas 3-0',cantidad:8,minimo:10}]);
+    if(!this.get('nextIds')) this.set('nextIds',{pac:6,med:5,cita:6,fac:1845,esp:7,seg:5,user:2,qx:3,eq:3,st:3,caja:1});
+    else{
+      const ids=this.get('nextIds');
+      Object.assign(ids,{qx:ids.qx||3,eq:ids.eq||3,st:ids.st||3,caja:ids.caja||1});
+      this.set('nextIds',ids);
+    }
   },
   nextId(k){const ids=this.get('nextIds');const n=ids[k]||1;ids[k]=n+1;this.set('nextIds',ids);return n;},
 };
@@ -916,9 +960,9 @@ function showMod(id,el){
   const mod=document.getElementById('mod-'+id);
   if(mod) mod.classList.add('active');
   if(el) el.classList.add('active');
-  const titles={dashboard:'Dashboard',agenda:'Agenda centralizada',hce:'Historia Clínica Electrónica',facturacion:'Facturación — SRI Ecuador',reportes:'Reportes y estadísticas',pacientes:'Gestión de pacientes',medicos:'Médicos y especialidades',especialidades:'Especialidades médicas',seguros:'Convenios con seguros',caja:'Caja del día',config:'Configuración del sistema'};
+  const titles={dashboard:'Dashboard',agenda:'Agenda centralizada',hce:'Historia Clínica Electrónica',facturacion:'Facturación — SRI Ecuador',reportes:'Reportes y estadísticas',pacientes:'Gestión de pacientes',medicos:'Médicos y especialidades',especialidades:'Especialidades médicas',seguros:'Convenios con seguros',quirofanos:'Gestión quirúrgica',caja:'Caja',config:'Configuración del sistema'};
   document.getElementById('tb-title').textContent=titles[id]||id;
-  const renderers={dashboard:initDashboard,agenda:initAgenda,hce:()=>renderPatList(),facturacion:()=>{renderFacStats();renderFacs();},reportes:renderReportes,pacientes:renderPacs,medicos:renderMeds,especialidades:renderEsps,seguros:renderSegs,caja:renderCaja,config:loadConfig};
+  const renderers={dashboard:initDashboard,agenda:initAgenda,hce:()=>renderPatList(),facturacion:()=>{renderFacStats();renderFacs();},reportes:renderReportes,pacientes:renderPacs,medicos:renderMeds,especialidades:renderEsps,seguros:renderSegs,quirofanos:renderQuirofanos,caja:renderCaja,config:loadConfig};
   if(renderers[id]) renderers[id]();
 }
 
@@ -1378,7 +1422,7 @@ function saveFactura(){
   renderFacs();renderFacStats();
 
   // Agregar a caja si está abierta
-  const cajas=DB.get('cajas')||[];const cajahoy=cajas.find(c=>c.fecha===today()&&c.estado==='abierta');
+  const cajas=DB.get('cajas')||[];const cajahoy=cajas.find(c=>c.estado==='abierta');
   if(cajahoy){cajahoy.movimientos=cajahoy.movimientos||[];cajahoy.movimientos.push({hora:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),pac:getPacName(+pac),concepto:f.serv,monto:total,pago:f.pago});DB.set('cajas',cajas);}
 }
 
@@ -1669,22 +1713,71 @@ function deleteSeg(id){
 }
 
 // =========================================================
-// CAJA DEL DÍA
+// QUIRÓFANOS / EQUIPOS / STOCK
+// =========================================================
+function badgeEstadoQx(estado){
+  const cls=estado==='Disponible'?'b-green':estado==='Ocupado'||estado==='En uso'?'b-amber':estado==='Limpieza'?'b-blue':'b-red';
+  return `<span class="badge ${cls}">${estado}</span>`;
+}
+
+function renderQuirofanos(){
+  const qx=DB.get('quirofanos')||[];
+  const eq=DB.get('equipos')||[];
+  const st=DB.get('stockQx')||[];
+  document.getElementById('qx-tbody').innerHTML=qx.map(q=>`<tr><td class="fw5">${q.nombre}</td><td>${badgeEstadoQx(q.estado)}</td><td class="text-r"><select onchange="setQuirofanoEstado(${q.id},this.value)" style="width:140px;"><option ${q.estado==='Disponible'?'selected':''}>Disponible</option><option ${q.estado==='Ocupado'?'selected':''}>Ocupado</option><option ${q.estado==='Limpieza'?'selected':''}>Limpieza</option><option ${q.estado==='Mantenimiento'?'selected':''}>Mantenimiento</option></select><button class="btn-ic" onclick="deleteQuirofano(${q.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')||'<tr><td colspan="3" class="text-c text-muted">Sin quirófanos registrados</td></tr>';
+  document.getElementById('eq-tbody').innerHTML=eq.map(e=>`<tr><td class="fw5">${e.nombre}</td><td>${badgeEstadoQx(e.estado)}</td><td class="text-r"><select onchange="setEquipoEstado(${e.id},this.value)" style="width:150px;"><option ${e.estado==='Disponible'?'selected':''}>Disponible</option><option ${e.estado==='En uso'?'selected':''}>En uso</option><option ${e.estado==='Mantenimiento'?'selected':''}>Mantenimiento</option><option ${e.estado==='Fuera de servicio'?'selected':''}>Fuera de servicio</option></select><button class="btn-ic" onclick="deleteEquipo(${e.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')||'<tr><td colspan="3" class="text-c text-muted">Sin equipos registrados</td></tr>';
+  document.getElementById('st-tbody').innerHTML=st.map(s=>`<tr><td class="fw5">${s.nombre}</td><td><input type="number" value="${s.cantidad}" onchange="setStockCantidad(${s.id},this.value)" style="width:76px;"/></td><td>${s.minimo}</td><td>${(+s.cantidad)<= (+s.minimo)?'<span class="badge b-red">Bajo stock</span>':'<span class="badge b-green">OK</span>'}</td><td class="text-r"><button class="btn-ic" onclick="deleteStock(${s.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')||'<tr><td colspan="5" class="text-c text-muted">Sin material registrado</td></tr>';
+}
+
+function addQuirofano(){
+  const nombre=document.getElementById('qx-nombre').value.trim();
+  const estado=document.getElementById('qx-estado').value;
+  if(!nombre){toast('Ingresa el nombre del quirófano','err');return;}
+  const qx=DB.get('quirofanos')||[];qx.push({id:DB.nextId('qx'),nombre,estado});DB.set('quirofanos',qx);
+  document.getElementById('qx-nombre').value='';toast('Quirófano guardado','ok');renderQuirofanos();
+}
+function setQuirofanoEstado(id,estado){const qx=DB.get('quirofanos')||[];const q=qx.find(x=>x.id===id);if(q){q.estado=estado;DB.set('quirofanos',qx);toast('Estado de quirófano actualizado','ok');renderQuirofanos();}}
+function deleteQuirofano(id){confirmDelete('¿Eliminar quirófano?',()=>{DB.set('quirofanos',(DB.get('quirofanos')||[]).filter(x=>x.id!==id));renderQuirofanos();toast('Quirófano eliminado','ok');});}
+
+function addEquipo(){
+  const nombre=document.getElementById('eq-nombre').value.trim();
+  const estado=document.getElementById('eq-estado').value;
+  if(!nombre){toast('Ingresa el nombre del equipo','err');return;}
+  const eq=DB.get('equipos')||[];eq.push({id:DB.nextId('eq'),nombre,estado});DB.set('equipos',eq);
+  document.getElementById('eq-nombre').value='';toast('Equipo guardado','ok');renderQuirofanos();
+}
+function setEquipoEstado(id,estado){const eq=DB.get('equipos')||[];const e=eq.find(x=>x.id===id);if(e){e.estado=estado;DB.set('equipos',eq);toast('Disponibilidad actualizada','ok');renderQuirofanos();}}
+function deleteEquipo(id){confirmDelete('¿Eliminar equipo?',()=>{DB.set('equipos',(DB.get('equipos')||[]).filter(x=>x.id!==id));renderQuirofanos();toast('Equipo eliminado','ok');});}
+
+function addStock(){
+  const nombre=document.getElementById('st-nombre').value.trim();
+  const cantidad=+(document.getElementById('st-cant').value||0);
+  const minimo=+(document.getElementById('st-min').value||0);
+  if(!nombre){toast('Ingresa el material quirúrgico','err');return;}
+  const st=DB.get('stockQx')||[];st.push({id:DB.nextId('st'),nombre,cantidad,minimo});DB.set('stockQx',st);
+  document.getElementById('st-nombre').value='';document.getElementById('st-cant').value=0;toast('Material guardado','ok');renderQuirofanos();
+}
+function setStockCantidad(id,cantidad){const st=DB.get('stockQx')||[];const s=st.find(x=>x.id===id);if(s){s.cantidad=+cantidad||0;DB.set('stockQx',st);toast('Stock actualizado','ok');renderQuirofanos();}}
+function deleteStock(id){confirmDelete('¿Eliminar material del stock?',()=>{DB.set('stockQx',(DB.get('stockQx')||[]).filter(x=>x.id!==id));renderQuirofanos();toast('Material eliminado','ok');});}
+
+// =========================================================
+// CAJA
 // =========================================================
 function renderCaja(){
   const cajas=DB.get('cajas')||[];
-  const hoy=today();
-  const cajaHoy=cajas.find(c=>c.fecha===hoy);
+  const cajaAbierta=cajas.find(c=>c.estado==='abierta');
+  const ultimaCaja=[...cajas].reverse().find(c=>c.estado==='cerrada');
+  const cajaHoy=cajaAbierta;
   const pacs=DB.get('pacientes')||[];
 
-  if(!cajaHoy||cajaHoy.estado==='cerrada'){
+  if(!cajaHoy){
     document.getElementById('caja-content').innerHTML=`
       <div class="caja-closed">
         <i class="ti ti-lock" style="font-size:64px;color:var(--text3);display:block;margin-bottom:16px;"></i>
-        <div class="fw7 text-md mb8">${cajaHoy?.estado==='cerrada'?'Caja cerrada':'Caja no abierta'}</div>
-        <div class="text-sm text-muted mb16">${cajaHoy?.estado==='cerrada'?`Caja del día ${fmtDate(hoy)} cerrada a las ${cajaHoy.horaCierre||'—'}<br>Total: ${fmtMoney(cajaHoy.movimientos?.reduce((a,m)=>a+m.monto,0)||0)}`:`Abre la caja para registrar movimientos del día ${fmtDate(hoy)}`}</div>
-        ${!cajaHoy||cajaHoy.estado==='cerrada'?`<button class="btn-g" onclick="abrirCaja()"><i class="ti ti-lock-open"></i> Abrir caja del día</button>`:''}
-        ${cajaHoy?.estado==='cerrada'&&cajaHoy.movimientos?.length?`<div class="card mt16" style="max-width:600px;margin:16px auto 0;text-align:left;"><div class="card-hdr"><span class="card-title">Resumen del día</span></div><div class="card-body"><table class="tbl"><thead><tr><th>Hora</th><th>Paciente</th><th>Concepto</th><th>Monto</th><th>Método</th></tr></thead><tbody>${cajaHoy.movimientos.map(m=>`<tr><td>${m.hora}</td><td>${m.pac}</td><td>${m.concepto}</td><td class="fw6" style="color:var(--green);">${fmtMoney(m.monto)}</td><td>${m.pago}</td></tr>`).join('')}</tbody></table></div></div>`:''}
+        <div class="fw7 text-md mb8">Caja no abierta</div>
+        <div class="text-sm text-muted mb16">El administrador puede abrir caja cuando lo necesite para registrar movimientos.</div>
+        ${currentUser?.rol==='admin'?`<button class="btn-g" onclick="abrirCaja()"><i class="ti ti-lock-open"></i> Abrir caja</button>`:'<div class="alert alert-w" style="max-width:420px;margin:0 auto;"><i class="ti ti-alert-circle"></i><span>Solo el administrador puede abrir caja.</span></div>'}
+        ${ultimaCaja?.movimientos?.length?`<div class="card mt16" style="max-width:700px;margin:16px auto 0;text-align:left;"><div class="card-hdr"><span class="card-title">Última caja cerrada · ${fmtDate(ultimaCaja.fecha)} ${ultimaCaja.horaCierre||''}</span></div><div class="card-body"><div class="fw6 mb8">Total: ${fmtMoney(ultimaCaja.movimientos.reduce((a,m)=>a+m.monto,0)||0)}</div><table class="tbl"><thead><tr><th>Hora</th><th>Paciente</th><th>Concepto</th><th>Monto</th><th>Método</th></tr></thead><tbody>${ultimaCaja.movimientos.map(m=>`<tr><td>${m.hora}</td><td>${m.pac}</td><td>${m.concepto}</td><td class="fw6" style="color:var(--green);">${fmtMoney(m.monto)}</td><td>${m.pago}</td></tr>`).join('')}</tbody></table></div></div>`:''}
       </div>`;
     return;
   }
@@ -1697,7 +1790,7 @@ function renderCaja(){
   const totalDia=movs.reduce((a,m)=>a+m.monto,0);
 
   document.getElementById('caja-content').innerHTML=`
-    <div class="caja-status-bar caja-open"><i class="ti ti-lock-open" style="font-size:18px;"></i><strong>Caja abierta</strong> · ${fmtDate(hoy)} desde las ${cajaHoy.horaApertura||'—'} · Cajero: ${currentUser.name} ${currentUser.last}</div>
+    <div class="caja-status-bar caja-open"><i class="ti ti-lock-open" style="font-size:18px;"></i><strong>Caja abierta</strong> · ${fmtDate(cajaHoy.fecha)} desde las ${cajaHoy.horaApertura||'—'} · Apertura: ${cajaHoy.cajero||'—'}</div>
     <div class="grid2">
       <div>
         <div class="stats-row" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
@@ -1715,7 +1808,7 @@ function renderCaja(){
           </table></div>
         </div>
         <div class="mt12 text-r">
-          <button class="btn-d" onclick="cerrarCaja()"><i class="ti ti-lock"></i> Cerrar caja del día</button>
+          ${currentUser?.rol==='admin'?`<button class="btn-d" onclick="cerrarCaja()"><i class="ti ti-lock"></i> Cerrar caja</button>`:''}
         </div>
       </div>
       <div>
@@ -1742,25 +1835,26 @@ function renderCaja(){
 }
 
 function abrirCaja(){
+  if(currentUser?.rol!=='admin'){toast('Solo el administrador puede abrir caja','err');return;}
   const cajas=DB.get('cajas')||[];
-  const hoy=today();
-  if(cajas.find(c=>c.fecha===hoy&&c.estado==='abierta')){toast('La caja ya está abierta','inf');renderCaja();return;}
-  cajas.push({fecha:hoy,horaApertura:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),estado:'abierta',cajero:currentUser.name+' '+currentUser.last,movimientos:[]});
+  if(cajas.find(c=>c.estado==='abierta')){toast('La caja ya está abierta','inf');renderCaja();return;}
+  cajas.push({id:DB.nextId('caja'),fecha:today(),horaApertura:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),estado:'abierta',cajero:currentUser.name+' '+currentUser.last,movimientos:[]});
   DB.set('cajas',cajas);toast('Caja abierta exitosamente','ok');renderCaja();
 }
 
 function cerrarCaja(){
-  confirmDelete('¿Cerrar la caja del día? No podrás agregar más movimientos.',()=>{
-    const cajas=DB.get('cajas')||[];const hoy=today();
-    const i=cajas.findIndex(c=>c.fecha===hoy&&c.estado==='abierta');
-    if(i>=0){cajas[i].estado='cerrada';cajas[i].horaCierre=new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});DB.set('cajas',cajas);}
+  if(currentUser?.rol!=='admin'){toast('Solo el administrador puede cerrar caja','err');return;}
+  confirmDelete('¿Cerrar la caja abierta? No podrás agregar más movimientos a esta caja.',()=>{
+    const cajas=DB.get('cajas')||[];
+    const i=cajas.findIndex(c=>c.estado==='abierta');
+    if(i>=0){cajas[i].estado='cerrada';cajas[i].horaCierre=new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});cajas[i].cerradoPor=currentUser.name+' '+currentUser.last;DB.set('cajas',cajas);}
     toast('Caja cerrada. Resumen guardado.','ok');renderCaja();
   });
 }
 
 function procesarCobroInline(){
   const cajas=DB.get('cajas')||[];const hoy=today();
-  const i=cajas.findIndex(c=>c.fecha===hoy&&c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
+  const i=cajas.findIndex(c=>c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
   const pacId=document.getElementById('inline-pac').value;
   const servText=document.getElementById('inline-serv').options[document.getElementById('inline-serv').selectedIndex].text;
   const pago=document.getElementById('inline-pago').value;
@@ -1783,7 +1877,7 @@ function openCobroModal(){
 
 function procesarCobro(){
   const cajas=DB.get('cajas')||[];const hoy=today();
-  const i=cajas.findIndex(c=>c.fecha===hoy&&c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
+  const i=cajas.findIndex(c=>c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
   const pacId=document.getElementById('cb-pac').value;
   const servEl=document.getElementById('cb-serv');const servText=servEl.options[servEl.selectedIndex].text;
   const pago=document.getElementById('cb-pago').value;const monto=parseFloat(document.getElementById('cb-monto').value)||0;
