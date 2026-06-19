@@ -3,4 +3,4 @@
 // window.MEDICG_API_BASE = "https://medicg.github.io/MedicG/";
 //
 // Si frontend y backend están en el mismo servidor, déjalo vacío.
-window.MEDICG_API_BASE = "";
+window.MEDICG_API_BASE = "https://medicg.github.io/MedicG/";
