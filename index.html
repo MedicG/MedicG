@@ -687,9 +687,14 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 // =========================================================
 const API = {
   base:(window.MEDICG_API_BASE || '').replace(/\/$/,''),
+  requireBackend: window.MEDICG_REQUIRE_BACKEND !== false,
   token: localStorage.getItem('mg_token') || '',
-  get localMode(){return !this.base;},
+  get localMode(){return !this.base && !this.requireBackend;},
+  get missingBackend(){return !this.base && this.requireBackend && (location.hostname.endsWith('github.io') || location.protocol === 'file:');},
   async req(path, opts={}){
+    if(this.missingBackend && path.startsWith('/api/')){
+      throw new Error('Servidor de base de datos no configurado. Configura MEDICG_API_BASE en config.js.');
+    }
     const headers = {'Content-Type':'application/json'};
     if(this.token) headers.Authorization = 'Bearer '+this.token;
     try{
@@ -731,7 +736,7 @@ const DB = {
   set(k,v){
     this.cache[k]=v;
     if(API.localMode){localStorage.setItem('mg_'+k,JSON.stringify(v));return;}
-    if(!API.token) return;
+    if(!API.token){toast('No hay sesión activa para guardar en la base de datos','err');return;}
     clearTimeout(this.saveTimers[k]);
     this.saveTimers[k]=setTimeout(()=>{
       API.post('/api/data',{key:k,value:v}).catch(err=>toast('No se pudo guardar en la base de datos: '+err.message,'err'));

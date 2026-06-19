@@ -14,6 +14,7 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8080"))
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@medicg.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin123")
+ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 SESSIONS = {}
 
 
@@ -56,6 +57,20 @@ def set_json_key(conn, key, value):
     )
 
 
+def audit(conn, user, action, key, detail=None):
+    conn.execute(
+        "insert into audit_log(ts,user_id,email,action,data_key,detail) values(?,?,?,?,?,?)",
+        (
+            now_iso(),
+            user.get("id") if user else None,
+            user.get("email") if user else "",
+            action,
+            key,
+            json.dumps(detail or {}, ensure_ascii=False),
+        ),
+    )
+
+
 def public_user(user):
     return {
         "id": user.get("id"),
@@ -74,6 +89,11 @@ def init_db():
             "create table if not exists app_data("
             "key text primary key, value text not null, updated_at text not null)"
         )
+        conn.execute(
+            "create table if not exists audit_log("
+            "id integer primary key autoincrement, ts text not null, user_id integer, "
+            "email text, action text not null, data_key text, detail text)"
+        )
         users = get_json_key(conn, "users")
         if not users:
             users = [
@@ -89,6 +109,14 @@ def init_db():
                 }
             ]
             set_json_key(conn, "users", users)
+        else:
+            changed = False
+            for user in users:
+                if user.get("pass") and not user.get("passHash"):
+                    user["passHash"] = hash_password(user.pop("pass"))
+                    changed = True
+            if changed:
+                set_json_key(conn, "users", users)
         if not get_json_key(conn, "nextIds"):
             set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2})
 
@@ -98,9 +126,15 @@ def make_response(handler, status, payload):
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Cache-Control", "no-store")
-    handler.send_header("Access-Control-Allow-Origin", "*")
+    origin = handler.headers.get("Origin", "")
+    if not ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS:
+        handler.send_header("Access-Control-Allow-Origin", origin or "*")
+    handler.send_header("Vary", "Origin")
     handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("X-Frame-Options", "DENY")
+    handler.send_header("Referrer-Policy", "no-referrer")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -163,10 +197,16 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 401, {"error": "Correo o contraseña incorrectos"})
             token = secrets.token_urlsafe(32)
             SESSIONS[token] = {"user": user, "exp": time.time() + 24 * 3600}
+            with db() as conn:
+                audit(conn, user, "login", "session")
             return make_response(self, 200, {"token": token, "user": public_user(user)})
 
         if path == "/api/logout":
             token = self.headers.get("Authorization", "").replace("Bearer ", "").strip()
+            session = SESSIONS.get(token)
+            if session:
+                with db() as conn:
+                    audit(conn, session["user"], "logout", "session")
             SESSIONS.pop(token, None)
             return make_response(self, 200, {"ok": True})
 
@@ -183,6 +223,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 403, {"error": "Solo el administrador puede modificar usuarios"})
             with db() as conn:
                 set_json_key(conn, key, value)
+                audit(conn, user, "save", key)
             return make_response(self, 200, {"ok": True})
 
         if path == "/api/users":
@@ -215,6 +256,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users.append(new_user)
                 set_json_key(conn, "users", users)
                 set_json_key(conn, "nextIds", next_ids)
+                audit(conn, user, "create_user", "users", {"createdUserId": new_id, "createdEmail": email, "rol": rol})
             return make_response(self, 200, {"user": public_user(new_user)})
 
         return make_response(self, 404, {"error": "Ruta no encontrada"})

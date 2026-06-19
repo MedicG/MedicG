@@ -1,8 +1,8 @@
-// Si publicas solo el frontend en GitHub Pages y quieres base central,
-// coloca aqui la URL del backend.
+// URL del backend seguro donde se guarda la base de datos.
 // Ejemplo:
 // window.MEDICG_API_BASE = "https://medicg-tu-cliente.onrender.com";
 //
-// Si lo dejas vacio, el sistema funciona en modo local del navegador:
-// inicia sesion, crea usuarios y guarda datos en localStorage de ese equipo.
+// Para seguridad, el sistema NO guarda datos en el navegador.
+// Debes configurar un backend real para iniciar sesion.
 window.MEDICG_API_BASE = "";
+window.MEDICG_REQUIRE_BACKEND = true;

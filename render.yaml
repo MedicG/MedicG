@@ -14,3 +14,5 @@ services:
         value: Admin123
       - key: MEDICG_DB_PATH
         value: /tmp/medicg.sqlite3
+      - key: ALLOWED_ORIGINS
+        value: https://TU-USUARIO.github.io
