@@ -15,7 +15,20 @@ PORT = int(os.environ.get("PORT", "8080"))
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@medicg.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin123")
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", str(12 * 1024 * 1024)))
 SESSIONS = {}
+ALLOWED_PERMISSIONS = {
+    "dashboard", "agenda", "hce", "facturacion", "reportes", "pacientes",
+    "medicos", "especialidades", "seguros", "quirofanos", "servicios",
+    "examenes", "caja", "config",
+}
+ROLE_DEFAULT_PERMISSIONS = {
+    "admin": sorted(ALLOWED_PERMISSIONS),
+    "recepcion": ["agenda", "caja"],
+    "secretaria": ["agenda", "caja"],
+    "asistente": ["agenda", "caja"],
+    "medico": ["hce"],
+}
 MOJIBAKE_REPLACEMENTS = {
     "GestiÃ³n": "Gestión",
     "MÃ©dica": "Médica",
@@ -131,9 +144,50 @@ def public_user(user):
         "last": user.get("last", ""),
         "email": user.get("email", ""),
         "rol": user.get("rol", "recepcion"),
+        "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
     }
+
+
+def clean_permissions(permissions, role):
+    if role == "admin":
+        return sorted(ALLOWED_PERMISSIONS)
+    if not isinstance(permissions, list) or not permissions:
+        permissions = ROLE_DEFAULT_PERMISSIONS.get(role, ROLE_DEFAULT_PERMISSIONS["recepcion"])
+    return [p for p in permissions if p in ALLOWED_PERMISSIONS and p != "config"]
+
+
+def can_save_key(user, key):
+    role = user.get("rol", "recepcion")
+    if role == "admin":
+        return True
+    perms = set(clean_permissions(user.get("permissions"), role))
+    key_map = {
+        "citas": "agenda",
+        "cajas": "caja",
+        "facturas": "facturacion",
+        "notas": "hce",
+        "recetas": "hce",
+        "archivosClinicos": "hce",
+        "pacientes": "pacientes",
+        "medicos": "medicos",
+        "especialidades": "especialidades",
+        "seguros": "seguros",
+        "quirofanos": "quirofanos",
+        "equipos": "quirofanos",
+        "stockQx": "quirofanos",
+        "servicios": "servicios",
+        "examenes": "examenes",
+        "cotizaciones": "examenes",
+    }
+    if key == "pacientes" and ({"agenda", "hce"} & perms):
+        return True
+    if key == "facturas" and "caja" in perms:
+        return True
+    if key == "nextIds" and perms:
+        return True
+    return key in key_map and key_map[key] in perms
 
 
 def init_db():
@@ -162,6 +216,7 @@ def init_db():
                     "email": ADMIN_EMAIL,
                     "passHash": hash_password(ADMIN_PASSWORD),
                     "rol": "admin",
+                    "permissions": clean_permissions(None, "admin"),
                     "estado": "activo",
                     "createdAt": now_iso(),
                 }
@@ -172,6 +227,10 @@ def init_db():
             for user in users:
                 if user.get("pass") and not user.get("passHash"):
                     user["passHash"] = hash_password(user.pop("pass"))
+                    changed = True
+                cleaned_permissions = clean_permissions(user.get("permissions"), user.get("rol", "recepcion"))
+                if user.get("permissions") != cleaned_permissions:
+                    user["permissions"] = cleaned_permissions
                     changed = True
             fixed_users = fix_text(users)
             if fixed_users != users:
@@ -186,15 +245,17 @@ def init_db():
                 set_json_key(conn, row["key"], fixed_value)
         next_ids = get_json_key(conn, "nextIds")
         if not next_ids:
-            set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2, "qx": 3, "eq": 3, "st": 3, "caja": 1})
+            set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2, "qx": 3, "eq": 3, "st": 3, "caja": 1, "serv": 6, "exam": 6, "cot": 1})
         else:
             changed_ids = False
-            for key, value in {"qx": 3, "eq": 3, "st": 3, "caja": 1}.items():
+            for key, value in {"qx": 3, "eq": 3, "st": 3, "caja": 1, "serv": 6, "exam": 6, "cot": 1}.items():
                 if key not in next_ids:
                     next_ids[key] = value
                     changed_ids = True
             if changed_ids:
                 set_json_key(conn, "nextIds", next_ids)
+        if get_json_key(conn, "archivosClinicos") is None:
+            set_json_key(conn, "archivosClinicos", {})
 
 
 def make_response(handler, status, payload):
@@ -218,6 +279,8 @@ def make_response(handler, status, payload):
 
 def read_body(handler):
     length = int(handler.headers.get("Content-Length", "0") or "0")
+    if length > MAX_BODY_BYTES:
+        raise ValueError("payload_too_large")
     return json.loads(handler.rfile.read(length).decode("utf-8") or "{}")
 
 
@@ -272,6 +335,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = read_body(self)
+        except ValueError as exc:
+            if str(exc) == "payload_too_large":
+                return make_response(self, 413, {"error": "Archivo o solicitud demasiado grande"})
+            return make_response(self, 400, {"error": "JSON inválido"})
         except Exception:
             return make_response(self, 400, {"error": "JSON inválido"})
 
@@ -314,6 +381,8 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 400, {"error": "Falta key"})
             if key == "users" and user.get("rol") != "admin":
                 return make_response(self, 403, {"error": "Solo el administrador puede modificar usuarios"})
+            if key != "users" and not can_save_key(user, key):
+                return make_response(self, 403, {"error": "No tienes permiso para guardar este módulo"})
             with db() as conn:
                 set_json_key(conn, key, value)
                 audit(conn, user, "save", key)
@@ -329,6 +398,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             rol = payload.get("rol") or "recepcion"
             if not name or not last or not email or len(password) < 6:
                 return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres"})
+            permissions = clean_permissions(payload.get("permissions"), rol)
             with db() as conn:
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
@@ -343,6 +413,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "email": email,
                     "passHash": hash_password(password),
                     "rol": rol,
+                    "permissions": permissions,
                     "estado": "activo",
                     "createdAt": now_iso(),
                 }
@@ -351,6 +422,21 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 set_json_key(conn, "nextIds", next_ids)
                 audit(conn, user, "create_user", "users", {"createdUserId": new_id, "createdEmail": email, "rol": rol})
             return make_response(self, 200, {"user": public_user(new_user)})
+
+        if path == "/api/users/permissions":
+            if user.get("rol") != "admin":
+                return make_response(self, 403, {"error": "Solo el administrador puede configurar permisos"})
+            user_id = int(payload.get("userId") or 0)
+            permissions = payload.get("permissions") or []
+            with db() as conn:
+                users = get_json_key(conn, "users", [])
+                target = next((u for u in users if int(u.get("id", 0)) == user_id), None)
+                if not target:
+                    return make_response(self, 404, {"error": "Usuario no encontrado"})
+                target["permissions"] = clean_permissions(permissions, target.get("rol", "recepcion"))
+                set_json_key(conn, "users", users)
+                audit(conn, user, "update_permissions", "users", {"targetUserId": user_id, "permissions": target["permissions"]})
+            return make_response(self, 200, {"user": public_user(target)})
 
         return make_response(self, 404, {"error": "Ruta no encontrada"})
 

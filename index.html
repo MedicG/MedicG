@@ -167,6 +167,16 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 .pat-item{padding:10px 13px;border-bottom:1px solid var(--gray-bd);cursor:pointer;}
 .pat-item:hover{background:var(--gray-lt);}.pat-item.sel{background:var(--primary-lt);}
 .pat-name{font-size:13px;font-weight:500;}.pat-meta{font-size:10px;color:var(--text3);margin-top:2px;}
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;}
+.file-card{border:1px solid var(--gray-bd);border-radius:var(--radius);background:var(--white);padding:12px;display:flex;gap:10px;align-items:flex-start;}
+.file-icon{width:38px;height:38px;border-radius:8px;background:var(--primary-lt);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.file-icon .ti{font-size:20px;}
+.file-name{font-size:12px;font-weight:600;word-break:break-word;}
+.file-desc{font-size:11px;color:var(--text2);white-space:pre-wrap;margin-top:4px;}
+.file-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.perm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0 12px;}
+.perm-check{display:flex;align-items:center;gap:7px;background:var(--gray-lt);border:1px solid var(--gray-bd);border-radius:var(--radius);padding:7px 9px;font-size:12px;}
+.perm-check input{width:auto;margin:0;}
 
 /* ===== CAJA ===== */
 .caja-closed{background:var(--white);border-radius:var(--radius-lg);box-shadow:var(--shadow);border:1px solid var(--gray-bd);padding:60px 24px;text-align:center;}
@@ -279,21 +289,23 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
   </div>
   <nav class="sb-nav">
     <div class="nav-sec">Principal</div>
-    <div class="nav-item active" onclick="showMod('dashboard',this)"><i class="ti ti-layout-dashboard"></i>Dashboard</div>
-    <div class="nav-item" onclick="showMod('agenda',this)"><i class="ti ti-calendar-event"></i>Agenda</div>
-    <div class="nav-item" onclick="showMod('hce',this)"><i class="ti ti-notes-medical"></i>Hist. Clínica</div>
-    <div class="nav-item" onclick="showMod('facturacion',this)"><i class="ti ti-receipt"></i>Facturación</div>
-    <div class="nav-item" onclick="showMod('reportes',this)"><i class="ti ti-chart-bar"></i>Reportes</div>
+    <div class="nav-item active" data-module="dashboard" onclick="showMod('dashboard',this)"><i class="ti ti-layout-dashboard"></i>Dashboard</div>
+    <div class="nav-item" data-module="agenda" onclick="showMod('agenda',this)"><i class="ti ti-calendar-event"></i>Agenda</div>
+    <div class="nav-item" data-module="hce" onclick="showMod('hce',this)"><i class="ti ti-notes-medical"></i>Hist. Clínica</div>
+    <div class="nav-item" data-module="facturacion" onclick="showMod('facturacion',this)"><i class="ti ti-receipt"></i>Facturación</div>
+    <div class="nav-item" data-module="reportes" onclick="showMod('reportes',this)"><i class="ti ti-chart-bar"></i>Reportes</div>
     <div class="sb-sep"></div>
     <div class="nav-sec">Administración</div>
-    <div class="nav-item" onclick="showMod('pacientes',this)"><i class="ti ti-users"></i>Pacientes</div>
-    <div class="nav-item" onclick="showMod('medicos',this)"><i class="ti ti-stethoscope"></i>Médicos</div>
-    <div class="nav-item" onclick="showMod('especialidades',this)"><i class="ti ti-clipboard-list"></i>Especialidades</div>
-    <div class="nav-item" onclick="showMod('seguros',this)"><i class="ti ti-shield-check"></i>Seguros</div>
-    <div class="nav-item" onclick="showMod('quirofanos',this)"><i class="ti ti-activity-heartbeat"></i>Quirófanos</div>
-    <div class="nav-item" onclick="showMod('caja',this)"><i class="ti ti-cash"></i>Caja</div>
+    <div class="nav-item" data-module="pacientes" onclick="showMod('pacientes',this)"><i class="ti ti-users"></i>Pacientes</div>
+    <div class="nav-item" data-module="medicos" onclick="showMod('medicos',this)"><i class="ti ti-stethoscope"></i>Médicos</div>
+    <div class="nav-item" data-module="especialidades" onclick="showMod('especialidades',this)"><i class="ti ti-clipboard-list"></i>Especialidades</div>
+    <div class="nav-item" data-module="seguros" onclick="showMod('seguros',this)"><i class="ti ti-shield-check"></i>Seguros</div>
+    <div class="nav-item" data-module="quirofanos" onclick="showMod('quirofanos',this)"><i class="ti ti-activity-heartbeat"></i>Quirófanos</div>
+    <div class="nav-item" data-module="servicios" onclick="showMod('servicios',this)"><i class="ti ti-briefcase"></i>Servicios</div>
+    <div class="nav-item" data-module="examenes" onclick="showMod('examenes',this)"><i class="ti ti-test-pipe"></i>Exámenes</div>
+    <div class="nav-item" data-module="caja" onclick="showMod('caja',this)"><i class="ti ti-cash"></i>Caja</div>
     <div class="sb-sep"></div>
-    <div class="nav-item" onclick="showMod('config',this)"><i class="ti ti-settings"></i>Configuración</div>
+    <div class="nav-item" data-module="config" onclick="showMod('config',this)"><i class="ti ti-settings"></i>Configuración</div>
     <div class="nav-item" onclick="doLogout()"><i class="ti ti-logout"></i>Cerrar sesión</div>
   </nav>
   <div class="sb-user">
@@ -311,7 +323,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
     <div class="tb-title" id="tb-title">Dashboard</div>
     <div style="flex:1;"></div>
     <div class="text-xs text-muted" id="tb-date"></div>
-    <button class="btn-p btn-sm flex gap6" onclick="openCitaModal()"><i class="ti ti-plus"></i>Nueva cita</button>
+    <button class="btn-p btn-sm flex gap6" id="top-new-cita" onclick="openCitaModal()"><i class="ti ti-plus"></i>Nueva cita</button>
   </div>
 
   <div class="content">
@@ -489,6 +501,55 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
     </div>
   </div>
 
+  <!-- SERVICIOS -->
+  <div id="mod-servicios" class="module">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-briefcase" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Servicios del centro médico</span></div>
+        <div class="card-body">
+          <div class="form-row"><div class="field"><label class="field-lbl">Servicio</label><input id="srv-nombre" placeholder="Consulta ginecológica"/></div><div class="field"><label class="field-lbl">Categoría</label><input id="srv-cat" placeholder="Consulta, terapia, procedimiento"/></div></div>
+          <div class="form-row"><div class="field"><label class="field-lbl">Precio ($)</label><input id="srv-precio" type="number" step="0.01" value="0"/></div><div class="field" style="align-self:end;"><button class="btn-p btn-sm" onclick="addServicio()"><i class="ti ti-plus"></i> Agregar servicio</button></div></div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Servicio</th><th>Categoría</th><th>Precio</th><th></th></tr></thead><tbody id="srv-tbody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-info-circle" style="color:var(--secondary);font-size:18px;"></i><span class="card-title">Uso en caja y cotizador</span></div>
+        <div class="card-body">
+          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Los servicios que agregues aquí aparecerán automáticamente en caja, cobro rápido y el cotizador.</span></div>
+          <div id="srv-summary" class="stats-row" style="grid-template-columns:1fr 1fr;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXÁMENES Y COTIZADOR -->
+  <div id="mod-examenes" class="module">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-test-pipe" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Exámenes del centro médico</span></div>
+        <div class="card-body">
+          <div class="form-row"><div class="field"><label class="field-lbl">Examen</label><input id="ex-nombre" placeholder="Hemograma completo"/></div><div class="field"><label class="field-lbl">Categoría</label><input id="ex-cat" placeholder="Laboratorio, imagen, cardiología"/></div></div>
+          <div class="form-row c3"><div class="field"><label class="field-lbl">Precio ($)</label><input id="ex-precio" type="number" step="0.01" value="0"/></div><div class="field"><label class="field-lbl">Descuento (%)</label><input id="ex-desc" type="number" min="0" max="100" value="0"/></div><div class="field" style="align-self:end;"><button class="btn-p btn-sm" onclick="addExamen()"><i class="ti ti-plus"></i> Agregar examen</button></div></div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Examen</th><th>Categoría</th><th>Precio</th><th>Desc.</th><th>Final</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-calculator" style="color:var(--green);font-size:18px;"></i><span class="card-title">Cotizador para pacientes</span></div>
+        <div class="card-body">
+          <div class="form-row"><div class="field"><label class="field-lbl">Paciente</label><select id="cot-pac"></select></div><div class="field"><label class="field-lbl">Servicio / examen</label><select id="cot-item"></select></div></div>
+          <div class="form-row c3"><div class="field"><label class="field-lbl">Cantidad</label><input id="cot-cant" type="number" min="1" value="1"/></div><div class="field"><label class="field-lbl">Descuento extra (%)</label><input id="cot-extra" type="number" min="0" max="100" value="0"/></div><div class="field" style="align-self:end;"><button class="btn-g btn-sm" onclick="addCotItem()"><i class="ti ti-plus"></i> Agregar</button></div></div>
+          <div class="tbl-wrap mb12"><table class="tbl"><thead><tr><th>Detalle</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th><th></th></tr></thead><tbody id="cot-tbody"></tbody></table></div>
+          <div style="text-align:right;"><div class="text-sm text-muted">Total cotizado</div><div class="stat-val" id="cot-total" style="font-size:24px;color:var(--green);">$0.00</div></div>
+          <div class="flex gap8 mt12" style="justify-content:flex-end;"><button class="btn-s btn-sm" onclick="clearCotizador()">Limpiar</button><button class="btn-p btn-sm" onclick="saveCotizacion(false)"><i class="ti ti-device-floppy"></i> Guardar cotización</button><button class="btn-g btn-sm" onclick="saveCotizacion(true)"><i class="ti ti-cash"></i> Enviar a caja</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card mt16">
+      <div class="card-hdr"><i class="ti ti-file-dollar" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Cotizaciones registradas</span></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Número</th><th>Fecha</th><th>Paciente</th><th>Detalle</th><th>Total</th><th>Estado</th><th></th></tr></thead><tbody id="cot-list-tbody"></tbody></table></div>
+    </div>
+  </div>
+
   <!-- CAJA -->
   <div id="mod-caja" class="module">
     <div id="caja-content"></div>
@@ -542,15 +603,35 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
           <div class="form-row c3">
             <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="u-name"/></div>
             <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="u-last"/></div>
-            <div class="field"><label class="field-lbl">Rol</label><select id="u-rol"><option value="recepcion">Recepción</option><option value="medico">Médico</option><option value="admin">Administrador</option></select></div>
+            <div class="field"><label class="field-lbl">Rol</label><select id="u-rol" onchange="renderCreatePerms()"><option value="recepcion">Recepción</option><option value="secretaria">Secretaria</option><option value="asistente">Asistente clínico</option><option value="medico">Médico</option><option value="admin">Administrador</option></select></div>
           </div>
           <div class="form-row">
             <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="u-email"/></div>
             <div class="field"><label class="field-lbl">Contraseña temporal <span class="req">*</span></label><input type="password" id="u-pass" placeholder="Mín. 6 caracteres"/></div>
           </div>
+          <div class="field-lbl">Permisos del nuevo usuario</div>
+          <div id="u-perms" class="perm-grid"></div>
           <button class="btn-p btn-sm" onclick="createSystemUser()"><i class="ti ti-user-plus"></i> Crear usuario</button>
           <div class="divider"></div>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Estado</th></tr></thead><tbody id="users-tbody"></tbody></table></div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Permisos</th><th>Estado</th><th></th></tr></thead><tbody id="users-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-list-search" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Catálogo de diagnósticos CIE-10</span></div>
+        <div class="card-body">
+          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Usa este catálogo para clasificar diagnósticos por código CIE-10 en las notas clínicas.</span></div>
+          <div id="cie10-admin-form">
+            <div class="form-row">
+              <div class="field"><label class="field-lbl">Código</label><input id="cie-code" placeholder="Ej: I10"/></div>
+              <div class="field"><label class="field-lbl">Descripción</label><input id="cie-desc" placeholder="Hipertensión esencial"/></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label class="field-lbl">Categoría</label><input id="cie-chapter" placeholder="Ej: Cardiología"/></div>
+              <div class="field" style="align-self:end;"><button class="btn-p btn-sm" onclick="addCie10Code()"><i class="ti ti-plus"></i> Agregar / actualizar código</button></div>
+            </div>
+          </div>
+          <div class="si mb8"><i class="ti ti-search"></i><input type="text" id="cie-q" placeholder="Buscar código o diagnóstico..." oninput="renderCie10Catalog()"/></div>
+          <div class="tbl-wrap" style="max-height:280px;"><table class="tbl"><thead><tr><th>Código</th><th>Diagnóstico</th><th>Categoría</th><th></th></tr></thead><tbody id="cie10-tbody"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -694,11 +775,35 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
       </div>
       <div class="field"><label class="field-lbl">Motivo de consulta</label><input type="text" id="n-motivo" placeholder="Descripción del motivo principal"/></div>
       <div class="field"><label class="field-lbl">Exploración física / Hallazgos</label><textarea id="n-explora" rows="2" placeholder="Hallazgos del examen físico..."></textarea></div>
-      <div class="field"><label class="field-lbl">Diagnóstico (CIE-10)</label><input type="text" id="n-dx" placeholder="Ej: I10 — Hipertensión esencial"/></div>
+      <div class="field">
+        <label class="field-lbl">Diagnóstico CIE-10</label>
+        <div class="form-row">
+          <div class="field" style="margin-bottom:0;"><input type="text" id="n-cie-search" placeholder="Buscar por código o diagnóstico..." oninput="fillCie10Select()"/></div>
+          <div class="field" style="margin-bottom:0;"><select id="n-cie" onchange="applyCie10Selection()"></select></div>
+        </div>
+        <input type="hidden" id="n-cie-code"/>
+        <input type="hidden" id="n-cie-desc"/>
+        <input type="text" id="n-dx" class="mt8" placeholder="Diagnóstico seleccionado o escrito manualmente"/>
+        <div class="text-xs text-muted mt4">CIE-10 clasifica enfermedades, síntomas, hallazgos anormales y causas externas. Si no encuentras un código, puedes escribir el diagnóstico manualmente.</div>
+      </div>
       <div class="field"><label class="field-lbl">Plan de tratamiento</label><textarea id="n-plan" rows="2" placeholder="Medicación, indicaciones, próximo control..."></textarea></div>
       <input type="hidden" id="n-pac-id"/>
     </div>
     <div class="modal-footer"><button class="btn-s" onclick="closeM('m-nota')">Cancelar</button><button class="btn-p" onclick="saveNota()"><i class="ti ti-device-floppy"></i> Guardar nota</button></div>
+  </div>
+</div>
+
+<!-- ARCHIVO CLÍNICO -->
+<div class="modal-bg" id="m-archivo">
+  <div class="modal">
+    <div class="modal-hdr"><i class="ti ti-paperclip" style="color:var(--primary);font-size:20px;"></i><span class="modal-title">Adjuntar resultado o estudio</span><button class="btn-ic" onclick="closeM('m-archivo')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ar-pac-id"/>
+      <div class="form-row"><div class="field"><label class="field-lbl">Tipo de archivo</label><select id="ar-tipo"><option>Laboratorio</option><option>Imagen</option><option>Estudio</option><option>Documento</option><option>Otro</option></select></div><div class="field"><label class="field-lbl">Archivo <span class="req">*</span></label><input type="file" id="ar-file" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.txt,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain"/></div></div>
+      <div class="field"><label class="field-lbl">Descripción / observación opcional</label><textarea id="ar-desc" rows="3" placeholder="Ej: Biometría hemática, ecografía, informe de laboratorio..."></textarea></div>
+      <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Se guarda en la base de datos del sistema. Por seguridad se aceptan PDF, imágenes, TXT, Word y Excel hasta 8 MB.</span></div>
+    </div>
+    <div class="modal-footer"><button class="btn-s" onclick="closeM('m-archivo')">Cancelar</button><button class="btn-p" onclick="saveArchivoClinico()"><i class="ti ti-upload"></i> Guardar adjunto</button></div>
   </div>
 </div>
 
@@ -719,15 +824,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
     <div class="modal-hdr"><i class="ti ti-cash" style="color:var(--green);font-size:20px;"></i><span class="modal-title">Cobro rápido</span><button class="btn-ic" onclick="closeM('m-cobro')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body">
       <div class="field"><label class="field-lbl">Paciente</label><select id="cb-pac"></select></div>
-      <div class="field"><label class="field-lbl">Servicio</label><select id="cb-serv" onchange="updateCobro()">
-        <option value="40">Consulta general — $40</option>
-        <option value="60">Consulta especialidad — $60</option>
-        <option value="85">Consulta cardiología — $85</option>
-        <option value="120">Consulta neurología — $120</option>
-        <option value="60">Consulta pediatría — $60</option>
-        <option value="70">Consulta dermatología — $70</option>
-        <option value="150">Procedimiento menor — $150</option>
-      </select></div>
+      <div class="field"><label class="field-lbl">Servicio</label><select id="cb-serv" onchange="updateMontoFromService(this,document.getElementById('cb-monto'))"></select></div>
       <div class="form-row"><div class="field"><label class="field-lbl">Forma de pago</label><select id="cb-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div><div class="field"><label class="field-lbl">Monto ($)</label><input type="number" id="cb-monto" value="60"/></div></div>
     </div>
     <div class="modal-footer"><button class="btn-s" onclick="closeM('m-cobro')">Cancelar</button><button class="btn-g" onclick="procesarCobro()"><i class="ti ti-check"></i> Procesar y emitir</button></div>
@@ -798,6 +895,76 @@ function normalizeData(value){
   return value;
 }
 
+const CIE10_SEED = [
+  {code:'A09',desc:'Diarrea y gastroenteritis de presunto origen infeccioso',chapter:'Enfermedades infecciosas'},
+  {code:'B34.9',desc:'Infección viral, no especificada',chapter:'Enfermedades infecciosas'},
+  {code:'D64.9',desc:'Anemia, no especificada',chapter:'Sangre y órganos hematopoyéticos'},
+  {code:'E03.9',desc:'Hipotiroidismo, no especificado',chapter:'Endocrino y metabólico'},
+  {code:'E10',desc:'Diabetes mellitus insulinodependiente',chapter:'Endocrino y metabólico'},
+  {code:'E11',desc:'Diabetes mellitus no insulinodependiente',chapter:'Endocrino y metabólico'},
+  {code:'E66.9',desc:'Obesidad, no especificada',chapter:'Endocrino y metabólico'},
+  {code:'F32.9',desc:'Episodio depresivo, no especificado',chapter:'Salud mental'},
+  {code:'F41.1',desc:'Trastorno de ansiedad generalizada',chapter:'Salud mental'},
+  {code:'G40.9',desc:'Epilepsia, no especificada',chapter:'Neurología'},
+  {code:'G43.9',desc:'Migraña, no especificada',chapter:'Neurología'},
+  {code:'H10.9',desc:'Conjuntivitis, no especificada',chapter:'Oftalmología'},
+  {code:'H52.1',desc:'Miopía',chapter:'Oftalmología'},
+  {code:'I10',desc:'Hipertensión esencial primaria',chapter:'Cardiología'},
+  {code:'I20.9',desc:'Angina de pecho, no especificada',chapter:'Cardiología'},
+  {code:'I25.1',desc:'Enfermedad aterosclerótica del corazón',chapter:'Cardiología'},
+  {code:'I50.9',desc:'Insuficiencia cardíaca, no especificada',chapter:'Cardiología'},
+  {code:'J00',desc:'Rinofaringitis aguda, resfriado común',chapter:'Respiratorio'},
+  {code:'J02.9',desc:'Faringitis aguda, no especificada',chapter:'Respiratorio'},
+  {code:'J03.9',desc:'Amigdalitis aguda, no especificada',chapter:'Respiratorio'},
+  {code:'J06.9',desc:'Infección aguda de vías respiratorias superiores, no especificada',chapter:'Respiratorio'},
+  {code:'J18.9',desc:'Neumonía, no especificada',chapter:'Respiratorio'},
+  {code:'J30.4',desc:'Rinitis alérgica, no especificada',chapter:'Respiratorio'},
+  {code:'J45.9',desc:'Asma, no especificada',chapter:'Respiratorio'},
+  {code:'K21.9',desc:'Enfermedad por reflujo gastroesofágico sin esofagitis',chapter:'Gastroenterología'},
+  {code:'K29.7',desc:'Gastritis, no especificada',chapter:'Gastroenterología'},
+  {code:'K35.9',desc:'Apendicitis aguda, no especificada',chapter:'Gastroenterología'},
+  {code:'K52.9',desc:'Gastroenteritis y colitis no infecciosas, no especificadas',chapter:'Gastroenterología'},
+  {code:'L20.9',desc:'Dermatitis atópica, no especificada',chapter:'Dermatología'},
+  {code:'L30.9',desc:'Dermatitis, no especificada',chapter:'Dermatología'},
+  {code:'M25.5',desc:'Dolor en articulación',chapter:'Traumatología'},
+  {code:'M54.5',desc:'Lumbago',chapter:'Traumatología'},
+  {code:'N39.0',desc:'Infección de vías urinarias, sitio no especificado',chapter:'Urología'},
+  {code:'O80',desc:'Parto único espontáneo',chapter:'Ginecología y obstetricia'},
+  {code:'R05',desc:'Tos',chapter:'Síntomas y signos'},
+  {code:'R10.4',desc:'Otros dolores abdominales y los no especificados',chapter:'Síntomas y signos'},
+  {code:'R50.9',desc:'Fiebre, no especificada',chapter:'Síntomas y signos'},
+  {code:'R51',desc:'Cefalea',chapter:'Síntomas y signos'},
+  {code:'S00.9',desc:'Traumatismo superficial de la cabeza, parte no especificada',chapter:'Lesiones'},
+  {code:'T14.9',desc:'Traumatismo, no especificado',chapter:'Lesiones'},
+  {code:'Z00.0',desc:'Examen médico general',chapter:'Factores de contacto con servicios de salud'},
+  {code:'Z34.9',desc:'Supervisión de embarazo normal, no especificado',chapter:'Ginecología y obstetricia'}
+];
+
+const MODULE_PERMS = [
+  {id:'dashboard',label:'Dashboard'},
+  {id:'agenda',label:'Agenda'},
+  {id:'hce',label:'Historia clínica y evoluciones'},
+  {id:'facturacion',label:'Facturación'},
+  {id:'reportes',label:'Reportes'},
+  {id:'pacientes',label:'Pacientes'},
+  {id:'medicos',label:'Médicos'},
+  {id:'especialidades',label:'Especialidades'},
+  {id:'seguros',label:'Seguros'},
+  {id:'quirofanos',label:'Quirófanos'},
+  {id:'servicios',label:'Servicios'},
+  {id:'examenes',label:'Exámenes y cotizador'},
+  {id:'caja',label:'Caja / cobranza'},
+  {id:'config',label:'Configuración'}
+];
+const ROLE_LABELS={admin:'Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico'};
+const ROLE_DEFAULT_PERMS={
+  admin:MODULE_PERMS.map(p=>p.id),
+  recepcion:['agenda','caja'],
+  secretaria:['agenda','caja'],
+  asistente:['agenda','caja'],
+  medico:['hce']
+};
+
 const DB = {
   cache:{},
   saveTimers:{},
@@ -814,7 +981,15 @@ const DB = {
   load(data){this.cache=normalizeData(data||{});},
   init(){
     if(!this.get('users')){
-      this.set('users',[{id:1,name:'Admin',last:'Sistema',email:'admin@medicg.com',pass:'Admin123',rol:'admin',createdAt:now()}]);
+      this.set('users',[{id:1,name:'Admin',last:'Sistema',email:'admin@medicg.com',pass:'Admin123',rol:'admin',permissions:defaultPermsForRole('admin'),createdAt:now()}]);
+    }else{
+      const users=this.get('users')||[];
+      let changed=false;
+      users.forEach(u=>{
+        const clean=cleanPermissions(u.permissions,u.rol);
+        if(JSON.stringify(u.permissions||[])!==JSON.stringify(clean)){u.permissions=clean;changed=true;}
+      });
+      if(changed) this.set('users',users);
     }
     if(!this.get('especialidades')){
       this.set('especialidades',[
@@ -865,15 +1040,32 @@ const DB = {
     ]);
     if(!this.get('notas')) this.set('notas',{});
     if(!this.get('recetas')) this.set('recetas',{});
+    if(!this.get('archivosClinicos')) this.set('archivosClinicos',{});
+    if(!this.get('cie10')) this.set('cie10',CIE10_SEED);
     if(!this.get('config')) this.set('config',{nombre:'Centro de Especialidades Medic G',ruc:'1790123456001',dir:'Av. 6 de Diciembre N34-156, Quito',tel:'02-234-5678',wa:'0991234567',email:'admin@medicg.com',color:'#1B4F8A',remind:'24 horas antes',tpl:'Estimado/a {{nombre}}, tiene cita con {{medico}} el {{fecha}} a las {{hora}}.'});
     if(!this.get('cajas')) this.set('cajas',[]);
     if(!this.get('quirofanos')) this.set('quirofanos',[{id:1,nombre:'Quirófano 1',estado:'Disponible'},{id:2,nombre:'Quirófano 2',estado:'Limpieza'}]);
     if(!this.get('equipos')) this.set('equipos',[{id:1,nombre:'Torre laparoscópica',estado:'Disponible'},{id:2,nombre:'Monitor multiparámetro',estado:'Disponible'}]);
     if(!this.get('stockQx')) this.set('stockQx',[{id:1,nombre:'Guantes estériles',cantidad:40,minimo:20},{id:2,nombre:'Suturas 3-0',cantidad:8,minimo:10}]);
-    if(!this.get('nextIds')) this.set('nextIds',{pac:6,med:5,cita:6,fac:1845,esp:7,seg:5,user:2,qx:3,eq:3,st:3,caja:1});
+    if(!this.get('servicios')) this.set('servicios',[
+      {id:1,nombre:'Consulta médica general',categoria:'Consulta',precio:40},
+      {id:2,nombre:'Consulta ginecológica',categoria:'Ginecología',precio:70},
+      {id:3,nombre:'Consulta pediátrica',categoria:'Pediatría',precio:60},
+      {id:4,nombre:'Terapia física',categoria:'Terapias',precio:35},
+      {id:5,nombre:'Procedimiento menor',categoria:'Procedimientos',precio:150}
+    ]);
+    if(!this.get('examenes')) this.set('examenes',[
+      {id:1,nombre:'Hemograma completo',categoria:'Laboratorio',precio:18,descuento:0},
+      {id:2,nombre:'Glucosa en ayunas',categoria:'Laboratorio',precio:8,descuento:0},
+      {id:3,nombre:'Perfil lipídico',categoria:'Laboratorio',precio:28,descuento:5},
+      {id:4,nombre:'Ecografía pélvica',categoria:'Imagen',precio:55,descuento:0},
+      {id:5,nombre:'Electrocardiograma',categoria:'Cardiología',precio:30,descuento:0}
+    ]);
+    if(!this.get('cotizaciones')) this.set('cotizaciones',[]);
+    if(!this.get('nextIds')) this.set('nextIds',{pac:6,med:5,cita:6,fac:1845,esp:7,seg:5,user:2,qx:3,eq:3,st:3,caja:1,serv:6,exam:6,cot:1});
     else{
       const ids=this.get('nextIds');
-      Object.assign(ids,{qx:ids.qx||3,eq:ids.eq||3,st:ids.st||3,caja:ids.caja||1});
+      Object.assign(ids,{qx:ids.qx||3,eq:ids.eq||3,st:ids.st||3,caja:ids.caja||1,serv:ids.serv||6,exam:ids.exam||6,cot:ids.cot||1});
       this.set('nextIds',ids);
     }
   },
@@ -884,6 +1076,25 @@ function now(){return new Date().toISOString();}
 function today(){return new Date().toISOString().split('T')[0];}
 function fmtDate(d){if(!d)return'—';const[y,mo,da]=d.split('-');const ms=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];return`${da} ${ms[+mo]} ${y}`;}
 function fmtMoney(n){return'$'+(+n||0).toFixed(2);}
+function fmtBytes(bytes){const n=+bytes||0;if(n<1024)return n+' B';if(n<1048576)return(n/1024).toFixed(1)+' KB';return(n/1048576).toFixed(1)+' MB';}
+function esc(value){return String(value??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
+function defaultPermsForRole(role){return [...(ROLE_DEFAULT_PERMS[role]||ROLE_DEFAULT_PERMS.recepcion)];}
+function cleanPermissions(perms,role){
+  if(role==='admin') return defaultPermsForRole('admin');
+  const allowed=MODULE_PERMS.map(p=>p.id).filter(p=>p!=='config');
+  const base=Array.isArray(perms)&&perms.length?perms:defaultPermsForRole(role);
+  return [...new Set(base.filter(p=>allowed.includes(p)))];
+}
+function userPerms(user=currentUser){return cleanPermissions(user?.permissions,user?.rol||'recepcion');}
+function hasPerm(moduleId,user=currentUser){return user?.rol==='admin'||userPerms(user).includes(moduleId);}
+function firstAllowedModule(){return MODULE_PERMS.find(p=>hasPerm(p.id))?.id||'agenda';}
+const MAX_CLINICAL_FILE_BYTES=8*1024*1024;
+const CLINICAL_FILE_EXTS=['pdf','jpg','jpeg','png','webp','gif','txt','doc','docx','xls','xlsx'];
+const CLINICAL_FILE_MIMES=['application/pdf','image/jpeg','image/png','image/webp','image/gif','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+function isAllowedClinicalFile(file){
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+  return CLINICAL_FILE_EXTS.includes(ext) || CLINICAL_FILE_MIMES.includes(file.type);
+}
 function calcEdad(fnac){if(!fnac)return'—';const diff=Date.now()-new Date(fnac).getTime();return Math.floor(diff/31557600000);}
 function getPacName(id){const p=(DB.get('pacientes')||[]).find(x=>x.id===+id);return p?p.nombres+' '+p.apellidos:'—';}
 function getMedName(id){const m=(DB.get('medicos')||[]).find(x=>x.id===+id);return m?m.nombre:'—';}
@@ -943,12 +1154,14 @@ function launchApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   document.getElementById('sb-uname').textContent=currentUser.name+' '+currentUser.last;
-  document.getElementById('sb-urole').textContent={admin:'Administrador',recepcion:'Recepción',medico:'Médico'}[currentUser.rol]||currentUser.rol;
+  document.getElementById('sb-urole').textContent=ROLE_LABELS[currentUser.rol]||currentUser.rol;
   document.getElementById('sb-av').textContent=(currentUser.name[0]+currentUser.last[0]).toUpperCase();
   document.getElementById('tb-date').textContent=new Date().toLocaleDateString('es-EC',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   applyTheme(DB.get('config')?.color||'#1B4F8A');
   applyLogo(DB.get('config')?.logo||DEFAULT_LOGO);
-  initDashboard();
+  applyPermissionUI();
+  const first=firstAllowedModule();
+  showMod(first,document.querySelector(`.nav-item[data-module="${first}"]`));
 }
 
 // =========================================================
@@ -976,15 +1189,30 @@ function confirmDelete(msg,fn){
 // =========================================================
 // MODULE NAVIGATION
 // =========================================================
+function applyPermissionUI(){
+  document.querySelectorAll('.nav-item[data-module]').forEach(item=>{
+    item.style.display=hasPerm(item.dataset.module)?'flex':'none';
+  });
+  document.querySelectorAll('.sb-sep,.nav-sec').forEach(el=>{el.style.display='';});
+  const citaBtn=document.getElementById('top-new-cita');
+  if(citaBtn) citaBtn.style.display=hasPerm('agenda')?'flex':'none';
+}
+
 function showMod(id,el){
+  if(!hasPerm(id)){
+    toast('No tienes permiso para acceder a este módulo','err');
+    const fallback=firstAllowedModule();
+    if(fallback!==id) return showMod(fallback,document.querySelector(`.nav-item[data-module="${fallback}"]`));
+    return;
+  }
   document.querySelectorAll('.module').forEach(m=>{m.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const mod=document.getElementById('mod-'+id);
   if(mod) mod.classList.add('active');
   if(el) el.classList.add('active');
-  const titles={dashboard:'Dashboard',agenda:'Agenda centralizada',hce:'Historia Clínica Electrónica',facturacion:'Facturación — SRI Ecuador',reportes:'Reportes y estadísticas',pacientes:'Gestión de pacientes',medicos:'Médicos y especialidades',especialidades:'Especialidades médicas',seguros:'Convenios con seguros',quirofanos:'Gestión quirúrgica',caja:'Caja',config:'Configuración del sistema'};
+  const titles={dashboard:'Dashboard',agenda:'Agenda centralizada',hce:'Historia Clínica Electrónica',facturacion:'Facturación — SRI Ecuador',reportes:'Reportes y estadísticas',pacientes:'Gestión de pacientes',medicos:'Médicos y especialidades',especialidades:'Especialidades médicas',seguros:'Convenios con seguros',quirofanos:'Gestión quirúrgica',servicios:'Servicios del centro médico',examenes:'Exámenes y cotizador',caja:'Caja',config:'Configuración del sistema'};
   document.getElementById('tb-title').textContent=titles[id]||id;
-  const renderers={dashboard:initDashboard,agenda:initAgenda,hce:()=>renderPatList(),facturacion:()=>{renderFacStats();renderFacs();},reportes:renderReportes,pacientes:renderPacs,medicos:renderMeds,especialidades:renderEsps,seguros:renderSegs,quirofanos:renderQuirofanos,caja:renderCaja,config:loadConfig};
+  const renderers={dashboard:initDashboard,agenda:initAgenda,hce:()=>renderPatList(),facturacion:()=>{renderFacStats();renderFacs();},reportes:renderReportes,pacientes:renderPacs,medicos:renderMeds,especialidades:renderEsps,seguros:renderSegs,quirofanos:renderQuirofanos,servicios:renderServicios,examenes:renderExamenes,caja:renderCaja,config:loadConfig};
   if(renderers[id]) renderers[id]();
 }
 
@@ -1132,6 +1360,7 @@ function initDashboard(){
 let weekOff=0, calDate=new Date(), filterEsps=new Set();
 
 function initAgenda(){
+  if(!hasPerm('agenda')) return;
   const esps=DB.get('especialidades')||[];
   filterEsps=new Set(esps.map(e=>e.nombre));
   renderWeek();renderMiniCal();renderAgFilter();
@@ -1180,10 +1409,12 @@ function nextW(){weekOff++;renderWeek();}
 function goToday(){weekOff=0;renderWeek();}
 
 function openCitaModal(){
+  if(!hasPerm('agenda')){toast('No tienes permiso para crear citas','err');return;}
   openNewCita(today(),'08:00');
 }
 
 function openNewCita(fecha,hora){
+  if(!hasPerm('agenda')){toast('No tienes permiso para crear citas','err');return;}
   document.getElementById('c-edit-id').value='';
   document.getElementById('m-cita-title').textContent='Nueva cita';
   fillCitaSelects();
@@ -1193,6 +1424,7 @@ function openNewCita(fecha,hora){
 }
 
 function editCita(id){
+  if(!hasPerm('agenda')){toast('No tienes permiso para editar citas','err');return;}
   const c=(DB.get('citas')||[]).find(x=>x.id===+id);
   if(!c)return;
   document.getElementById('c-edit-id').value=c.id;
@@ -1232,6 +1464,7 @@ function fillMeds(){
 }
 
 function saveCita(){
+  if(!hasPerm('agenda')){toast('No tienes permiso para guardar citas','err');return;}
   const pac=document.getElementById('c-pac').value;
   const esp=document.getElementById('c-esp').value;
   const med=document.getElementById('c-med').value;
@@ -1287,6 +1520,7 @@ let selPac=null;
 let returnToCitaAfterPac=false;
 
 function renderPatList(){
+  if(!hasPerm('hce')) return;
   const q=document.getElementById('hce-q')?.value.toLowerCase()||'';
   const pacs=DB.get('pacientes')||[];
   const fil=pacs.filter(p=>(p.nombres+' '+p.apellidos+p.cedula+p.tel).toLowerCase().includes(q));
@@ -1298,12 +1532,14 @@ function renderPatList(){
     </div>`).join('')||'<div style="padding:20px;text-align:center;color:var(--text3);">Sin resultados</div>';
 }
 
-function selectPat(id){selPac=id;renderPatList();renderHCE(id);}
+function selectPat(id){if(!hasPerm('hce')){toast('No tienes permiso para ver expedientes clínicos','err');return;}selPac=id;renderPatList();renderHCE(id);}
 
 function renderHCE(id){
+  if(!hasPerm('hce')) return;
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+id);
   if(!p)return;
   const notas=(DB.get('notas')||{})[id]||[];
+  const archivos=(DB.get('archivosClinicos')||{})[id]||[];
   const ini=(p.nombres[0]+p.apellidos[0]).toUpperCase();
   const espColor=getEspColor(p.esp);
   document.getElementById('hce-detail').innerHTML=`
@@ -1316,6 +1552,7 @@ function renderHCE(id){
       </div>
       <button class="btn-p btn-sm flex gap6" onclick="openNotaModal(${id})"><i class="ti ti-pencil"></i>Nueva nota</button>
       ${currentUser?.rol==='medico'||currentUser?.rol==='admin'?`<button class="btn-g btn-sm flex gap6" onclick="openRecetaModal(${id})"><i class="ti ti-prescription"></i>Receta</button><button class="btn-s btn-sm" onclick="printEtiqueta(${id})"><i class="ti ti-tag"></i>Etiqueta</button>`:''}
+      <button class="btn-s btn-sm" onclick="openArchivoModal(${id})"><i class="ti ti-paperclip"></i>Adjuntar</button>
       <button class="btn-s btn-sm" onclick="editPacModal(${id})"><i class="ti ti-edit"></i>Editar</button>
     </div>
     <div class="card-body">
@@ -1335,6 +1572,7 @@ function renderHCE(id){
       <div class="tabs">
         <div class="tab active" onclick="swTab('t-evo',this)">Evoluciones (${notas.length})</div>
         <div class="tab" onclick="swTab('t-recetas',this)">Recetas</div>
+        <div class="tab" onclick="swTab('t-archivos',this)">Archivos (${archivos.length})</div>
         <div class="tab" onclick="swTab('t-citas',this)">Citas</div>
         <div class="tab" onclick="swTab('t-fac',this)">Facturas</div>
       </div>
@@ -1354,7 +1592,7 @@ function renderHCE(id){
               </div>
               ${n.motivo?`<div class="mb4"><span class="field-lbl">Motivo:</span> <span class="text-sm">${n.motivo}</span></div>`:''}
               ${n.explora?`<div class="mb4"><span class="field-lbl">Exploración:</span> <span class="text-sm">${n.explora}</span></div>`:''}
-              ${n.dx?`<div class="mb4"><span class="field-lbl">Diagnóstico:</span> <strong class="text-sm">${n.dx}</strong></div>`:''}
+              ${(n.dx||n.cie10Desc)?`<div class="mb4"><span class="field-lbl">Diagnóstico:</span> ${n.cie10Code?`<span class="badge b-blue">CIE-10 ${esc(n.cie10Code)}</span> `:''}<strong class="text-sm">${esc(n.dx||n.cie10Desc)}</strong></div>`:''}
               ${n.plan?`<div><span class="field-lbl">Plan:</span> <span class="text-sm">${n.plan}</span></div>`:''}
             </div>
           </div>`).join('')
@@ -1366,6 +1604,24 @@ function renderHCE(id){
             <div class="card-hdr" style="padding:10px 14px;"><i class="ti ti-prescription" style="color:var(--green);font-size:16px;"></i><div style="flex:1;"><div class="fw5 text-sm">${r.medico}</div><div class="text-xs text-muted">${fmtDate(r.fecha)}</div></div><button class="btn-s btn-xs" onclick="printReceta(${id},${r.id})"><i class="ti ti-printer"></i> Imprimir</button></div>
             <div class="card-body" style="padding:10px 14px;"><div class="field-lbl">Medicamentos</div><div style="white-space:pre-wrap;">${r.medicamentos}</div>${r.indicaciones?`<div class="field-lbl mt8">Indicaciones</div><div style="white-space:pre-wrap;">${r.indicaciones}</div>`:''}</div>
           </div>`).join('')||'<div class="text-muted text-sm">Sin recetas registradas.</div>'}
+      </div>
+      <div id="t-archivos" class="tab-panel">
+        <div class="mb12"><button class="btn-p btn-sm" onclick="openArchivoModal(${id})"><i class="ti ti-upload"></i> Adjuntar resultado, imagen o estudio</button></div>
+        ${archivos.length?`<div class="file-grid">${archivos.map(a=>`
+          <div class="file-card">
+            <div class="file-icon"><i class="ti ${archivoIcon(a)}"></i></div>
+            <div style="flex:1;min-width:0;">
+              <div class="file-name">${esc(a.nombre)}</div>
+              <div class="text-xs text-muted">${esc(a.tipo||'Documento')} · ${fmtDate(a.fecha)} · ${fmtBytes(a.size)}</div>
+              ${a.descripcion?`<div class="file-desc">${esc(a.descripcion)}</div>`:''}
+              <div class="text-xs text-muted mt4">Subido por: ${esc(a.subidoPor||'—')}</div>
+              <div class="file-actions">
+                <button class="btn-s btn-xs" onclick="openArchivoClinico(${id},${a.id})"><i class="ti ti-eye"></i> Abrir</button>
+                <button class="btn-s btn-xs" onclick="downloadArchivoClinico(${id},${a.id})"><i class="ti ti-download"></i> Descargar</button>
+                <button class="btn-d btn-xs" onclick="deleteArchivoClinico(${id},${a.id})"><i class="ti ti-trash"></i></button>
+              </div>
+            </div>
+          </div>`).join('')}</div>`:'<div class="text-muted text-sm">Sin archivos adjuntos. Puedes agregar resultados de laboratorio, imágenes, estudios o documentos cuando sea necesario.</div>'}
       </div>
       <div id="t-citas" class="tab-panel">
         ${(DB.get('citas')||[]).filter(c=>c.pac===+id).map(c=>`
@@ -1394,19 +1650,52 @@ function swTab(id,el){
   const panel=document.getElementById(id);if(panel)panel.classList.add('active');
 }
 
+function normalizeCie10Code(code){return String(code||'').trim().toUpperCase();}
+function cie10Catalog(){return DB.get('cie10')||CIE10_SEED;}
+function getCie10ByCode(code){const c=normalizeCie10Code(code);return cie10Catalog().find(x=>normalizeCie10Code(x.code)===c);}
+function searchCie10(q,limit=80){
+  const term=String(q||'').trim().toLowerCase();
+  const list=[...cie10Catalog()].sort((a,b)=>normalizeCie10Code(a.code).localeCompare(normalizeCie10Code(b.code)));
+  const filtered=term?list.filter(x=>(x.code+' '+x.desc+' '+(x.chapter||'')).toLowerCase().includes(term)):list;
+  return filtered.slice(0,limit);
+}
+function fillCie10Select(){
+  const q=document.getElementById('n-cie-search')?.value||'';
+  const sel=document.getElementById('n-cie');
+  if(!sel)return;
+  const items=searchCie10(q,70);
+  sel.innerHTML='<option value="">Seleccionar CIE-10...</option>'+items.map(x=>`<option value="${esc(normalizeCie10Code(x.code))}">${esc(normalizeCie10Code(x.code))} — ${esc(x.desc)}</option>`).join('');
+}
+function applyCie10Selection(){
+  const item=getCie10ByCode(document.getElementById('n-cie').value);
+  if(!item){
+    document.getElementById('n-cie-code').value='';
+    document.getElementById('n-cie-desc').value='';
+    return;
+  }
+  document.getElementById('n-cie-code').value=normalizeCie10Code(item.code);
+  document.getElementById('n-cie-desc').value=item.desc;
+  document.getElementById('n-dx').value=`${normalizeCie10Code(item.code)} — ${item.desc}`;
+}
+
 function openNotaModal(pacId){
+  if(!hasPerm('hce')){toast('No tienes permiso para crear notas de evolución','err');return;}
   document.getElementById('n-pac-id').value=pacId;
   const esps=DB.get('especialidades')||[];
   const meds=DB.get('medicos')||[];
   document.getElementById('n-esp').innerHTML=esps.map(e=>`<option>${e.nombre}</option>`).join('');
   document.getElementById('n-med').innerHTML=meds.map(m=>`<option>${m.nombre}</option>`).join('');
-  ['n-pa','n-fc','n-temp','n-peso','n-motivo','n-explora','n-dx','n-plan'].forEach(id=>document.getElementById(id).value='');
+  ['n-pa','n-fc','n-temp','n-peso','n-motivo','n-explora','n-cie-search','n-cie-code','n-cie-desc','n-dx','n-plan'].forEach(id=>document.getElementById(id).value='');
+  fillCie10Select();
   openM('m-nota');
 }
 
 function saveNota(){
+  if(!hasPerm('hce')){toast('No tienes permiso para guardar notas de evolución','err');return;}
   const pacId=document.getElementById('n-pac-id').value;
-  const nota={esp:document.getElementById('n-esp').value,med:document.getElementById('n-med').value,fecha:today(),pa:document.getElementById('n-pa').value,fc:document.getElementById('n-fc').value,temp:document.getElementById('n-temp').value,peso:document.getElementById('n-peso').value,motivo:document.getElementById('n-motivo').value,explora:document.getElementById('n-explora').value,dx:document.getElementById('n-dx').value,plan:document.getElementById('n-plan').value};
+  const cieItem=getCie10ByCode(document.getElementById('n-cie-code').value || document.getElementById('n-cie').value);
+  const dx=document.getElementById('n-dx').value.trim();
+  const nota={esp:document.getElementById('n-esp').value,med:document.getElementById('n-med').value,fecha:today(),pa:document.getElementById('n-pa').value,fc:document.getElementById('n-fc').value,temp:document.getElementById('n-temp').value,peso:document.getElementById('n-peso').value,motivo:document.getElementById('n-motivo').value,explora:document.getElementById('n-explora').value,cie10Code:cieItem?normalizeCie10Code(cieItem.code):'',cie10Desc:cieItem?cieItem.desc:'',dx:dx||(cieItem?`${normalizeCie10Code(cieItem.code)} — ${cieItem.desc}`:''),plan:document.getElementById('n-plan').value};
   const notas=DB.get('notas')||{};
   if(!notas[pacId]) notas[pacId]=[];
   notas[pacId].unshift(nota);
@@ -1417,7 +1706,110 @@ function saveNota(){
   if(selPac===+pacId) renderHCE(pacId);
 }
 
+function archivoIcon(a){
+  const mime=(a?.mime||'').toLowerCase();
+  const tipo=(a?.tipo||'').toLowerCase();
+  if(mime.startsWith('image/')||tipo==='imagen') return 'ti-photo';
+  if(mime.includes('pdf')) return 'ti-file-type-pdf';
+  if(mime.includes('word')||/\.(doc|docx)$/i.test(a?.nombre||'')) return 'ti-file-type-doc';
+  if(mime.includes('excel')||/\.(xls|xlsx)$/i.test(a?.nombre||'')) return 'ti-file-spreadsheet';
+  if(tipo==='laboratorio') return 'ti-flask';
+  if(tipo==='estudio') return 'ti-device-heart-monitor';
+  return 'ti-file-description';
+}
+
+function getArchivoClinico(pacId,archivoId){
+  return ((DB.get('archivosClinicos')||{})[pacId]||[]).find(a=>a.id===+archivoId);
+}
+
+function openArchivoModal(pacId){
+  if(!hasPerm('hce')){toast('No tienes permiso para adjuntar archivos clínicos','err');return;}
+  document.getElementById('ar-pac-id').value=pacId;
+  document.getElementById('ar-tipo').value='Laboratorio';
+  document.getElementById('ar-file').value='';
+  document.getElementById('ar-desc').value='';
+  openM('m-archivo');
+}
+
+function saveArchivoClinico(){
+  if(!hasPerm('hce')){toast('No tienes permiso para guardar archivos clínicos','err');return;}
+  const pacId=document.getElementById('ar-pac-id').value;
+  const tipo=document.getElementById('ar-tipo').value;
+  const file=document.getElementById('ar-file').files[0];
+  const descripcion=document.getElementById('ar-desc').value.trim();
+  if(!pacId){toast('Selecciona un paciente','err');return;}
+  if(!file){toast('Selecciona un archivo para adjuntar','err');return;}
+  if(file.size>MAX_CLINICAL_FILE_BYTES){toast('El archivo supera el límite de 8 MB','err');return;}
+  if(!isAllowedClinicalFile(file)){toast('Tipo de archivo no permitido. Usa PDF, imagen, TXT, Word o Excel.','err');return;}
+  const reader=new FileReader();
+  reader.onerror=()=>toast('No se pudo leer el archivo','err');
+  reader.onload=()=>{
+    const archivos=DB.get('archivosClinicos')||{};
+    if(!archivos[pacId]) archivos[pacId]=[];
+    archivos[pacId].unshift({
+      id:Date.now(),
+      fecha:today(),
+      tipo,
+      nombre:file.name,
+      mime:file.type||'application/octet-stream',
+      size:file.size,
+      descripcion,
+      dataUrl:reader.result,
+      subidoPor:currentUser?(currentUser.name+' '+currentUser.last):'Usuario'
+    });
+    DB.set('archivosClinicos',archivos);
+    closeM('m-archivo');
+    toast('Archivo clínico guardado en la base de datos','ok');
+    if(selPac===+pacId) renderHCE(+pacId);
+  };
+  reader.readAsDataURL(file);
+}
+
+function openArchivoClinico(pacId,archivoId){
+  if(!hasPerm('hce')){toast('No tienes permiso para abrir archivos clínicos','err');return;}
+  const a=getArchivoClinico(pacId,archivoId);
+  if(!a){toast('Archivo no encontrado','err');return;}
+  const mime=(a.mime||'').toLowerCase();
+  if(!mime.startsWith('image/') && !mime.includes('pdf') && !mime.startsWith('text/')){
+    downloadArchivoClinico(pacId,archivoId);
+    toast('Este tipo de archivo se descargó para abrirlo con su programa correspondiente','inf');
+    return;
+  }
+  const w=window.open('','_blank','width=900,height=720');
+  if(!w){toast('Permite ventanas emergentes para abrir el archivo','err');return;}
+  const body=mime.startsWith('image/')
+    ? `<img src="${a.dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`
+    : `<iframe src="${a.dataUrl}" style="width:100%;height:82vh;border:0;"></iframe>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(a.nombre)}</title><style>body{font-family:Arial,sans-serif;margin:0;padding:18px;background:#f6f7f9;color:#222}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.wrap{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px}</style></head><body><div class="top"><div><strong>${esc(a.nombre)}</strong><div style="font-size:12px;color:#666;">${esc(a.tipo||'Documento')} · ${fmtDate(a.fecha)} · ${fmtBytes(a.size)}</div></div><button onclick="window.print()">Imprimir</button></div><div class="wrap">${body}</div></body></html>`);
+  w.document.close();
+}
+
+function downloadArchivoClinico(pacId,archivoId){
+  if(!hasPerm('hce')){toast('No tienes permiso para descargar archivos clínicos','err');return;}
+  const a=getArchivoClinico(pacId,archivoId);
+  if(!a){toast('Archivo no encontrado','err');return;}
+  const link=document.createElement('a');
+  link.href=a.dataUrl;
+  link.download=a.nombre||'archivo-clinico';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function deleteArchivoClinico(pacId,archivoId){
+  if(!hasPerm('hce')){toast('No tienes permiso para eliminar archivos clínicos','err');return;}
+  const a=getArchivoClinico(pacId,archivoId);
+  confirmDelete(`¿Eliminar el archivo "${a?a.nombre:'seleccionado'}"?`,()=>{
+    const archivos=DB.get('archivosClinicos')||{};
+    archivos[pacId]=(archivos[pacId]||[]).filter(x=>x.id!==+archivoId);
+    DB.set('archivosClinicos',archivos);
+    toast('Archivo eliminado','inf');
+    if(selPac===+pacId) renderHCE(+pacId);
+  });
+}
+
 function openRecetaModal(pacId){
+  if(!hasPerm('hce')){toast('No tienes permiso para generar recetas','err');return;}
   document.getElementById('rx-pac-id').value=pacId;
   document.getElementById('rx-medico').value=currentUser.name+' '+currentUser.last;
   document.getElementById('rx-meds').value='';
@@ -1426,6 +1818,7 @@ function openRecetaModal(pacId){
 }
 
 function saveReceta(print=false){
+  if(!hasPerm('hce')){toast('No tienes permiso para guardar recetas','err');return;}
   const pacId=document.getElementById('rx-pac-id').value;
   const medicamentos=document.getElementById('rx-meds').value.trim();
   if(!medicamentos){toast('Ingresa los medicamentos de la receta','err');return;}
@@ -1447,6 +1840,7 @@ function printDoc(title,html){
 }
 
 function printReceta(pacId,recetaId){
+  if(!hasPerm('hce')){toast('No tienes permiso para imprimir recetas','err');return;}
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId);const r=((DB.get('recetas')||{})[pacId]||[]).find(x=>x.id===recetaId);if(!p||!r)return;
   const cfg=DB.get('config')||{};
   const logo=cfg.logo||DEFAULT_LOGO;
@@ -1454,6 +1848,7 @@ function printReceta(pacId,recetaId){
 }
 
 function printEtiqueta(pacId){
+  if(!hasPerm('hce')){toast('No tienes permiso para imprimir etiquetas clínicas','err');return;}
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId);if(!p)return;
   printDoc('Etiqueta paciente',`<div class="tag"><div class="big">${p.nombres} ${p.apellidos}</div><div>Cédula: ${p.cedula||'—'}</div><div>HCE-${String(p.id).padStart(4,'0')} · ${p.esp||'—'}</div><div>Sangre: ${p.sangre||'—'} · Alergias: ${p.alergias||'Ninguna'}</div><div class="barcode">*HCE${String(p.id).padStart(4,'0')}*</div></div>`);
 }
@@ -1498,6 +1893,7 @@ function markPagado(id){const facs=DB.get('facturas')||[];const i=facs.findIndex
 function anularFac(id){confirmDelete(`¿Anular comprobante ${id}?`,()=>{const facs=DB.get('facturas')||[];const i=facs.findIndex(f=>f.id===id);if(i>=0){facs[i].estado='Anulado';DB.set('facturas',facs);}renderFacs();renderFacStats();toast('Comprobante anulado','inf');});}
 
 function openFacModal(){
+  if(!hasPerm('facturacion')){toast('No tienes permiso para facturación','err');return;}
   const pacs=DB.get('pacientes')||[];
   const esps=DB.get('especialidades')||[];
   document.getElementById('f-pac').innerHTML='<option value="">Seleccionar...</option>'+pacs.map(p=>`<option value="${p.id}">${p.nombres} ${p.apellidos} — ${p.cedula}</option>`).join('');
@@ -1529,6 +1925,7 @@ function calcFac(){
 }
 
 function saveFactura(){
+  if(!hasPerm('facturacion')){toast('No tienes permiso para emitir facturas','err');return;}
   const pac=document.getElementById('f-pac').value;
   if(!pac){toast('Selecciona un paciente','err');return;}
   const esp=document.getElementById('f-esp').value;
@@ -1588,6 +1985,7 @@ function renderReportes(){
 // PACIENTES CRUD
 // =========================================================
 function renderPacs(){
+  if(!hasPerm('pacientes')) return;
   const q=(document.getElementById('pac-q')?.value||'').toLowerCase();
   const espF=document.getElementById('pac-esp-f')?.value||'';
   const pacs=(DB.get('pacientes')||[]).filter(p=>{
@@ -1602,7 +2000,7 @@ function renderPacs(){
       <td><span class="badge" style="background:${getEspColor(p.esp)}22;color:${getEspColor(p.esp)};">${p.esp}</span></td>
       <td>${p.seguro||'—'}</td><td>${fmtDate(p.ultima)}</td>
       <td style="white-space:nowrap;">
-        <button class="btn-ic" title="Ver HCE" onclick="showMod('hce',document.querySelector('[onclick*=hce]'));setTimeout(()=>selectPat(${p.id}),200)"><i class="ti ti-notes-medical" style="font-size:14px;color:var(--secondary);"></i></button>
+        ${hasPerm('hce')?`<button class="btn-ic" title="Ver HCE" onclick="showMod('hce',document.querySelector('[data-module=hce]'));setTimeout(()=>selectPat(${p.id}),200)"><i class="ti ti-notes-medical" style="font-size:14px;color:var(--secondary);"></i></button>`:''}
         <button class="btn-ic" title="Editar" onclick="editPacModal(${p.id})"><i class="ti ti-edit" style="font-size:14px;color:var(--primary);"></i></button>
         <button class="btn-ic" title="Eliminar" onclick="deletePac(${p.id})"><i class="ti ti-trash" style="font-size:14px;color:var(--red);"></i></button>
       </td>
@@ -1618,6 +2016,7 @@ function fillPacEspFilter(){
 }
 
 function openPacModal(){
+  if(!hasPerm('pacientes')){toast('No tienes permiso para administrar pacientes','err');return;}
   returnToCitaAfterPac=false;
   document.getElementById('p-edit-id').value='';
   document.getElementById('m-pac-title').textContent='Registrar paciente';
@@ -1627,6 +2026,7 @@ function openPacModal(){
 }
 
 function openPacFromCita(){
+  if(!hasPerm('agenda')&&!hasPerm('pacientes')){toast('No tienes permiso para registrar pacientes','err');return;}
   returnToCitaAfterPac=true;
   closeM('m-cita');
   document.getElementById('p-edit-id').value='';
@@ -1638,6 +2038,7 @@ function openPacFromCita(){
 }
 
 function editPacModal(id){
+  if(!hasPerm('pacientes')){toast('No tienes permiso para editar pacientes','err');return;}
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+id);if(!p)return;
   document.getElementById('p-edit-id').value=p.id;
   document.getElementById('m-pac-title').textContent='Editar paciente';
@@ -1668,6 +2069,7 @@ function fillPacModalSelects(){
 }
 
 function savePac(){
+  if(!hasPerm('pacientes')&&!returnToCitaAfterPac){toast('No tienes permiso para guardar pacientes','err');return;}
   const nombres=document.getElementById('p-nombres').value.trim();
   const apellidos=document.getElementById('p-apellidos').value.trim();
   const cedula=document.getElementById('p-cedula').value.trim();
@@ -1689,6 +2091,7 @@ function savePac(){
 }
 
 function deletePac(id){
+  if(!hasPerm('pacientes')){toast('No tienes permiso para eliminar pacientes','err');return;}
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+id);
   confirmDelete(`¿Eliminar a ${p?.nombres} ${p?.apellidos}?`,()=>{
     const pacs=(DB.get('pacientes')||[]).filter(x=>x.id!==+id);DB.set('pacientes',pacs);
@@ -1912,9 +2315,157 @@ function setStockCantidad(id,cantidad){const st=DB.get('stockQx')||[];const s=st
 function deleteStock(id){confirmDelete('¿Eliminar material del stock?',()=>{DB.set('stockQx',(DB.get('stockQx')||[]).filter(x=>x.id!==id));renderQuirofanos();toast('Material eliminado','ok');});}
 
 // =========================================================
+// SERVICIOS / EXÁMENES / COTIZADOR
+// =========================================================
+let cotItems=[];
+
+function allChargeItems(){
+  const servicios=(DB.get('servicios')||[]).map(s=>({kind:'servicio',id:s.id,nombre:s.nombre,categoria:s.categoria||'Servicio',precio:+s.precio||0,descuento:0}));
+  const examenes=(DB.get('examenes')||[]).map(e=>({kind:'examen',id:e.id,nombre:e.nombre,categoria:e.categoria||'Examen',precio:+e.precio||0,descuento:+e.descuento||0}));
+  return [...servicios,...examenes];
+}
+
+function chargeItemKey(item){return `${item.kind}:${item.id}`;}
+function chargeItemFinal(item,extra=0){const d=Math.min(100,Math.max(0,(+item.descuento||0)+(+extra||0)));return {discount:d,total:(+item.precio||0)*(1-d/100)};}
+function chargeOptionsHtml(){return allChargeItems().map(i=>{const fin=chargeItemFinal(i);return `<option value="${chargeItemKey(i)}">${esc(i.nombre)} (${esc(i.categoria)}) — ${fmtMoney(fin.total)}</option>`;}).join('');}
+function getChargeItem(key){const [kind,id]=String(key||'').split(':');return allChargeItems().find(i=>i.kind===kind&&i.id===+id);}
+
+function renderServicios(){
+  if(!hasPerm('servicios')) return;
+  const servicios=DB.get('servicios')||[];
+  document.getElementById('srv-tbody').innerHTML=servicios.map(s=>`<tr><td class="fw5">${esc(s.nombre)}</td><td>${esc(s.categoria||'Servicio')}</td><td class="fw6">${fmtMoney(s.precio)}</td><td class="text-r"><button class="btn-ic" onclick="deleteServicio(${s.id})"><i class="ti ti-trash" style="color:var(--red);"></i></button></td></tr>`).join('')||'<tr><td colspan="4" class="text-c text-muted">Sin servicios registrados</td></tr>';
+  const total=servicios.reduce((a,s)=>a+(+s.precio||0),0);
+  document.getElementById('srv-summary').innerHTML=`<div class="stat-box"><div class="stat-lbl">Servicios</div><div class="stat-val">${servicios.length}</div><div class="stat-sub">Activos</div></div><div class="stat-box"><div class="stat-lbl">Precio promedio</div><div class="stat-val">${fmtMoney(servicios.length?total/servicios.length:0)}</div><div class="stat-sub">Referencial</div></div>`;
+}
+
+function addServicio(){
+  if(!hasPerm('servicios')){toast('No tienes permiso para administrar servicios','err');return;}
+  const nombre=document.getElementById('srv-nombre').value.trim();
+  const categoria=document.getElementById('srv-cat').value.trim()||'Servicio';
+  const precio=+(document.getElementById('srv-precio').value||0);
+  if(!nombre||precio<=0){toast('Ingresa nombre y precio del servicio','err');return;}
+  const servicios=DB.get('servicios')||[];
+  servicios.push({id:DB.nextId('serv'),nombre,categoria,precio});
+  DB.set('servicios',servicios);
+  ['srv-nombre','srv-cat'].forEach(id=>document.getElementById(id).value='');document.getElementById('srv-precio').value=0;
+  toast('Servicio agregado','ok');renderServicios();refreshChargeSelectors();
+}
+
+function deleteServicio(id){
+  if(!hasPerm('servicios')){toast('No tienes permiso para eliminar servicios','err');return;}
+  confirmDelete('¿Eliminar este servicio?',()=>{DB.set('servicios',(DB.get('servicios')||[]).filter(s=>s.id!==id));renderServicios();refreshChargeSelectors();toast('Servicio eliminado','inf');});
+}
+
+function renderExamenes(){
+  if(!hasPerm('examenes')) return;
+  const examenes=DB.get('examenes')||[];
+  document.getElementById('ex-tbody').innerHTML=examenes.map(e=>{const final=(+e.precio||0)*(1-(+e.descuento||0)/100);return `<tr><td class="fw5">${esc(e.nombre)}</td><td>${esc(e.categoria||'Examen')}</td><td>${fmtMoney(e.precio)}</td><td>${+e.descuento||0}%</td><td class="fw6" style="color:var(--green);">${fmtMoney(final)}</td><td class="text-r"><button class="btn-ic" onclick="deleteExamen(${e.id})"><i class="ti ti-trash" style="color:var(--red);"></i></button></td></tr>`;}).join('')||'<tr><td colspan="6" class="text-c text-muted">Sin exámenes registrados</td></tr>';
+  refreshChargeSelectors();
+  renderCotizador();
+}
+
+function addExamen(){
+  if(!hasPerm('examenes')){toast('No tienes permiso para administrar exámenes','err');return;}
+  const nombre=document.getElementById('ex-nombre').value.trim();
+  const categoria=document.getElementById('ex-cat').value.trim()||'Examen';
+  const precio=+(document.getElementById('ex-precio').value||0);
+  const descuento=Math.min(100,Math.max(0,+(document.getElementById('ex-desc').value||0)));
+  if(!nombre||precio<=0){toast('Ingresa nombre y precio del examen','err');return;}
+  const examenes=DB.get('examenes')||[];
+  examenes.push({id:DB.nextId('exam'),nombre,categoria,precio,descuento});
+  DB.set('examenes',examenes);
+  ['ex-nombre','ex-cat'].forEach(id=>document.getElementById(id).value='');document.getElementById('ex-precio').value=0;document.getElementById('ex-desc').value=0;
+  toast('Examen agregado','ok');renderExamenes();
+}
+
+function deleteExamen(id){
+  if(!hasPerm('examenes')){toast('No tienes permiso para eliminar exámenes','err');return;}
+  confirmDelete('¿Eliminar este examen?',()=>{DB.set('examenes',(DB.get('examenes')||[]).filter(e=>e.id!==id));renderExamenes();toast('Examen eliminado','inf');});
+}
+
+function refreshChargeSelectors(){
+  const html=chargeOptionsHtml();
+  ['cot-item','cb-serv','inline-serv'].forEach(id=>{const el=document.getElementById(id);if(el){const cur=el.value;el.innerHTML=html;if(cur)el.value=cur;}});
+  const inlineMonto=document.getElementById('inline-monto');const inlineServ=document.getElementById('inline-serv');
+  if(inlineMonto&&inlineServ) updateMontoFromService(inlineServ,inlineMonto);
+  const cbMonto=document.getElementById('cb-monto');const cbServ=document.getElementById('cb-serv');
+  if(cbMonto&&cbServ) updateMontoFromService(cbServ,cbMonto);
+}
+
+function updateMontoFromService(sel,input){
+  const item=getChargeItem(sel.value);
+  if(item&&input) input.value=chargeItemFinal(item).total.toFixed(2);
+}
+
+function renderCotizador(){
+  const pacs=DB.get('pacientes')||[];
+  const pacSel=document.getElementById('cot-pac');
+  if(pacSel) pacSel.innerHTML='<option value="">Paciente sin seleccionar</option>'+pacs.map(p=>`<option value="${p.id}">${esc(p.nombres)} ${esc(p.apellidos)} — ${esc(p.cedula)}</option>`).join('');
+  const itemSel=document.getElementById('cot-item');
+  if(itemSel) itemSel.innerHTML=chargeOptionsHtml();
+  renderCotItems();
+  renderCotList();
+}
+
+function addCotItem(){
+  if(!hasPerm('examenes')){toast('No tienes permiso para cotizar','err');return;}
+  const item=getChargeItem(document.getElementById('cot-item').value);
+  if(!item){toast('Selecciona un servicio o examen','err');return;}
+  const cantidad=Math.max(1,+(document.getElementById('cot-cant').value||1));
+  const extra=+(document.getElementById('cot-extra').value||0);
+  const fin=chargeItemFinal(item,extra);
+  cotItems.push({key:chargeItemKey(item),tipo:item.kind,nombre:item.nombre,categoria:item.categoria,cantidad,precio:item.precio,descuento:fin.discount,total:fin.total*cantidad});
+  document.getElementById('cot-cant').value=1;document.getElementById('cot-extra').value=0;
+  renderCotItems();
+}
+
+function renderCotItems(){
+  const tbody=document.getElementById('cot-tbody');if(!tbody)return;
+  tbody.innerHTML=cotItems.map((i,idx)=>`<tr><td>${esc(i.nombre)}<div class="text-xs text-muted">${esc(i.categoria)} · ${i.tipo==='examen'?'Examen':'Servicio'}</div></td><td>${i.cantidad}</td><td>${fmtMoney(i.precio)}</td><td>${i.descuento}%</td><td class="fw6">${fmtMoney(i.total)}</td><td><button class="btn-ic" onclick="cotItems.splice(${idx},1);renderCotItems();"><i class="ti ti-trash" style="color:var(--red);"></i></button></td></tr>`).join('')||'<tr><td colspan="6" class="text-c text-muted">Agrega servicios o exámenes para cotizar</td></tr>';
+  document.getElementById('cot-total').textContent=fmtMoney(cotItems.reduce((a,i)=>a+i.total,0));
+}
+
+function clearCotizador(){cotItems=[];renderCotItems();}
+
+function saveCotizacion(sendCaja=false){
+  if(!hasPerm('examenes')){toast('No tienes permiso para guardar cotizaciones','err');return;}
+  if(sendCaja&&!hasPerm('caja')){toast('No tienes permiso para enviar cotizaciones a caja. Se guardará solo como cotización.','inf');sendCaja=false;}
+  if(!cotItems.length){toast('Agrega al menos un servicio o examen','err');return;}
+  const total=cotItems.reduce((a,i)=>a+i.total,0);
+  const cot={id:DB.nextId('cot'),numero:`COT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,fecha:today(),pac:+(document.getElementById('cot-pac').value||0),items:[...cotItems],total,estado:sendCaja?'Enviado a caja':'Cotizado',creadoPor:currentUser.name+' '+currentUser.last};
+  const cots=DB.get('cotizaciones')||[];cots.unshift(cot);DB.set('cotizaciones',cots);
+  if(sendCaja) sendCotizacionCaja(cot);
+  printCotizacion(cot.id);
+  clearCotizador();renderCotList();toast(sendCaja?'Cotización guardada y enviada a caja':'Cotización guardada','ok');
+}
+
+function sendCotizacionCaja(cot){
+  const cajas=DB.get('cajas')||[];const caja=cajas.find(c=>c.estado==='abierta');
+  if(!caja){toast('No hay caja abierta. La cotización quedó guardada.','inf');return;}
+  caja.movimientos=caja.movimientos||[];
+  caja.movimientos.unshift({hora:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),pac:cot.pac?getPacName(cot.pac):'Paciente sin seleccionar',concepto:cot.numero+' · Servicios/exámenes',monto:cot.total,pago:'Pendiente'});
+  DB.set('cajas',cajas);
+}
+
+function renderCotList(){
+  const tbody=document.getElementById('cot-list-tbody');if(!tbody)return;
+  const cots=DB.get('cotizaciones')||[];
+  tbody.innerHTML=cots.map(c=>`<tr><td class="fw6">${c.numero}</td><td>${fmtDate(c.fecha)}</td><td>${c.pac?getPacName(c.pac):'—'}</td><td>${(c.items||[]).map(i=>esc(i.nombre)).join(', ')}</td><td class="fw6" style="color:var(--green);">${fmtMoney(c.total)}</td><td><span class="badge ${c.estado==='Enviado a caja'?'b-green':'b-blue'}">${c.estado}</span></td><td><button class="btn-ic" onclick="printCotizacion(${c.id})"><i class="ti ti-printer"></i></button></td></tr>`).join('')||'<tr><td colspan="7" class="text-c text-muted">Sin cotizaciones registradas</td></tr>';
+}
+
+function printCotizacion(id){
+  const c=(DB.get('cotizaciones')||[]).find(x=>x.id===id);if(!c)return;
+  const cfg=DB.get('config')||{};
+  const p=(DB.get('pacientes')||[]).find(x=>x.id===+c.pac)||{};
+  const rows=(c.items||[]).map(i=>`<tr><td>${esc(i.nombre)}</td><td>${i.cantidad}</td><td>${fmtMoney(i.precio)}</td><td>${i.descuento}%</td><td>${fmtMoney(i.total)}</td></tr>`).join('');
+  printDoc('Cotización',`<div class="hdr"><img class="logo" src="${cfg.logo||DEFAULT_LOGO}"><div><div class="big">${cfg.nombre||'Centro Médico'}</div><div class="muted">${cfg.dir||''} · ${cfg.tel||''}</div><div class="muted">Cotización de servicios y exámenes</div></div></div><div class="row"><div><div class="label">Cotización</div>${c.numero}</div><div><div class="label">Fecha</div>${fmtDate(c.fecha)}</div></div><div class="box"><div><span class="label">Paciente:</span> ${p.nombres||'—'} ${p.apellidos||''}</div><div><span class="label">Cédula:</span> ${p.cedula||'—'}</div></div><table width="100%" border="1" cellspacing="0" cellpadding="6"><thead><tr><th>Detalle</th><th>Cant.</th><th>Precio</th><th>Desc.</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><div style="text-align:right;margin-top:12px;"><div class="big">Total: ${fmtMoney(c.total)}</div><div class="muted">Cotización válida según disponibilidad y tarifas vigentes.</div></div>`);
+}
+
+// =========================================================
 // CAJA
 // =========================================================
 function renderCaja(){
+  if(!hasPerm('caja')) return;
   const cajas=DB.get('cajas')||[];
   const cajaAbierta=cajas.find(c=>c.estado==='abierta');
   const ultimaCaja=[...cajas].reverse().find(c=>c.estado==='cerrada');
@@ -1967,15 +2518,7 @@ function renderCaja(){
           <div class="card-hdr"><i class="ti ti-calculator" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Cobro rápido</span></div>
           <div class="card-body">
             <div class="field"><label class="field-lbl">Paciente</label><select id="inline-pac">${pacs.map(p=>`<option value="${p.id}">${p.nombres} ${p.apellidos}</option>`).join('')}</select></div>
-            <div class="field"><label class="field-lbl">Servicio</label><select id="inline-serv" onchange="document.getElementById('inline-monto').value=this.value;">
-              <option value="40">Consulta general — $40</option>
-              <option value="60">Consulta especialidad — $60</option>
-              <option value="85">Consulta cardiología — $85</option>
-              <option value="120">Consulta neurología — $120</option>
-              <option value="60">Consulta pediatría — $60</option>
-              <option value="70">Consulta dermatología — $70</option>
-              <option value="150">Procedimiento menor — $150</option>
-            </select></div>
+            <div class="field"><label class="field-lbl">Servicio</label><select id="inline-serv" onchange="updateMontoFromService(this,document.getElementById('inline-monto'))">${chargeOptionsHtml()}</select></div>
             <div class="form-row"><div class="field"><label class="field-lbl">Forma de pago</label><select id="inline-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div>
             <div class="field"><label class="field-lbl">Monto ($)</label><input type="number" id="inline-monto" value="40"/></div></div>
             <button class="btn-g w100" onclick="procesarCobroInline()"><i class="ti ti-check"></i> Procesar cobro</button>
@@ -1983,9 +2526,11 @@ function renderCaja(){
         </div>
       </div>
     </div>`;
+  refreshChargeSelectors();
 }
 
 function abrirCaja(){
+  if(!hasPerm('caja')){toast('No tienes permiso para acceder a caja','err');return;}
   if(currentUser?.rol!=='admin'){toast('Solo el administrador puede abrir caja','err');return;}
   const cajas=DB.get('cajas')||[];
   if(cajas.find(c=>c.estado==='abierta')){toast('La caja ya está abierta','inf');renderCaja();return;}
@@ -1994,6 +2539,7 @@ function abrirCaja(){
 }
 
 function cerrarCaja(){
+  if(!hasPerm('caja')){toast('No tienes permiso para acceder a caja','err');return;}
   if(currentUser?.rol!=='admin'){toast('Solo el administrador puede cerrar caja','err');return;}
   confirmDelete('¿Cerrar la caja abierta? No podrás agregar más movimientos a esta caja.',()=>{
     const cajas=DB.get('cajas')||[];
@@ -2004,6 +2550,7 @@ function cerrarCaja(){
 }
 
 function procesarCobroInline(){
+  if(!hasPerm('caja')){toast('No tienes permiso para procesar cobros','err');return;}
   const cajas=DB.get('cajas')||[];const hoy=today();
   const i=cajas.findIndex(c=>c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
   const pacId=document.getElementById('inline-pac').value;
@@ -2021,12 +2568,15 @@ function procesarCobroInline(){
 }
 
 function openCobroModal(){
+  if(!hasPerm('caja')){toast('No tienes permiso para procesar cobros','err');return;}
   const pacs=DB.get('pacientes')||[];
   document.getElementById('cb-pac').innerHTML=pacs.map(p=>`<option value="${p.id}">${p.nombres} ${p.apellidos}</option>`).join('');
+  refreshChargeSelectors();
   openM('m-cobro');
 }
 
 function procesarCobro(){
+  if(!hasPerm('caja')){toast('No tienes permiso para procesar cobros','err');return;}
   const cajas=DB.get('cajas')||[];const hoy=today();
   const i=cajas.findIndex(c=>c.estado==='abierta');if(i<0){toast('La caja no está abierta','err');return;}
   const pacId=document.getElementById('cb-pac').value;
@@ -2059,7 +2609,11 @@ function loadConfig(){
   const panel=document.getElementById('admin-users-panel');
   if(panel) panel.style.display = currentUser?.rol==='admin' ? 'block' : 'none';
   const users=DB.get('users')||[];
-  document.getElementById('users-tbody').innerHTML=users.map(u=>`<tr><td class="text-sm">${u.email}</td><td>${u.name} ${u.last}</td><td><span class="badge b-blue">${{admin:'Administrador',recepcion:'Recepción',medico:'Médico'}[u.rol]||u.rol}</span></td><td><span class="badge b-green">Activo</span></td></tr>`).join('');
+  renderCreatePerms();
+  document.getElementById('users-tbody').innerHTML=users.map(u=>`<tr><td class="text-sm">${u.email}</td><td>${u.name} ${u.last}</td><td><span class="badge b-blue">${ROLE_LABELS[u.rol]||u.rol}</span></td><td>${renderUserPerms(u)}</td><td><span class="badge b-green">Activo</span></td><td>${u.rol==='admin'?'<span class="text-xs text-muted">Permisos completos</span>':`<button class="btn-p btn-xs" onclick="saveUserPerms(${u.id})"><i class="ti ti-device-floppy"></i> Guardar</button>`}</td></tr>`).join('');
+  const cieForm=document.getElementById('cie10-admin-form');
+  if(cieForm) cieForm.style.display=currentUser?.rol==='admin'?'block':'none';
+  renderCie10Catalog();
 }
 
 async function createSystemUser(){
@@ -2069,7 +2623,8 @@ async function createSystemUser(){
     last:document.getElementById('u-last').value.trim(),
     email:document.getElementById('u-email').value.trim(),
     password:document.getElementById('u-pass').value,
-    rol:document.getElementById('u-rol').value
+    rol:document.getElementById('u-rol').value,
+    permissions:getCheckedPerms('u-perm-')
   };
   try{
     const res=await API.post('/api/users',payload);
@@ -2080,6 +2635,79 @@ async function createSystemUser(){
     loadConfig();
     toast('Usuario creado correctamente','ok');
   }catch(err){toast(err.message||'No se pudo crear el usuario','err');}
+}
+
+function renderPermChecks(prefix,perms,disabled=false){
+  const clean=cleanPermissions(perms,'recepcion');
+  return MODULE_PERMS.map(p=>`<label class="perm-check"><input type="checkbox" id="${prefix}${p.id}" value="${p.id}" ${clean.includes(p.id)||perms?.includes(p.id)?'checked':''} ${disabled||p.id==='config'?'disabled':''}/> ${p.label}</label>`).join('');
+}
+
+function renderCreatePerms(){
+  const box=document.getElementById('u-perms');
+  if(!box)return;
+  const role=document.getElementById('u-rol')?.value||'recepcion';
+  const perms=defaultPermsForRole(role);
+  box.innerHTML=renderPermChecks('u-perm-',perms,role==='admin');
+}
+
+function renderUserPerms(u){
+  if(u.rol==='admin') return '<span class="badge b-green">Todos los módulos</span>';
+  return `<div class="perm-grid" style="min-width:420px;">${MODULE_PERMS.filter(p=>p.id!=='config').map(p=>`<label class="perm-check"><input type="checkbox" id="perm-${u.id}-${p.id}" value="${p.id}" ${hasPerm(p.id,u)?'checked':''}/> ${p.label}</label>`).join('')}</div>`;
+}
+
+function getCheckedPerms(prefix){
+  return MODULE_PERMS.map(p=>p.id).filter(id=>document.getElementById(prefix+id)?.checked);
+}
+
+async function saveUserPerms(userId){
+  if(currentUser?.rol!=='admin'){toast('Solo el administrador puede configurar permisos','err');return;}
+  const user=(DB.get('users')||[]).find(u=>u.id===+userId);
+  if(!user){toast('Usuario no encontrado','err');return;}
+  const permissions=MODULE_PERMS.map(p=>p.id).filter(id=>document.getElementById(`perm-${userId}-${id}`)?.checked);
+  try{
+    const res=await API.post('/api/users/permissions',{userId,permissions});
+    const users=DB.get('users')||[];
+    const i=users.findIndex(u=>u.id===+userId);
+    if(i>=0) users[i]=res.user;
+    DB.cache.users=users;
+    if(currentUser.id===+userId){currentUser=res.user;applyPermissionUI();}
+    loadConfig();
+    toast('Permisos actualizados','ok');
+  }catch(err){toast(err.message||'No se pudieron guardar los permisos','err');}
+}
+
+function renderCie10Catalog(){
+  const tbody=document.getElementById('cie10-tbody');
+  if(!tbody)return;
+  const q=document.getElementById('cie-q')?.value||'';
+  const items=searchCie10(q,140);
+  tbody.innerHTML=items.map(x=>`<tr><td class="fw6">${esc(normalizeCie10Code(x.code))}</td><td>${esc(x.desc)}</td><td>${esc(x.chapter||'General')}</td><td class="text-r">${currentUser?.rol==='admin'?`<button class="btn-ic" title="Eliminar código" onclick="deleteCie10Code('${esc(normalizeCie10Code(x.code))}')"><i class="ti ti-trash" style="font-size:14px;color:var(--red);"></i></button>`:''}</td></tr>`).join('')||'<tr><td colspan="4" class="text-c text-muted">Sin códigos encontrados</td></tr>';
+}
+
+function addCie10Code(){
+  if(currentUser?.rol!=='admin'){toast('Solo el administrador puede modificar el catálogo CIE-10','err');return;}
+  const code=normalizeCie10Code(document.getElementById('cie-code').value);
+  const desc=document.getElementById('cie-desc').value.trim();
+  const chapter=document.getElementById('cie-chapter').value.trim()||'General';
+  if(!code||!desc){toast('Ingresa código y descripción CIE-10','err');return;}
+  const list=cie10Catalog().filter(x=>normalizeCie10Code(x.code)!==code);
+  list.push({code,desc,chapter});
+  DB.set('cie10',list);
+  ['cie-code','cie-desc','cie-chapter'].forEach(id=>document.getElementById(id).value='');
+  renderCie10Catalog();
+  fillCie10Select();
+  toast('Código CIE-10 guardado','ok');
+}
+
+function deleteCie10Code(code){
+  if(currentUser?.rol!=='admin'){toast('Solo el administrador puede modificar el catálogo CIE-10','err');return;}
+  const clean=normalizeCie10Code(code);
+  confirmDelete(`¿Eliminar el código CIE-10 ${clean}?`,()=>{
+    DB.set('cie10',cie10Catalog().filter(x=>normalizeCie10Code(x.code)!==clean));
+    renderCie10Catalog();
+    fillCie10Select();
+    toast('Código CIE-10 eliminado','inf');
+  });
 }
 
 function saveCfg(){
