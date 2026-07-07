@@ -391,6 +391,18 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if path == "/api/users":
             if user.get("rol") != "admin":
                 return make_response(self, 403, {"error": "Solo el administrador puede crear usuarios"})
+            if payload.get("action") == "permissions":
+                user_id = int(payload.get("userId") or 0)
+                permissions = payload.get("permissions") or []
+                with db() as conn:
+                    users = get_json_key(conn, "users", [])
+                    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)
+                    if not target:
+                        return make_response(self, 404, {"error": "Usuario no encontrado"})
+                    target["permissions"] = clean_permissions(permissions, target.get("rol", "recepcion"))
+                    set_json_key(conn, "users", users)
+                    audit(conn, user, "update_permissions", "users", {"targetUserId": user_id, "permissions": target["permissions"]})
+                return make_response(self, 200, {"user": public_user(target)})
             name = (payload.get("name") or "").strip()
             last = (payload.get("last") or "").strip()
             email = (payload.get("email") or "").strip().lower()

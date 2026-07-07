@@ -984,12 +984,10 @@ const DB = {
       this.set('users',[{id:1,name:'Admin',last:'Sistema',email:'admin@medicg.com',pass:'Admin123',rol:'admin',permissions:defaultPermsForRole('admin'),createdAt:now()}]);
     }else{
       const users=this.get('users')||[];
-      let changed=false;
       users.forEach(u=>{
         const clean=cleanPermissions(u.permissions,u.rol);
-        if(JSON.stringify(u.permissions||[])!==JSON.stringify(clean)){u.permissions=clean;changed=true;}
+        if(JSON.stringify(u.permissions||[])!==JSON.stringify(clean)) u.permissions=clean;
       });
-      if(changed) this.set('users',users);
     }
     if(!this.get('especialidades')){
       this.set('especialidades',[
@@ -2665,7 +2663,7 @@ async function saveUserPerms(userId){
   if(!user){toast('Usuario no encontrado','err');return;}
   const permissions=MODULE_PERMS.map(p=>p.id).filter(id=>document.getElementById(`perm-${userId}-${id}`)?.checked);
   try{
-    const res=await API.post('/api/users/permissions',{userId,permissions});
+    const res=await API.post('/api/users',{action:'permissions',userId,permissions});
     const users=DB.get('users')||[];
     const i=users.findIndex(u=>u.id===+userId);
     if(i>=0) users[i]=res.user;
