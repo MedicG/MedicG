@@ -162,6 +162,8 @@ def can_save_key(user, key):
     role = user.get("rol", "recepcion")
     if role == "admin":
         return True
+    if key in ("servicios", "examenes"):
+        return False
     perms = set(clean_permissions(user.get("permissions"), role))
     key_map = {
         "citas": "agenda",
