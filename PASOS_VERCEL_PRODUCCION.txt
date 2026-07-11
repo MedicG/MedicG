@@ -14,7 +14,7 @@ Medic G en Vercel con base de datos real
 5. En Settings > Environment Variables agrega:
 
    ADMIN_EMAIL=admin@medicg.com
-   ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
+   ADMIN_PASSWORD=Cjmh10vnpt
    PUBLIC_APP_URL=https://TU-PROYECTO.vercel.app
    ALLOWED_ORIGINS=https://TU-PROYECTO.vercel.app
 
