@@ -27,12 +27,22 @@ Variables de entorno recomendadas
 - ADMIN_PASSWORD: contrasena inicial del administrador.
 - ALLOWED_ORIGINS: dominios permitidos para conectarse al backend, separados por coma.
   Ejemplo: https://tuusuario.github.io
+- PUBLIC_APP_URL: URL publica del sistema para crear enlaces de verificacion.
+  Ejemplo: https://tuusuario.github.io/medicg
+- SMTP_HOST: servidor SMTP para enviar correos de verificacion.
+- SMTP_PORT: puerto SMTP, normalmente 587.
+- SMTP_USER: usuario/correo SMTP.
+- SMTP_PASSWORD: clave o app password SMTP.
+- SMTP_FROM: correo remitente. Si se deja vacio usa SMTP_USER o ADMIN_EMAIL.
+- SMTP_TLS: true para STARTTLS en puerto 587.
+- SMTP_SSL: true solo si usas puerto 465.
 
 Seguridad incluida
 - Los datos se guardan en SQLite en el backend, no en el navegador.
 - Las contrasenas se guardan con hash PBKDF2, no en texto plano.
-- El registro publico esta desactivado.
-- Solo el administrador puede crear usuarios desde Configuracion > Usuarios del sistema.
+- Los usuarios pueden registrarse con correo y deben verificarlo antes de iniciar sesion.
+- Las cuentas registradas quedan sin permisos hasta que el administrador las autorice.
+- El administrador tambien puede crear usuarios internos desde Configuracion > Usuarios del sistema.
 - Solo el administrador puede abrir y cerrar caja; los movimientos se guardan en la caja abierta.
 - Gestion de quirofanos, disponibilidad de equipos especializados y stock quirurgico.
 - El backend valida sesion para cada guardado.
@@ -45,3 +55,4 @@ Importante
 - Usa una ruta persistente para MEDICG_DB_PATH. Si el hosting borra archivos al reiniciar, perderas la base.
 - Cambia ADMIN_PASSWORD antes de entregar el sistema a un cliente.
 - Si config.js no apunta a un backend real, el login no se habilitara en modo seguro.
+- Si no configuras SMTP, el sistema creara la cuenta pero no podra enviar el correo de verificacion.

@@ -251,6 +251,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
         <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"/></div>
         <div id="login-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
         <button class="btn-p w100" onclick="doLogin()"><i class="ti ti-login" style="font-size:16px;"></i> Ingresar al sistema</button>
+        <button class="btn-s w100 mt8" onclick="switchAuth('register')"><i class="ti ti-user-plus" style="font-size:16px;"></i> Crear cuenta nueva</button>
       </div>
 
       <!-- REGISTER FORM -->
@@ -264,11 +265,10 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
           <div class="field"><label class="field-lbl">Contraseña <span class="req">*</span></label><input type="password" id="r-pass" placeholder="Mín. 6 caracteres"/></div>
           <div class="field"><label class="field-lbl">Confirmar contraseña</label><input type="password" id="r-pass2" placeholder="Repetir contraseña"/></div>
         </div>
-        <div class="field"><label class="field-lbl">Rol</label>
-          <select id="r-rol"><option value="admin">Administrador</option><option value="recepcion">Recepción</option><option value="medico">Médico</option></select>
-        </div>
+        <div class="alert alert-i mb8"><i class="ti ti-mail-check"></i><span>Te enviaremos un correo de verificación. Luego el administrador podrá asignarte permisos.</span></div>
         <div id="reg-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
         <button class="btn-p w100" onclick="doRegister()"><i class="ti ti-user-plus" style="font-size:16px;"></i> Crear cuenta</button>
+        <button class="btn-s w100 mt8" onclick="switchAuth('login')">Ya tengo cuenta</button>
       </div>
     </div>
   </div>
@@ -349,6 +349,16 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
       <div class="card">
         <div class="card-hdr"><i class="ti ti-users" style="color:var(--green);font-size:18px;"></i><span class="card-title">Pacientes por especialidad</span></div>
         <div class="card-body" id="dash-pacesp"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUENTA SIN PERMISOS -->
+  <div id="mod-noaccess" class="module">
+    <div class="card">
+      <div class="card-hdr"><i class="ti ti-lock" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Cuenta pendiente de permisos</span></div>
+      <div class="card-body">
+        <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Tu correo ya fue verificado, pero el administrador todavía debe asignarte permisos para usar los módulos del sistema.</span></div>
       </div>
     </div>
   </div>
@@ -599,7 +609,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
       <div class="card">
         <div class="card-hdr"><i class="ti ti-users-group" style="color:var(--secondary);font-size:18px;"></i><span class="card-title">Usuarios del sistema</span></div>
         <div class="card-body" id="admin-users-panel">
-          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Solo el administrador puede crear usuarios. El registro público está desactivado.</span></div>
+          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Los usuarios pueden registrarse con correo verificado, pero solo el administrador puede crear usuarios internos y asignar permisos.</span></div>
           <div class="form-row c3">
             <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="u-name"/></div>
             <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="u-last"/></div>
@@ -956,13 +966,14 @@ const MODULE_PERMS = [
   {id:'caja',label:'Caja / cobranza'},
   {id:'config',label:'Configuración'}
 ];
-const ROLE_LABELS={admin:'Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico'};
+const ROLE_LABELS={admin:'Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico',pendiente:'Pendiente de permisos'};
 const ROLE_DEFAULT_PERMS={
   admin:MODULE_PERMS.map(p=>p.id),
   recepcion:['agenda','caja'],
   secretaria:['agenda','caja'],
   asistente:['agenda','caja'],
-  medico:['hce']
+  medico:['hce'],
+  pendiente:[]
 };
 
 const DB = {
@@ -1085,7 +1096,7 @@ function cleanPermissions(perms,role){
 }
 function userPerms(user=currentUser){return cleanPermissions(user?.permissions,user?.rol||'recepcion');}
 function hasPerm(moduleId,user=currentUser){return user?.rol==='admin'||userPerms(user).includes(moduleId);}
-function firstAllowedModule(){return MODULE_PERMS.find(p=>hasPerm(p.id))?.id||'agenda';}
+function firstAllowedModule(){return MODULE_PERMS.find(p=>hasPerm(p.id))?.id||null;}
 const MAX_CLINICAL_FILE_BYTES=8*1024*1024;
 const CLINICAL_FILE_EXTS=['pdf','jpg','jpeg','png','webp','gif','txt','doc','docx','xls','xlsx'];
 const CLINICAL_FILE_MIMES=['application/pdf','image/jpeg','image/png','image/webp','image/gif','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
@@ -1129,14 +1140,33 @@ async function doLogin(){
   }
 }
 
-function doRegister(){
-  showAuthErr('reg','El registro público está desactivado. Un administrador debe crear el usuario.');
+async function doRegister(){
+  const name=document.getElementById('r-name').value.trim();
+  const last=document.getElementById('r-last').value.trim();
+  const email=document.getElementById('r-email').value.trim();
+  const password=document.getElementById('r-pass').value;
+  const password2=document.getElementById('r-pass2').value;
+  if(password!==password2) return showAuthErr('reg','Las contraseñas no coinciden');
+  try{
+    const result=await API.post('/api/register',{name,last,email,password});
+    showAuthMsg('reg',result.message||'Cuenta creada. Revisa tu correo para verificarla.',result.emailSent?'s':'w',false);
+    if(result.emailSent){
+      ['r-name','r-last','r-email','r-pass','r-pass2'].forEach(id=>document.getElementById(id).value='');
+    }
+  }catch(err){
+    showAuthErr('reg',err.message||'No se pudo crear la cuenta');
+  }
 }
 function showAuthErr(type,msg){
+  showAuthMsg(type,msg,'d',true);
+}
+function showAuthMsg(type,msg,kind='d',autoHide=true){
   const el=document.getElementById(type==='login'?'login-err':'reg-err');
-  el.classList.remove('hidden');
+  el.className=`alert alert-${kind} mb8`;
+  const icon=el.querySelector('i');
+  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':'ti ti-alert-circle');
   el.querySelector('span').textContent=msg;
-  setTimeout(()=>el.classList.add('hidden'),4000);
+  if(autoHide) setTimeout(()=>el.classList.add('hidden'),5000);
 }
 
 function doLogout(){
@@ -1159,7 +1189,8 @@ function launchApp(){
   applyLogo(DB.get('config')?.logo||DEFAULT_LOGO);
   applyPermissionUI();
   const first=firstAllowedModule();
-  showMod(first,document.querySelector(`.nav-item[data-module="${first}"]`));
+  if(first) showMod(first,document.querySelector(`.nav-item[data-module="${first}"]`));
+  else showNoAccess();
 }
 
 // =========================================================
@@ -1196,11 +1227,20 @@ function applyPermissionUI(){
   if(citaBtn) citaBtn.style.display=hasPerm('agenda')?'flex':'none';
 }
 
+function showNoAccess(){
+  document.querySelectorAll('.module').forEach(m=>{m.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('mod-noaccess')?.classList.add('active');
+  document.getElementById('tb-title').textContent='Cuenta pendiente';
+}
+
 function showMod(id,el){
+  if(!id) return showNoAccess();
   if(!hasPerm(id)){
     toast('No tienes permiso para acceder a este módulo','err');
     const fallback=firstAllowedModule();
-    if(fallback!==id) return showMod(fallback,document.querySelector(`.nav-item[data-module="${fallback}"]`));
+    if(fallback&&fallback!==id) return showMod(fallback,document.querySelector(`.nav-item[data-module="${fallback}"]`));
+    if(!fallback) return showNoAccess();
     return;
   }
   document.querySelectorAll('.module').forEach(m=>{m.classList.remove('active');});
@@ -2668,10 +2708,17 @@ function loadConfig(){
   if(panel) panel.style.display = currentUser?.rol==='admin' ? 'block' : 'none';
   const users=DB.get('users')||[];
   renderCreatePerms();
-  document.getElementById('users-tbody').innerHTML=users.map(u=>`<tr><td class="text-sm">${u.email}</td><td>${u.name} ${u.last}</td><td><span class="badge b-blue">${ROLE_LABELS[u.rol]||u.rol}</span></td><td>${renderUserPerms(u)}</td><td><span class="badge b-green">Activo</span></td><td>${u.rol==='admin'?'<span class="text-xs text-muted">Permisos completos</span>':`<button class="btn-p btn-xs" onclick="saveUserPerms(${u.id})"><i class="ti ti-device-floppy"></i> Guardar</button>`}</td></tr>`).join('');
+  document.getElementById('users-tbody').innerHTML=users.map(u=>`<tr><td class="text-sm">${u.email}</td><td>${u.name} ${u.last}</td><td><span class="badge b-blue">${ROLE_LABELS[u.rol]||u.rol}</span></td><td>${renderUserPerms(u)}</td><td>${renderUserStatus(u)}</td><td>${u.rol==='admin'?'<span class="text-xs text-muted">Permisos completos</span>':`<button class="btn-p btn-xs" onclick="saveUserPerms(${u.id})"><i class="ti ti-device-floppy"></i> Guardar</button>`}</td></tr>`).join('');
   const cieForm=document.getElementById('cie10-admin-form');
   if(cieForm) cieForm.style.display=currentUser?.rol==='admin'?'block':'none';
   renderCie10Catalog();
+}
+
+function renderUserStatus(u){
+  if(u.estado==='pendiente_verificacion'||!u.emailVerified) return '<span class="badge b-amber">Pendiente de verificación</span>';
+  if((u.permissions||[]).length===0&&u.rol!=='admin') return '<span class="badge b-amber">Pendiente de permisos</span>';
+  if(u.estado&&u.estado!=='activo') return '<span class="badge b-red">Inactivo</span>';
+  return '<span class="badge b-green">Activo</span>';
 }
 
 async function createSystemUser(){

@@ -20,6 +20,14 @@ Pasos rapidos con Render
    ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
    MEDICG_DB_PATH=/tmp/medicg.sqlite3
    ALLOWED_ORIGINS=https://TU-USUARIO.github.io
+   PUBLIC_APP_URL=https://TU-USUARIO.github.io
+   SMTP_HOST=smtp.tu-proveedor.com
+   SMTP_PORT=587
+   SMTP_USER=tu-correo@dominio.com
+   SMTP_PASSWORD=TU_CLAVE_SMTP
+   SMTP_FROM=tu-correo@dominio.com
+   SMTP_TLS=true
+   SMTP_SSL=false
 6. Render te dara una URL parecida a:
    https://medicg-backend.onrender.com
 7. Edita config.js en GitHub y coloca:
@@ -32,3 +40,5 @@ Importante
 - En Render gratis, /tmp puede borrarse cuando el servicio reinicia.
 - Para un cliente real conviene usar un VPS o almacenamiento persistente.
 - Cambia ADMIN_PASSWORD antes de entregar el sistema.
+- El registro con correo necesita SMTP configurado para enviar el enlace de verificacion.
+- Los usuarios registrados quedan pendientes hasta verificar correo y recibir permisos del admin.

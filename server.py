@@ -1,10 +1,12 @@
 ﻿from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
+from email.message import EmailMessage
 import hashlib
 import json
 import os
 import secrets
+import smtplib
 import sqlite3
 import time
 
@@ -16,6 +18,15 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@medicg.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin123")
 ALLOWED_ORIGINS = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", str(12 * 1024 * 1024)))
+PUBLIC_APP_URL = os.environ.get("PUBLIC_APP_URL", "").rstrip("/")
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER or ADMIN_EMAIL)
+SMTP_TLS = os.environ.get("SMTP_TLS", "true").lower() not in ("0", "false", "no")
+SMTP_SSL = os.environ.get("SMTP_SSL", "false").lower() in ("1", "true", "yes")
+SHOW_VERIFICATION_LINK = os.environ.get("SHOW_VERIFICATION_LINK", "false").lower() in ("1", "true", "yes")
 SESSIONS = {}
 ALLOWED_PERMISSIONS = {
     "dashboard", "agenda", "hce", "facturacion", "reportes", "pacientes",
@@ -28,6 +39,7 @@ ROLE_DEFAULT_PERMISSIONS = {
     "secretaria": ["agenda", "caja"],
     "asistente": ["agenda", "caja"],
     "medico": ["hce"],
+    "pendiente": [],
 }
 MOJIBAKE_REPLACEMENTS = {
     "GestiÃ³n": "Gestión",
@@ -97,6 +109,54 @@ def token_hash(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def user_email_verified(user):
+    return bool(user.get("emailVerified", user.get("estado", "activo") == "activo"))
+
+
+def app_base_url(handler):
+    if PUBLIC_APP_URL:
+        return PUBLIC_APP_URL
+    origin = handler.headers.get("Origin", "").rstrip("/")
+    if origin:
+        return origin
+    proto = handler.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower()
+    proto = "https" if proto == "https" else "http"
+    host = handler.headers.get("Host", f"{HOST}:{PORT}")
+    return f"{proto}://{host}".rstrip("/")
+
+
+def smtp_configured():
+    return bool(SMTP_HOST and SMTP_FROM)
+
+
+def send_verification_email(to_email, name, link):
+    if not smtp_configured():
+        return False, "SMTP no configurado"
+    msg = EmailMessage()
+    msg["Subject"] = "Verifica tu cuenta Medic G"
+    msg["From"] = SMTP_FROM
+    msg["To"] = to_email
+    msg.set_content(
+        f"Hola {name},\n\n"
+        "Gracias por registrarte en Medic G.\n\n"
+        f"Verifica tu correo en este enlace:\n{link}\n\n"
+        "Si no solicitaste esta cuenta, puedes ignorar este mensaje."
+    )
+    if SMTP_SSL:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            if SMTP_USER and SMTP_PASSWORD:
+                smtp.login(SMTP_USER, SMTP_PASSWORD)
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            if SMTP_TLS:
+                smtp.starttls()
+            if SMTP_USER and SMTP_PASSWORD:
+                smtp.login(SMTP_USER, SMTP_PASSWORD)
+            smtp.send_message(msg)
+    return True, ""
+
+
 def fix_text(value):
     if isinstance(value, str):
         for bad, good in MOJIBAKE_REPLACEMENTS.items():
@@ -147,6 +207,7 @@ def public_user(user):
         "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
+        "emailVerified": user_email_verified(user),
     }
 
 
@@ -220,6 +281,7 @@ def init_db():
                     "rol": "admin",
                     "permissions": clean_permissions(None, "admin"),
                     "estado": "activo",
+                    "emailVerified": True,
                     "createdAt": now_iso(),
                 }
             ]
@@ -229,6 +291,9 @@ def init_db():
             for user in users:
                 if user.get("pass") and not user.get("passHash"):
                     user["passHash"] = hash_password(user.pop("pass"))
+                    changed = True
+                if "emailVerified" not in user:
+                    user["emailVerified"] = user.get("estado", "activo") == "activo"
                     changed = True
                 cleaned_permissions = clean_permissions(user.get("permissions"), user.get("rol", "recepcion"))
                 if user.get("permissions") != cleaned_permissions:
@@ -271,6 +336,19 @@ def make_response(handler, status, payload):
     handler.send_header("Vary", "Origin")
     handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    handler.send_header("X-Frame-Options", "DENY")
+    handler.send_header("Referrer-Policy", "no-referrer")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def make_html_response(handler, status, html):
+    body = html.encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
     handler.send_header("X-Content-Type-Options", "nosniff")
     handler.send_header("X-Frame-Options", "DENY")
     handler.send_header("Referrer-Policy", "no-referrer")
@@ -322,6 +400,35 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/health":
             return make_response(self, 200, {"ok": True})
+        if path == "/api/verify-email":
+            token = parse_qs(urlparse(self.path).query).get("token", [""])[0]
+            if not token:
+                return make_html_response(self, 400, "<h1>Enlace inválido</h1><p>Falta el token de verificación.</p>")
+            hashed_token = token_hash(token)
+            with db() as conn:
+                users = get_json_key(conn, "users", [])
+                target = next((u for u in users if u.get("verifyTokenHash") == hashed_token), None)
+                if not target:
+                    return make_html_response(self, 404, "<h1>Enlace no encontrado</h1><p>Solicita un nuevo registro o contacta al administrador.</p>")
+                if float(target.get("verifyExpiresAt") or 0) < time.time():
+                    return make_html_response(self, 410, "<h1>Enlace expirado</h1><p>Regístrate nuevamente para recibir otro correo de verificación.</p>")
+                target["emailVerified"] = True
+                target["estado"] = "activo"
+                target.pop("verifyTokenHash", None)
+                target.pop("verifyExpiresAt", None)
+                set_json_key(conn, "users", users)
+                audit(conn, target, "verify_email", "users")
+            return make_html_response(
+                self,
+                200,
+                "<!doctype html><html lang='es'><meta charset='utf-8'>"
+                "<title>Cuenta verificada</title>"
+                "<body style='font-family:Arial,sans-serif;padding:32px;color:#1f2937;'>"
+                "<h1>Correo verificado correctamente</h1>"
+                "<p>Ya puedes iniciar sesión en Medic G. Si todavía no ves módulos, el administrador debe asignarte permisos.</p>"
+                "<p><a href='/' style='color:#0d7a6b;font-weight:700;'>Ir al sistema</a></p>"
+                "</body></html>",
+            )
         if path == "/api/data":
             user = auth_user(self)
             if not user:
@@ -350,8 +457,12 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             with db() as conn:
                 users = get_json_key(conn, "users", [])
             user = next((u for u in users if (u.get("email") or "").lower() == email), None)
-            if not user or user.get("estado", "activo") != "activo" or not verify_password(password, user.get("passHash") or user.get("pass")):
+            if not user or not verify_password(password, user.get("passHash") or user.get("pass")):
                 return make_response(self, 401, {"error": "Correo o contraseña incorrectos"})
+            if not user_email_verified(user) or user.get("estado") == "pendiente_verificacion":
+                return make_response(self, 403, {"error": "Verifica tu correo electrónico antes de iniciar sesión"})
+            if user.get("estado", "activo") != "activo":
+                return make_response(self, 403, {"error": "Usuario no activo"})
             token = secrets.token_urlsafe(32)
             expires_at = time.time() + 24 * 3600
             with db() as conn:
@@ -361,6 +472,56 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 )
                 audit(conn, user, "login", "session")
             return make_response(self, 200, {"token": token, "user": public_user(user)})
+
+        if path == "/api/register":
+            name = (payload.get("name") or "").strip()
+            last = (payload.get("last") or "").strip()
+            email = (payload.get("email") or "").strip().lower()
+            password = payload.get("password") or ""
+            if not name or not last or not email or len(password) < 6:
+                return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres"})
+            verify_token = secrets.token_urlsafe(32)
+            verify_link = f"{app_base_url(self)}/api/verify-email?token={verify_token}"
+            with db() as conn:
+                users = get_json_key(conn, "users", [])
+                if any((u.get("email") or "").lower() == email for u in users):
+                    return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                next_ids = get_json_key(conn, "nextIds", {})
+                new_id = int(next_ids.get("user", len(users) + 1))
+                next_ids["user"] = new_id + 1
+                new_user = {
+                    "id": new_id,
+                    "name": name,
+                    "last": last,
+                    "email": email,
+                    "passHash": hash_password(password),
+                    "rol": "pendiente",
+                    "permissions": [],
+                    "estado": "pendiente_verificacion",
+                    "emailVerified": False,
+                    "verifyTokenHash": token_hash(verify_token),
+                    "verifyExpiresAt": time.time() + 48 * 3600,
+                    "createdAt": now_iso(),
+                }
+                users.append(new_user)
+                set_json_key(conn, "users", users)
+                set_json_key(conn, "nextIds", next_ids)
+                audit(conn, None, "public_register", "users", {"createdUserId": new_id, "createdEmail": email})
+            try:
+                email_sent, email_error = send_verification_email(email, name, verify_link)
+            except Exception as exc:
+                email_sent, email_error = False, str(exc)
+            response = {
+                "ok": True,
+                "emailSent": email_sent,
+                "message": "Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesión.",
+            }
+            if not email_sent:
+                response["message"] = "Cuenta creada, pero el servidor de correo no está configurado. Configura SMTP para enviar verificaciones."
+                response["emailError"] = email_error
+            if SHOW_VERIFICATION_LINK:
+                response["verificationLink"] = verify_link
+            return make_response(self, 201, response)
 
         if path == "/api/logout":
             token = self.headers.get("Authorization", "").replace("Bearer ", "").strip()
@@ -429,6 +590,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "rol": rol,
                     "permissions": permissions,
                     "estado": "activo",
+                    "emailVerified": True,
                     "createdAt": now_iso(),
                 }
                 users.append(new_user)

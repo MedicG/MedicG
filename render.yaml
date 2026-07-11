@@ -16,3 +16,19 @@ services:
         value: /tmp/medicg.sqlite3
       - key: ALLOWED_ORIGINS
         value: https://TU-USUARIO.github.io
+      - key: PUBLIC_APP_URL
+        value: https://TU-USUARIO.github.io
+      - key: SMTP_HOST
+        value: smtp.tu-proveedor.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        value: tu-correo@dominio.com
+      - key: SMTP_PASSWORD
+        value: TU_CLAVE_SMTP
+      - key: SMTP_FROM
+        value: tu-correo@dominio.com
+      - key: SMTP_TLS
+        value: "true"
+      - key: SMTP_SSL
+        value: "false"
