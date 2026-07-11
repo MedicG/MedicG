@@ -11,7 +11,7 @@ services:
       - key: ADMIN_EMAIL
         value: admin@medicg.com
       - key: ADMIN_PASSWORD
-        value: Admin123
+        value: Cjmh10vnpt
       - key: MEDICG_DB_PATH
         value: /tmp/medicg.sqlite3
       - key: ALLOWED_ORIGINS
