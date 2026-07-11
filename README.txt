@@ -1,58 +1,58 @@
-Medic G Web con base de datos segura
+Medic G - Produccion en Vercel
 
-Uso local con base de datos
-1. Ejecuta INICIAR.bat.
-2. Abre en el navegador: http://127.0.0.1:8080
-3. Ingresa con el usuario administrador configurado.
+Este proyecto ya esta preparado para subirlo a GitHub y conectarlo en Vercel.
 
-Uso web / hosting
-- El backend debe ejecutarse en un hosting que soporte Python: VPS, Render, Railway u otro.
-- GitHub Pages solo debe usarse para mostrar el frontend.
-- Comando de inicio del backend:
-  python server.py
+Como funciona en produccion
+- Vercel sirve index.html, config.js y assets.
+- Vercel ejecuta la API Python desde api/index.py.
+- La base de datos de produccion debe ser PostgreSQL.
+- Si no hay DATABASE_URL o POSTGRES_URL, el sistema usa SQLite solo para pruebas locales.
 
-Uso seguro con GitHub Pages
-- GitHub Pages NO ejecuta Python ni SQLite.
-- Para guardar todo en base de datos segura, config.js debe apuntar a un backend real.
-- El modo local del navegador queda desactivado por seguridad.
-- Edita config.js y coloca:
-  window.MEDICG_API_BASE = "https://tu-backend.com";
-  window.MEDICG_REQUIRE_BACKEND = true;
+Variables obligatorias en Vercel
+- DATABASE_URL o POSTGRES_URL: conexion PostgreSQL. Recomendado: Neon desde Vercel Marketplace.
+- ADMIN_EMAIL: correo del administrador inicial.
+- ADMIN_PASSWORD: clave inicial del administrador. Cambiala antes de entregar.
+- PUBLIC_APP_URL: URL publica de Vercel. Ejemplo: https://medicg.vercel.app
 
-Variables de entorno recomendadas
-- PORT: puerto asignado por el hosting.
-- HOST: normalmente 0.0.0.0.
-- MEDICG_DB_PATH: ruta donde se guardara la base de datos.
-- ADMIN_EMAIL: correo inicial del administrador.
-- ADMIN_PASSWORD: contrasena inicial del administrador.
-- ALLOWED_ORIGINS: dominios permitidos para conectarse al backend, separados por coma.
-  Ejemplo: https://tuusuario.github.io
-- PUBLIC_APP_URL: URL publica del sistema para crear enlaces de verificacion.
-  Ejemplo: https://tuusuario.github.io/medicg
-- SMTP_HOST: servidor SMTP para enviar correos de verificacion.
-- SMTP_PORT: puerto SMTP, normalmente 587.
+Variables para enviar correos de verificacion
+- SMTP_HOST: servidor SMTP.
+- SMTP_PORT: normalmente 587.
 - SMTP_USER: usuario/correo SMTP.
-- SMTP_PASSWORD: clave o app password SMTP.
-- SMTP_FROM: correo remitente. Si se deja vacio usa SMTP_USER o ADMIN_EMAIL.
-- SMTP_TLS: true para STARTTLS en puerto 587.
-- SMTP_SSL: true solo si usas puerto 465.
+- SMTP_PASSWORD: clave SMTP o app password.
+- SMTP_FROM: correo remitente.
+- SMTP_TLS: true para puerto 587.
+- SMTP_SSL: false para puerto 587, true solo si usas 465.
+
+Variables recomendadas
+- ALLOWED_ORIGINS: dominio permitido. Ejemplo: https://medicg.vercel.app
+- MAX_BODY_BYTES: limite de archivos adjuntos. Por defecto 12582912.
+
+Pasos rapidos
+1. Sube esta carpeta a un repositorio de GitHub.
+2. En Vercel, importa el repositorio.
+3. En Vercel Marketplace, agrega una base Postgres, por ejemplo Neon.
+4. Confirma que Vercel agrego DATABASE_URL o POSTGRES_URL al proyecto.
+5. Agrega las variables ADMIN_EMAIL, ADMIN_PASSWORD, PUBLIC_APP_URL y SMTP.
+6. Deploy.
+7. Abre la URL de Vercel e inicia sesion con el administrador inicial.
+8. Crea o autoriza usuarios desde Configuracion > Usuarios del sistema.
 
 Seguridad incluida
-- Los datos se guardan en SQLite en el backend, no en el navegador.
+- Los datos se guardan en PostgreSQL en produccion.
 - Las contrasenas se guardan con hash PBKDF2, no en texto plano.
-- Los usuarios pueden registrarse con correo y deben verificarlo antes de iniciar sesion.
-- Las cuentas registradas quedan sin permisos hasta que el administrador las autorice.
-- El administrador tambien puede crear usuarios internos desde Configuracion > Usuarios del sistema.
-- Solo el administrador puede abrir y cerrar caja; los movimientos se guardan en la caja abierta.
-- Gestion de quirofanos, disponibilidad de equipos especializados y stock quirurgico.
-- El backend valida sesion para cada guardado.
-- Las sesiones se guardan en SQLite; si el backend se reinicia, el usuario puede seguir guardando mientras el token no expire.
-- CORS se puede restringir con ALLOWED_ORIGINS.
-- Se agregan cabeceras de seguridad HTTP.
-- Se registra auditoria de login, logout, creacion de usuarios y guardado de datos.
+- Las sesiones se guardan en la base de datos.
+- Los usuarios registrados con correo deben verificar su email.
+- Los usuarios verificados quedan sin permisos hasta que el administrador los autorice.
+- El backend valida permisos antes de guardar cambios.
+- El administrador controla usuarios, permisos, servicios y examenes.
+- Se registra auditoria de login, logout, registros, permisos y guardados.
+
+Uso local
+1. Ejecuta INICIAR.bat.
+2. Abre http://127.0.0.1:8080
+3. Si no configuras DATABASE_URL, usara medicg.sqlite3 local.
 
 Importante
-- Usa una ruta persistente para MEDICG_DB_PATH. Si el hosting borra archivos al reiniciar, perderas la base.
-- Cambia ADMIN_PASSWORD antes de entregar el sistema a un cliente.
-- Si config.js no apunta a un backend real, el login no se habilitara en modo seguro.
-- Si no configuras SMTP, el sistema creara la cuenta pero no podra enviar el correo de verificacion.
+- No uses SQLite como base final en Vercel.
+- Configura SMTP real; sin SMTP se crea la cuenta, pero no se enviara verificacion.
+- Cambia ADMIN_PASSWORD despues del primer acceso.

@@ -1,8 +1,4 @@
-// URL del backend seguro donde se guarda la base de datos.
-// Ejemplo:
-// window.MEDICG_API_BASE = "https://medicg-tu-cliente.onrender.com";
-//
-// Para seguridad, el sistema NO guarda datos en el navegador.
-// Debes configurar un backend real para iniciar sesion.
+// En Vercel el frontend y la API quedan en el mismo dominio, por eso debe ir vacio.
+// Si algun dia usas un backend externo, coloca aqui su URL completa.
 window.MEDICG_API_BASE = "";
 window.MEDICG_REQUIRE_BACKEND = true;

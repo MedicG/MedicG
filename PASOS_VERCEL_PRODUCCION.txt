@@ -1,0 +1,51 @@
+Medic G en Vercel con base de datos real
+
+1. Sube esta carpeta a GitHub.
+
+2. Entra a Vercel:
+   https://vercel.com
+
+3. Crea un nuevo proyecto importando el repositorio de GitHub.
+
+4. En Vercel Marketplace agrega Postgres.
+   Recomendado: Neon.
+   Vercel debe agregar automaticamente una variable como DATABASE_URL o POSTGRES_URL.
+
+5. En Settings > Environment Variables agrega:
+
+   ADMIN_EMAIL=admin@medicg.com
+   ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
+   PUBLIC_APP_URL=https://TU-PROYECTO.vercel.app
+   ALLOWED_ORIGINS=https://TU-PROYECTO.vercel.app
+
+   SMTP_HOST=smtp.tu-proveedor.com
+   SMTP_PORT=587
+   SMTP_USER=tu-correo@dominio.com
+   SMTP_PASSWORD=TU_CLAVE_SMTP
+   SMTP_FROM=tu-correo@dominio.com
+   SMTP_TLS=true
+   SMTP_SSL=false
+
+6. Build & Development Settings:
+   Framework Preset: Other
+   Build Command: dejar vacio
+   Output Directory: dejar vacio
+   Install Command: dejar automatico o vacio. Vercel detecta requirements.txt.
+
+7. Haz Deploy.
+
+8. Al abrir la URL:
+   - Inicia con ADMIN_EMAIL y ADMIN_PASSWORD.
+   - Cambia la clave inicial.
+   - Configura logo, datos del centro, servicios, examenes y permisos.
+
+9. Flujo de usuarios:
+   - El usuario puede registrarse con correo.
+   - Debe verificar el enlace recibido por correo.
+   - Despues de verificar, el admin debe asignarle permisos.
+
+Notas importantes
+- SQLite queda solo para local. En Vercel debes usar Postgres.
+- Si no llega correo, revisa SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_FROM.
+- Si el login dice error de servidor, revisa que DATABASE_URL o POSTGRES_URL exista en Vercel.
+- Si usas Gmail, necesitas una App Password, no tu clave normal.

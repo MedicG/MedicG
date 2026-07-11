@@ -12,6 +12,12 @@ import time
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("MEDICG_DB_PATH", BASE_DIR / "medicg.sqlite3"))
+DATABASE_URL = (
+    os.environ.get("DATABASE_URL")
+    or os.environ.get("POSTGRES_URL")
+    or os.environ.get("POSTGRES_URL_NON_POOLING")
+)
+DB_DRIVER = "postgres" if DATABASE_URL else "sqlite"
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8080"))
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@medicg.com")
@@ -79,11 +85,68 @@ MOJIBAKE_REPLACEMENTS = {
 }
 
 
+class DatabaseConnection:
+    def __init__(self, connection, driver):
+        self.connection = connection
+        self.driver = driver
+
+    def execute(self, sql, params=()):
+        if self.driver == "postgres":
+            sql = sql.replace("?", "%s")
+        return self.connection.execute(sql, params or ())
+
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+    def close(self):
+        self.connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type:
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
+        return False
+
+
 def db():
+    if DB_DRIVER == "postgres":
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError as exc:
+            raise RuntimeError(
+                "Falta psycopg. Instala requirements.txt o configura Vercel para instalar dependencias."
+            ) from exc
+        conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
+        return DatabaseConnection(conn, "postgres")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    return DatabaseConnection(conn, "sqlite")
+
+
+def table_sqlite_audit():
+    return (
+        "create table if not exists audit_log("
+        "id integer primary key autoincrement, ts text not null, user_id integer, "
+        "email text, action text not null, data_key text, detail text)"
+    )
+
+
+def table_postgres_audit():
+    return (
+        "create table if not exists audit_log("
+        "id bigserial primary key, ts text not null, user_id integer, "
+        "email text, action text not null, data_key text, detail text)"
+    )
 
 
 def now_iso():
@@ -259,11 +322,7 @@ def init_db():
             "create table if not exists app_data("
             "key text primary key, value text not null, updated_at text not null)"
         )
-        conn.execute(
-            "create table if not exists audit_log("
-            "id integer primary key autoincrement, ts text not null, user_id integer, "
-            "email text, action text not null, data_key text, detail text)"
-        )
+        conn.execute(table_postgres_audit() if DB_DRIVER == "postgres" else table_sqlite_audit())
         conn.execute(
             "create table if not exists sessions("
             "token_hash text primary key, user_id integer not null, expires_at real not null, created_at text not null)"
@@ -623,8 +682,8 @@ class MedicGHandler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     init_db()
     server = ThreadingHTTPServer((HOST, PORT), MedicGHandler)
-    print("Medic G con base de datos SQLite")
+    print(f"Medic G con base de datos {DB_DRIVER}")
     print(f"Abre: http://{HOST}:{PORT}")
-    print(f"Base de datos: {DB_PATH}")
+    print(f"Base de datos: {DB_PATH if DB_DRIVER == 'sqlite' else 'PostgreSQL'}")
     server.serve_forever()
 
