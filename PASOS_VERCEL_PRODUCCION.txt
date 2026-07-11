@@ -49,3 +49,5 @@ Notas importantes
 - Si no llega correo, revisa SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_FROM.
 - Si el login dice error de servidor, revisa que DATABASE_URL o POSTGRES_URL exista en Vercel.
 - Si usas Gmail, necesitas una App Password, no tu clave normal.
+- Si Vercel muestra "api/index.py definido en functions no coincide", sube esta version completa:
+  vercel.json ya no usa ese patron y api/index.py define un handler compatible.

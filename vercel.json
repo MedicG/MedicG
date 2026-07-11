@@ -1,11 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "functions": {
-    "api/index.py": {
-      "excludeFiles": "{**/__pycache__/**,**/*.pyc,**/*.sqlite3,**/*.sqlite3-wal,**/*.sqlite3-shm,**/*.zip}"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/:path*",
