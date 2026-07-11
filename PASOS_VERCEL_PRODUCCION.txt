@@ -14,7 +14,7 @@ Medic G en Vercel con base de datos real
 5. En Settings > Environment Variables agrega:
 
    ADMIN_EMAIL=admin@medicg.com
-   ADMIN_PASSWORD=Cjmh10vnpt
+   ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
    PUBLIC_APP_URL=https://TU-PROYECTO.vercel.app
    ALLOWED_ORIGINS=https://TU-PROYECTO.vercel.app
 
@@ -35,6 +35,8 @@ Medic G en Vercel con base de datos real
 7. Haz Deploy.
 
 8. Al abrir la URL:
+   - Primero prueba https://TU-PROYECTO.vercel.app/api/health
+   - Si responde {"ok": true, "db": "postgres"}, la API y la base estan conectadas.
    - Inicia con ADMIN_EMAIL y ADMIN_PASSWORD.
    - Cambia la clave inicial.
    - Configura logo, datos del centro, servicios, examenes y permisos.
@@ -48,6 +50,7 @@ Notas importantes
 - SQLite queda solo para local. En Vercel debes usar Postgres.
 - Si no llega correo, revisa SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_FROM.
 - Si el login dice error de servidor, revisa que DATABASE_URL o POSTGRES_URL exista en Vercel.
+- Si /api/health dice "Base de datos no configurada en Vercel", falta conectar Postgres/Neon.
 - Si usas Gmail, necesitas una App Password, no tu clave normal.
 - Si Vercel muestra "api/index.py definido en functions no coincide", sube esta version completa:
   vercel.json ya no usa ese patron y api/index.py define un handler compatible.
