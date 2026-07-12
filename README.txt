@@ -12,7 +12,8 @@ Variables obligatorias en Vercel
 - DATABASE_URL o POSTGRES_URL: conexion PostgreSQL. Recomendado: Neon desde Vercel Marketplace.
 - ADMIN_EMAIL: correo del administrador inicial.
 - ADMIN_PASSWORD: clave inicial del administrador. Cambiala antes de entregar.
-- PUBLIC_APP_URL: URL publica de Vercel. Ejemplo: https://medicg.vercel.app
+- PUBLIC_API_URL: URL publica de Vercel. Ejemplo: https://medicg.vercel.app
+- PUBLIC_APP_URL: URL del frontend. Si usas GitHub Pages: https://medicg.github.io/MedicG
 
 Variables para enviar correos de verificacion
 - SMTP_HOST: servidor SMTP.
@@ -25,6 +26,7 @@ Variables para enviar correos de verificacion
 
 Variables recomendadas
 - ALLOWED_ORIGINS: dominio permitido. Ejemplo: https://medicg.vercel.app
+- Si usas GitHub Pages, usa ALLOWED_ORIGINS=https://medicg.github.io
 - MAX_BODY_BYTES: limite de archivos adjuntos. Por defecto 12582912.
 
 Pasos rapidos
@@ -32,7 +34,7 @@ Pasos rapidos
 2. En Vercel, importa el repositorio.
 3. En Vercel Marketplace, agrega una base Postgres, por ejemplo Neon.
 4. Confirma que Vercel agrego DATABASE_URL o POSTGRES_URL al proyecto.
-5. Agrega las variables ADMIN_EMAIL, ADMIN_PASSWORD, PUBLIC_APP_URL y SMTP.
+5. Agrega las variables ADMIN_EMAIL, ADMIN_PASSWORD, PUBLIC_API_URL, PUBLIC_APP_URL y SMTP.
 6. Deploy.
 7. Abre la URL de Vercel e inicia sesion con el administrador inicial.
 8. Crea o autoriza usuarios desde Configuracion > Usuarios del sistema.
@@ -54,5 +56,6 @@ Uso local
 
 Importante
 - No uses SQLite como base final en Vercel.
+- Si publicas el frontend en GitHub Pages, revisa config.js y coloca tu dominio Vercel en MEDICG_VERCEL_BACKEND.
 - Configura SMTP real; sin SMTP se crea la cuenta, pero no se enviara verificacion.
 - Cambia ADMIN_PASSWORD despues del primer acceso.

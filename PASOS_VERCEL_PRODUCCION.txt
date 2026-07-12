@@ -15,8 +15,9 @@ Medic G en Vercel con base de datos real
 
    ADMIN_EMAIL=admin@medicg.com
    ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
-   PUBLIC_APP_URL=https://TU-PROYECTO.vercel.app
-   ALLOWED_ORIGINS=https://TU-PROYECTO.vercel.app
+   PUBLIC_API_URL=https://TU-PROYECTO.vercel.app
+   PUBLIC_APP_URL=https://medicg.github.io/MedicG
+   ALLOWED_ORIGINS=https://medicg.github.io
 
    SMTP_HOST=smtp.tu-proveedor.com
    SMTP_PORT=587
@@ -51,6 +52,7 @@ Notas importantes
 - Si no llega correo, revisa SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_FROM.
 - Si el login dice error de servidor, revisa que DATABASE_URL o POSTGRES_URL exista en Vercel.
 - Si /api/health dice "Base de datos no configurada en Vercel", falta conectar Postgres/Neon.
+- Si usas GitHub Pages, config.js debe apuntar a tu dominio de Vercel en MEDICG_VERCEL_BACKEND.
 - Si usas Gmail, necesitas una App Password, no tu clave normal.
 - Si Vercel muestra "api/index.py definido en functions no coincide", sube esta version completa:
   vercel.json ya no usa ese patron y api/index.py define un handler compatible.
