@@ -56,3 +56,5 @@ Notas importantes
 - Si usas Gmail, necesitas una App Password, no tu clave normal.
 - Si Vercel muestra "api/index.py definido en functions no coincide", sube esta version completa:
   vercel.json ya no usa ese patron y api/index.py define un handler compatible.
+- Si Vercel falla en el build, confirma que NO exista server.py en la raiz.
+  Para local se usa local_server.py; en Vercel solo api/index.py es entrypoint.

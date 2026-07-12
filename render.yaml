@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: ""
-    startCommand: python server.py
+    startCommand: python local_server.py
     envVars:
       - key: HOST
         value: 0.0.0.0

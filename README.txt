@@ -53,6 +53,7 @@ Uso local
 1. Ejecuta INICIAR.bat.
 2. Abre http://127.0.0.1:8080
 3. Si no configuras DATABASE_URL, usara medicg.sqlite3 local.
+4. El servidor local se ejecuta con local_server.py.
 
 Importante
 - No uses SQLite como base final en Vercel.

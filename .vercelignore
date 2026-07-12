@@ -8,3 +8,9 @@ __pycache__/
 .venv/
 venv/
 *.zip
+Dockerfile
+Procfile
+render.yaml
+INICIAR.bat
+local_server.py
+PASOS_GITHUB_RENDER.txt

@@ -5,7 +5,7 @@ No ejecuta Python, no abre SQLite y no responde rutas /api/login.
 
 Para guardar todo en una base de datos segura necesitas:
 1. Frontend en GitHub Pages: index.html + config.js.
-2. Backend en Render, Railway o VPS: server.py + base SQLite persistente.
+2. Backend en Render, Railway o VPS: local_server.py + base SQLite persistente.
 
 Pasos rapidos con Render
 1. Entra a https://render.com y crea una cuenta.
@@ -13,7 +13,7 @@ Pasos rapidos con Render
 3. Conecta el repositorio donde subiste estos archivos.
 4. Usa:
    Build Command: vacio
-   Start Command: python server.py
+   Start Command: python local_server.py
 5. En Environment Variables agrega:
    HOST=0.0.0.0
    ADMIN_EMAIL=admin@medicg.com
