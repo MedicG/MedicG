@@ -1,60 +1,51 @@
-Medic G en Vercel con base de datos real
+Medic G en Vercel
 
-1. Sube esta carpeta a GitHub.
+Sube a GitHub el contenido de esta carpeta, no una carpeta externa que contenga otra carpeta medicg-db.
 
-2. Entra a Vercel:
-   https://vercel.com
+Archivos clave que deben quedar en la raiz del repositorio:
+- index.html
+- config.js
+- vercel.json
+- requirements.txt
+- medicg_app.py
+- api/index.py
+- api/__init__.py
 
-3. Crea un nuevo proyecto importando el repositorio de GitHub.
+No debe existir en la raiz:
+- server.py
+- runtime.txt
+- pyproject.toml
+- medicg.sqlite3
 
-4. En Vercel Marketplace agrega Postgres.
-   Recomendado: Neon.
-   Vercel debe agregar automaticamente una variable como DATABASE_URL o POSTGRES_URL.
+Si Vercel sigue mostrando error de pyproject.toml:
+- Asegurate de subir este .vercelignore actualizado.
+- Si GitHub conserva un pyproject.toml viejo en la raiz, Vercel lo ignorara antes de compilar.
+- Si aun falla, entra al repositorio en GitHub y borra pyproject.toml manualmente.
 
-5. En Settings > Environment Variables agrega:
+Variables necesarias en Vercel:
+- DATABASE_URL o POSTGRES_URL: conexion PostgreSQL/Neon.
+- ADMIN_EMAIL: correo inicial del administrador.
+- ADMIN_PASSWORD: clave inicial del administrador.
+- PUBLIC_API_URL: URL de Vercel, por ejemplo https://tu-proyecto.vercel.app
+- PUBLIC_APP_URL: URL de GitHub Pages, por ejemplo https://medicg.github.io/MedicG
+- ALLOWED_ORIGINS: https://medicg.github.io
 
-   ADMIN_EMAIL=admin@medicg.com
-   ADMIN_PASSWORD=CAMBIA_ESTA_CLAVE
-   PUBLIC_API_URL=https://TU-PROYECTO.vercel.app
-   PUBLIC_APP_URL=https://medicg.github.io/MedicG
-   ALLOWED_ORIGINS=https://medicg.github.io
+Correo de verificacion:
+- SMTP_HOST
+- SMTP_PORT=587
+- SMTP_USER
+- SMTP_PASSWORD
+- SMTP_FROM
+- SMTP_TLS=true
+- SMTP_SSL=false
 
-   SMTP_HOST=smtp.tu-proveedor.com
-   SMTP_PORT=587
-   SMTP_USER=tu-correo@dominio.com
-   SMTP_PASSWORD=TU_CLAVE_SMTP
-   SMTP_FROM=tu-correo@dominio.com
-   SMTP_TLS=true
-   SMTP_SSL=false
+Despues del deploy prueba:
+https://TU-PROYECTO.vercel.app/api/health
 
-6. Build & Development Settings:
-   Framework Preset: Other
-   Build Command: dejar vacio
-   Output Directory: dejar vacio
-   Install Command: dejar automatico o vacio. Vercel detecta requirements.txt.
+Si responde {"ok": true, "db": "postgres"}, ya esta conectado.
+Si dice "Base de datos no configurada en Vercel", falta conectar Neon/Postgres.
 
-7. Haz Deploy.
+En GitHub Pages, config.js apunta a:
+https://medic-g-git-main-medicgs-projects.vercel.app
 
-8. Al abrir la URL:
-   - Primero prueba https://TU-PROYECTO.vercel.app/api/health
-   - Si responde {"ok": true, "db": "postgres"}, la API y la base estan conectadas.
-   - Inicia con ADMIN_EMAIL y ADMIN_PASSWORD.
-   - Cambia la clave inicial.
-   - Configura logo, datos del centro, servicios, examenes y permisos.
-
-9. Flujo de usuarios:
-   - El usuario puede registrarse con correo.
-   - Debe verificar el enlace recibido por correo.
-   - Despues de verificar, el admin debe asignarle permisos.
-
-Notas importantes
-- SQLite queda solo para local. En Vercel debes usar Postgres.
-- Si no llega correo, revisa SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD y SMTP_FROM.
-- Si el login dice error de servidor, revisa que DATABASE_URL o POSTGRES_URL exista en Vercel.
-- Si /api/health dice "Base de datos no configurada en Vercel", falta conectar Postgres/Neon.
-- Si usas GitHub Pages, config.js debe apuntar a tu dominio de Vercel en MEDICG_VERCEL_BACKEND.
-- Si usas Gmail, necesitas una App Password, no tu clave normal.
-- Si Vercel muestra "api/index.py definido en functions no coincide", sube esta version completa:
-  vercel.json ya no usa ese patron y api/index.py define un handler compatible.
-- Si Vercel falla en el build, confirma que NO exista server.py en la raiz.
-  Para local se usa local_server.py; en Vercel solo api/index.py es entrypoint.
+Si tu Vercel usa otro dominio, cambia la constante MEDICG_VERCEL_BACKEND en config.js.
