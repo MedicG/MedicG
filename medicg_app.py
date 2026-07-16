@@ -1,4 +1,4 @@
-﻿from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from email.message import EmailMessage
@@ -46,10 +46,11 @@ ALLOWED_PERMISSIONS = {
 }
 ROLE_DEFAULT_PERMISSIONS = {
     "admin": sorted(ALLOWED_PERMISSIONS),
-    "recepcion": ["agenda", "caja"],
-    "secretaria": ["agenda", "caja"],
+    "recepcion": ["dashboard", "agenda", "caja"],
+    "secretaria": ["dashboard", "agenda", "caja"],
     "asistente": ["agenda", "caja"],
-    "medico": ["hce"],
+    "medico": ["dashboard", "agenda", "hce"],
+    "paciente": [],
     "pendiente": [],
 }
 MOJIBAKE_REPLACEMENTS = {
@@ -281,6 +282,7 @@ def public_user(user):
         "email": user.get("email", ""),
         "rol": user.get("rol", "recepcion"),
         "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
+        "patientId": user.get("patientId"),
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
         "emailVerified": user_email_verified(user),
@@ -290,6 +292,8 @@ def public_user(user):
 def clean_permissions(permissions, role):
     if role == "admin":
         return sorted(ALLOWED_PERMISSIONS)
+    if role == "paciente":
+        return []
     if not isinstance(permissions, list) or not permissions:
         permissions = ROLE_DEFAULT_PERMISSIONS.get(role, ROLE_DEFAULT_PERMISSIONS["recepcion"])
     return [p for p in permissions if p in ALLOWED_PERMISSIONS and p != "config"]
@@ -395,6 +399,8 @@ def init_db():
                 set_json_key(conn, "nextIds", next_ids)
         if get_json_key(conn, "archivosClinicos") is None:
             set_json_key(conn, "archivosClinicos", {})
+        if get_json_key(conn, "notificaciones") is None:
+            set_json_key(conn, "notificaciones", [])
 
 
 def make_response(handler, status, payload):
@@ -456,6 +462,171 @@ def auth_user(handler):
     return user
 
 
+def split_full_name(value):
+    parts = [p for p in (value or "").strip().split() if p]
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return " ".join(parts[:-1]), parts[-1]
+
+
+def next_id(next_ids, key, fallback):
+    current = int(next_ids.get(key, fallback) or fallback)
+    next_ids[key] = current + 1
+    return current
+
+
+def find_patient(patients, email="", cedula="", patient_id=0):
+    email = (email or "").strip().lower()
+    cedula = (cedula or "").strip()
+    for patient in patients:
+        if patient_id and int(patient.get("id", 0)) == int(patient_id):
+            return patient
+        if cedula and (patient.get("cedula") or "").strip() == cedula:
+            return patient
+        if email and (patient.get("email") or "").strip().lower() == email:
+            return patient
+    return None
+
+
+def upsert_patient_from_payload(conn, payload):
+    patients = get_json_key(conn, "pacientes", []) or []
+    next_ids = get_json_key(conn, "nextIds", {}) or {}
+    email = (payload.get("email") or "").strip().lower()
+    cedula = (payload.get("cedula") or payload.get("documento") or "").strip()
+    name = (payload.get("name") or payload.get("nombres") or "").strip()
+    last = (payload.get("last") or payload.get("apellidos") or "").strip()
+    full_name = (payload.get("nombreCompleto") or payload.get("paciente") or "").strip()
+    if not name and full_name:
+        name, last = split_full_name(full_name)
+    patient = find_patient(patients, email=email, cedula=cedula)
+    created = False
+    if not patient:
+        patient = {
+            "id": next_id(next_ids, "pac", len(patients) + 1),
+            "nombres": name,
+            "apellidos": last,
+            "cedula": cedula,
+            "fnac": payload.get("fnac") or "",
+            "genero": payload.get("genero") or "",
+            "tel": payload.get("tel") or payload.get("phone") or "",
+            "email": email,
+            "dir": payload.get("dir") or "",
+            "seguro": payload.get("seguro") or "",
+            "afiliado": payload.get("afiliado") or "",
+            "sangre": payload.get("sangre") or "",
+            "alergias": payload.get("alergias") or "",
+            "antec": payload.get("antec") or "",
+            "esp": payload.get("esp") or payload.get("especialidad") or "",
+            "ultima": "",
+            "origen": payload.get("origen") or "Landing pública",
+            "createdAt": now_iso(),
+        }
+        patients.append(patient)
+        created = True
+    else:
+        updates = {
+            "nombres": name,
+            "apellidos": last,
+            "cedula": cedula,
+            "fnac": payload.get("fnac") or "",
+            "genero": payload.get("genero") or "",
+            "tel": payload.get("tel") or payload.get("phone") or "",
+            "email": email,
+            "dir": payload.get("dir") or "",
+            "seguro": payload.get("seguro") or "",
+            "afiliado": payload.get("afiliado") or "",
+            "sangre": payload.get("sangre") or "",
+            "alergias": payload.get("alergias") or "",
+            "antec": payload.get("antec") or "",
+            "esp": payload.get("esp") or payload.get("especialidad") or "",
+        }
+        for key, value in updates.items():
+            if value and not patient.get(key):
+                patient[key] = value
+    set_json_key(conn, "pacientes", patients)
+    set_json_key(conn, "nextIds", next_ids)
+    return patient, created
+
+
+def create_online_appointment(conn, patient, payload, user=None):
+    appointments = get_json_key(conn, "citas", []) or []
+    medicos = get_json_key(conn, "medicos", []) or []
+    next_ids = get_json_key(conn, "nextIds", {}) or {}
+    esp = (payload.get("esp") or payload.get("especialidad") or patient.get("esp") or "").strip()
+    med = int(payload.get("med") or payload.get("medicoId") or 0)
+    if not med and esp:
+        doctor = next((m for m in medicos if (m.get("esp") or "") == esp), None)
+        med = int(doctor.get("id", 0)) if doctor else 0
+    appointment = {
+        "id": next_id(next_ids, "cita", len(appointments) + 1),
+        "pac": int(patient.get("id")),
+        "med": med,
+        "esp": esp,
+        "tipo": payload.get("tipo") or "Reserva online",
+        "fecha": payload.get("fecha") or "",
+        "hora": payload.get("hora") or "08:00",
+        "motivo": payload.get("motivo") or "",
+        "estado": "Solicitada online",
+        "notif": "Sistema",
+        "origen": payload.get("origen") or "Landing pública",
+        "createdAt": now_iso(),
+        "createdBy": user.get("email") if user else "paciente-web",
+    }
+    appointments.append(appointment)
+    set_json_key(conn, "citas", appointments)
+    set_json_key(conn, "nextIds", next_ids)
+    notifications = get_json_key(conn, "notificaciones", []) or []
+    notifications.insert(0, {
+        "id": f"web-{appointment['id']}",
+        "tipo": "cita_online",
+        "fecha": now_iso(),
+        "titulo": "Nueva cita solicitada desde la landing",
+        "detalle": f"{patient.get('nombres', '')} {patient.get('apellidos', '')} pidió cita de {esp} el {appointment['fecha']} a las {appointment['hora']}",
+        "citaId": appointment["id"],
+        "leida": False,
+    })
+    set_json_key(conn, "notificaciones", notifications[:80])
+    return appointment
+
+
+def patient_portal_payload(conn, user):
+    patients = get_json_key(conn, "pacientes", []) or []
+    patient = find_patient(
+        patients,
+        email=user.get("email", ""),
+        patient_id=int(user.get("patientId") or 0),
+    )
+    if not patient:
+        return None
+    patient_id = int(patient.get("id"))
+    appointments = [c for c in (get_json_key(conn, "citas", []) or []) if int(c.get("pac", 0)) == patient_id]
+    notes = (get_json_key(conn, "notas", {}) or {}).get(str(patient_id), []) or (get_json_key(conn, "notas", {}) or {}).get(patient_id, []) or []
+    prescriptions = (get_json_key(conn, "recetas", {}) or {}).get(str(patient_id), []) or (get_json_key(conn, "recetas", {}) or {}).get(patient_id, []) or []
+    files = (get_json_key(conn, "archivosClinicos", {}) or {}).get(str(patient_id), []) or (get_json_key(conn, "archivosClinicos", {}) or {}).get(patient_id, []) or []
+    invoices = [f for f in (get_json_key(conn, "facturas", []) or []) if int(f.get("pac", 0)) == patient_id]
+    return {
+        "patient": patient,
+        "appointments": sorted(appointments, key=lambda c: (c.get("fecha", ""), c.get("hora", "")), reverse=True),
+        "notes": sorted(notes, key=lambda n: n.get("fecha", ""), reverse=True),
+        "prescriptions": sorted(prescriptions, key=lambda r: r.get("fecha", ""), reverse=True),
+        "files": sorted(files, key=lambda f: f.get("fecha", ""), reverse=True),
+        "invoices": sorted(invoices, key=lambda f: f.get("fecha", ""), reverse=True),
+    }
+
+
+def public_catalog_payload(conn):
+    config = get_json_key(conn, "config", {}) or {}
+    public_config = {k: config.get(k, "") for k in ("nombre", "dir", "tel", "wa", "email", "color", "logo")}
+    return {
+        "config": public_config,
+        "especialidades": [e for e in (get_json_key(conn, "especialidades", []) or []) if e.get("estado", "activo") == "activo"],
+        "medicos": get_json_key(conn, "medicos", []) or [],
+        "servicios": get_json_key(conn, "servicios", []) or [],
+    }
+
+
 class MedicGHandler(SimpleHTTPRequestHandler):
     extensions_map = {
         **SimpleHTTPRequestHandler.extensions_map,
@@ -472,6 +643,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/health", "/api/health"):
             return make_response(self, 200, {"ok": True, "db": DB_DRIVER})
+        if path == "/api/public/options":
+            with db() as conn:
+                return make_response(self, 200, public_catalog_payload(conn))
         if path == "/api/verify-email":
             token = parse_qs(urlparse(self.path).query).get("token", [""])[0]
             if not token:
@@ -505,11 +679,24 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             user = auth_user(self)
             if not user:
                 return make_response(self, 401, {"error": "Sesión no válida"})
+            if user.get("rol") == "paciente":
+                return make_response(self, 403, {"error": "Usa el portal del paciente"})
             with db() as conn:
                 rows = conn.execute("select key,value from app_data").fetchall()
             data = {row["key"]: json.loads(row["value"]) for row in rows}
             data["users"] = [public_user(u) for u in data.get("users", [])]
             return make_response(self, 200, {"user": public_user(user), "data": data})
+        if path == "/api/patient/portal":
+            user = auth_user(self)
+            if not user:
+                return make_response(self, 401, {"error": "Sesión no válida"})
+            if user.get("rol") != "paciente":
+                return make_response(self, 403, {"error": "Portal disponible solo para pacientes"})
+            with db() as conn:
+                portal = patient_portal_payload(conn, user)
+            if not portal:
+                return make_response(self, 404, {"error": "No encontramos una ficha de paciente vinculada a tu correo"})
+            return make_response(self, 200, {"user": public_user(user), "portal": portal})
         return super().do_GET()
 
     def do_POST(self):
@@ -558,19 +745,26 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
                     return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                patient, _ = upsert_patient_from_payload(conn, {
+                    **payload,
+                    "name": name,
+                    "last": last,
+                    "email": email,
+                    "origen": "Registro web",
+                })
                 next_ids = get_json_key(conn, "nextIds", {})
-                new_id = int(next_ids.get("user", len(users) + 1))
-                next_ids["user"] = new_id + 1
+                new_id = next_id(next_ids, "user", len(users) + 1)
                 new_user = {
                     "id": new_id,
                     "name": name,
                     "last": last,
                     "email": email,
                     "passHash": hash_password(password),
-                    "rol": "pendiente",
+                    "rol": "paciente",
                     "permissions": [],
                     "estado": "pendiente_verificacion",
                     "emailVerified": False,
+                    "patientId": patient.get("id"),
                     "verifyTokenHash": token_hash(verify_token),
                     "verifyExpiresAt": time.time() + 48 * 3600,
                     "createdAt": now_iso(),
@@ -578,7 +772,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users.append(new_user)
                 set_json_key(conn, "users", users)
                 set_json_key(conn, "nextIds", next_ids)
-                audit(conn, None, "public_register", "users", {"createdUserId": new_id, "createdEmail": email})
+                audit(conn, None, "patient_register", "users", {"createdUserId": new_id, "createdEmail": email, "patientId": patient.get("id")})
             try:
                 email_sent, email_error = send_verification_email(email, name, verify_link)
             except Exception as exc:
@@ -595,6 +789,29 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 response["verificationLink"] = verify_link
             return make_response(self, 201, response)
 
+        if path == "/api/public/appointment":
+            required = [
+                payload.get("name") or payload.get("nombres") or payload.get("paciente"),
+                payload.get("last") or payload.get("apellidos") or payload.get("paciente"),
+                payload.get("email"),
+                payload.get("tel") or payload.get("phone"),
+                payload.get("esp") or payload.get("especialidad"),
+                payload.get("fecha"),
+                payload.get("hora"),
+            ]
+            if any(not str(v or "").strip() for v in required):
+                return make_response(self, 400, {"error": "Completa paciente, correo, teléfono, especialidad, fecha y hora"})
+            with db() as conn:
+                patient, patient_created = upsert_patient_from_payload(conn, {**payload, "origen": "Landing pública"})
+                appointment = create_online_appointment(conn, patient, payload)
+                audit(conn, None, "public_appointment", "citas", {"appointmentId": appointment["id"], "patientId": patient.get("id")})
+            return make_response(self, 201, {
+                "ok": True,
+                "patientCreated": patient_created,
+                "appointment": appointment,
+                "message": "Cita solicitada correctamente. El centro médico la verá en agenda y te confirmará la atención.",
+            })
+
         if path == "/api/logout":
             token = self.headers.get("Authorization", "").replace("Bearer ", "").strip()
             user = auth_user(self)
@@ -608,6 +825,20 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         user = auth_user(self)
         if not user:
             return make_response(self, 401, {"error": "Sesión no válida"})
+
+        if path == "/api/patient/appointment":
+            if user.get("rol") != "paciente":
+                return make_response(self, 403, {"error": "Ruta disponible solo para pacientes"})
+            if not (payload.get("esp") or payload.get("especialidad")) or not payload.get("fecha") or not payload.get("hora"):
+                return make_response(self, 400, {"error": "Selecciona especialidad, fecha y hora"})
+            with db() as conn:
+                portal = patient_portal_payload(conn, user)
+                if not portal:
+                    return make_response(self, 404, {"error": "No encontramos una ficha de paciente vinculada a tu usuario"})
+                appointment = create_online_appointment(conn, portal["patient"], {**payload, "origen": "Portal paciente"}, user)
+                audit(conn, user, "patient_appointment", "citas", {"appointmentId": appointment["id"], "patientId": portal["patient"].get("id")})
+                portal = patient_portal_payload(conn, user)
+            return make_response(self, 201, {"ok": True, "appointment": appointment, "portal": portal})
 
         if path == "/api/data":
             key = payload.get("key")
@@ -650,6 +881,15 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
                     return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                patient_id = None
+                if rol == "paciente":
+                    patient, _ = upsert_patient_from_payload(conn, {
+                        "name": name,
+                        "last": last,
+                        "email": email,
+                        "origen": "Creado por administrador",
+                    })
+                    patient_id = patient.get("id")
                 next_ids = get_json_key(conn, "nextIds", {})
                 new_id = int(next_ids.get("user", len(users) + 1))
                 next_ids["user"] = new_id + 1
@@ -663,6 +903,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "permissions": permissions,
                     "estado": "activo",
                     "emailVerified": True,
+                    "patientId": patient_id,
                     "createdAt": now_iso(),
                 }
                 users.append(new_user)

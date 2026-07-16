@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -96,19 +96,51 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 .toast.ok{background:var(--green);}.toast.err{background:var(--red);}.toast.inf{background:var(--primary);}
 @keyframes toastIn{from{transform:translateY(16px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 
-/* ===== AUTH SCREEN ===== */
-#auth-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--primary-dk) 0%,var(--primary) 60%,#2A6CC4 100%);display:flex;align-items:center;justify-content:center;z-index:500;}
-.auth-card{background:var(--white);border-radius:20px;padding:0;width:100%;max-width:900px;min-height:520px;display:flex;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35);}
-.auth-left{background:linear-gradient(160deg,var(--primary-dk),var(--primary));color:#fff;width:44%;padding:48px 40px;display:flex;flex-direction:column;justify-content:space-between;}
-.auth-brand{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:8px;}
-.auth-tagline{font-size:14px;opacity:.75;line-height:1.6;}
-.auth-feat{margin-top:32px;display:flex;flex-direction:column;gap:14px;}
-.auth-feat-item{display:flex;align-items:center;gap:10px;font-size:13px;opacity:.85;}
-.auth-feat-item i{font-size:18px;opacity:.7;}
-.auth-right{flex:1;padding:48px 44px;display:flex;flex-direction:column;justify-content:center;}
-.auth-title{font-size:22px;font-weight:700;margin-bottom:4px;}
-.auth-sub{font-size:13px;color:var(--text3);margin-bottom:28px;}
+/* ===== LANDING / AUTH ===== */
+#auth-screen{min-height:100vh;background:#F7FAFC;display:block;z-index:500;}
+.landing-nav{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--gray-bd);}
+.landing-nav-in{max-width:1180px;margin:0 auto;padding:12px 22px;display:flex;align-items:center;gap:16px;}
+.landing-logo{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--primary);font-size:18px;letter-spacing:-.3px;}
+.landing-logo img{width:40px;height:40px;object-fit:contain;border-radius:50%;background:#fff;}
+.landing-links{display:flex;gap:18px;align-items:center;font-size:13px;color:var(--text2);margin-left:auto;}
+.landing-links a{color:inherit;text-decoration:none;}
+.landing-links a:hover{color:var(--primary);}
+.landing-hero{max-width:1180px;margin:0 auto;padding:54px 22px 34px;display:grid;grid-template-columns:minmax(0,1.05fr) 430px;gap:28px;align-items:start;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--primary-lt);color:var(--primary);border:1px solid rgba(27,79,138,.12);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:700;margin-bottom:16px;}
+.hero-title{font-size:42px;line-height:1.05;letter-spacing:-1.2px;font-weight:800;color:#10233F;margin-bottom:14px;max-width:720px;}
+.hero-copy{font-size:16px;line-height:1.7;color:var(--text2);max-width:660px;margin-bottom:22px;}
+.hero-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;}
+.hero-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:680px;}
+.hero-stat{background:#fff;border:1px solid var(--gray-bd);border-radius:12px;padding:14px;box-shadow:var(--shadow);}
+.hero-stat b{display:block;font-size:20px;color:var(--primary);margin-bottom:3px;}
+.hero-stat span{font-size:11px;color:var(--text2);}
+.booking-card{background:#fff;border:1px solid var(--gray-bd);border-radius:16px;box-shadow:0 18px 50px rgba(16,35,63,.14);padding:20px;}
+.booking-title{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;margin-bottom:4px;color:#10233F;}
+.booking-sub{font-size:12px;color:var(--text3);margin-bottom:16px;}
+.landing-section{max-width:1180px;margin:0 auto;padding:22px;}
+.section-title{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;color:#10233F;}
+.section-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:18px;max-width:680px;}
+.landing-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
+.landing-card{background:#fff;border:1px solid var(--gray-bd);border-radius:14px;padding:18px;box-shadow:var(--shadow);}
+.landing-card i{font-size:24px;color:var(--primary);display:block;margin-bottom:10px;}
+.landing-card b{display:block;font-size:14px;margin-bottom:6px;}
+.landing-card span{font-size:12px;color:var(--text2);line-height:1.6;}
+.access-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;}
+.auth-card{background:#fff;border:1px solid var(--gray-bd);border-radius:16px;padding:22px;box-shadow:var(--shadow-md);}
+.auth-title{font-size:20px;font-weight:800;margin-bottom:4px;color:#10233F;}
+.auth-sub{font-size:13px;color:var(--text3);margin-bottom:18px;}
 .auth-footer{margin-top:14px;font-size:11px;color:var(--text3);text-align:center;}
+.patient-screen{display:none;min-height:100vh;background:var(--bg);}
+.patient-top{background:var(--primary);color:#fff;padding:14px 22px;}
+.patient-top-in{max-width:1120px;margin:0 auto;display:flex;align-items:center;gap:12px;}
+.patient-logo{width:42px;height:42px;border-radius:50%;background:#fff;object-fit:contain;}
+.patient-main{max-width:1120px;margin:0 auto;padding:24px 22px 34px;}
+.patient-hero{background:#fff;border:1px solid var(--gray-bd);border-radius:16px;padding:20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;margin-bottom:18px;}
+.patient-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.portal-list{display:flex;flex-direction:column;gap:9px;}
+.portal-item{border:1px solid var(--gray-bd);border-radius:10px;padding:11px;background:#fff;}
+.portal-item-head{display:flex;gap:8px;align-items:center;margin-bottom:4px;}
+.portal-item-head i{color:var(--primary);font-size:18px;}
 
 /* ===== APP ===== */
 #app-screen{display:none;min-height:100vh;}
@@ -216,62 +248,145 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
   .sidebar{transform:translateX(-100%);transition:transform .25s;}
   .sidebar.open{transform:none;}
   .main-area{margin-left:0;}
-  .hce-wrap,.grid2,.grid3,.grid4{grid-template-columns:1fr;}
+  .hce-wrap,.grid2,.grid3,.grid4,.landing-hero,.landing-cards,.access-grid,.patient-grid{grid-template-columns:1fr;}
   .form-row,.form-row.c3{grid-template-columns:1fr;}
-  .auth-card{flex-direction:column;max-width:420px;}.auth-left{width:100%;padding:28px 28px 20px;}
+  .landing-nav-in{padding:10px 14px;}
+  .landing-links{display:none;}
+  .landing-hero{padding:28px 14px 20px;}
+  .hero-title{font-size:30px;}
+  .hero-stats{grid-template-columns:1fr;}
+  .landing-section{padding:18px 14px;}
+  .booking-card,.auth-card{padding:16px;}
+  .patient-main{padding:18px 14px;}
+  .patient-hero{align-items:flex-start;}
 }
 </style>
 </head>
 <body>
 
-<!-- ========== AUTH SCREEN ========== -->
+<!-- ========== LANDING / AUTH SCREEN ========== -->
 <div id="auth-screen">
-  <div class="auth-card">
-    <div class="auth-left">
-      <div>
-        <div class="auth-brand">Medic G</div>
-        <div class="auth-tagline">Sistema de Gestión para Centros de Especialidades Médicas</div>
-        <div class="auth-feat">
-          <div class="auth-feat-item"><i class="ti ti-calendar-event"></i> Agenda multiespecialidad</div>
-          <div class="auth-feat-item"><i class="ti ti-notes-medical"></i> Historia Clínica Electrónica</div>
-          <div class="auth-feat-item"><i class="ti ti-receipt"></i> Facturación SRI Ecuador</div>
-          <div class="auth-feat-item"><i class="ti ti-chart-bar"></i> Reportes y estadísticas</div>
-          <div class="auth-feat-item"><i class="ti ti-shield-check"></i> Gestión de seguros médicos</div>
-        </div>
+  <header class="landing-nav">
+    <div class="landing-nav-in">
+      <div class="landing-logo"><img src="assets/medicg-logo.jpg" alt="Medic G"/> <span id="landing-brand">Medic G</span></div>
+      <div class="landing-links">
+        <a href="#servicios-publicos">Servicios</a>
+        <a href="#reservar">Reservar cita</a>
+        <a href="#portal-access">Portal</a>
       </div>
-      <div class="text-xs" style="opacity:.45;margin-top:24px;">© 2025 Medic G · Todos los derechos reservados</div>
+      <button class="btn-s btn-sm" onclick="document.getElementById('portal-access').scrollIntoView({behavior:'smooth'})">Iniciar sesión</button>
     </div>
-      <div class="auth-right">
-      <div class="auth-title" id="auth-title">Bienvenido de vuelta</div>
-      <div class="auth-sub" id="auth-sub">Inicia sesión para continuar</div>
+  </header>
 
-      <!-- LOGIN FORM -->
-      <div id="login-form">
-        <div class="field"><label class="field-lbl">Correo electrónico</label><input type="email" id="l-email" placeholder="usuario@medicg.com" autocomplete="username"/></div>
-        <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password"/></div>
-        <div id="login-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
-        <button class="btn-p w100" onclick="doLogin()"><i class="ti ti-login" style="font-size:16px;"></i> Ingresar al sistema</button>
-        <button class="btn-s w100 mt8" onclick="switchAuth('register')"><i class="ti ti-user-plus" style="font-size:16px;"></i> Crear cuenta nueva</button>
+  <main>
+    <section class="landing-hero">
+      <div>
+        <div class="hero-eyebrow"><i class="ti ti-shield-check"></i> Centro médico conectado con historia clínica y agenda real</div>
+        <h1 class="hero-title">Reserva tu cita médica y consulta tu información clínica en un solo lugar.</h1>
+        <p class="hero-copy">Los pacientes pueden registrarse, pedir citas reales y ver sus datos, citas, historia clínica, recetas, resultados de laboratorio, imágenes y estudios. El equipo clínico recibe cada solicitud dentro del sistema.</p>
+        <div class="hero-actions">
+          <button class="btn-p" onclick="document.getElementById('reservar').scrollIntoView({behavior:'smooth'})"><i class="ti ti-calendar-plus"></i> Reservar cita</button>
+          <button class="btn-s" onclick="document.getElementById('portal-access').scrollIntoView({behavior:'smooth'})"><i class="ti ti-login"></i> Entrar al portal</button>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><b>24/7</b><span>Solicitudes de cita desde la web</span></div>
+          <div class="hero-stat"><b>1 portal</b><span>Pacientes, médicos, recepción y dueño</span></div>
+          <div class="hero-stat"><b>Seguro</b><span>Datos guardados en base de datos</span></div>
+        </div>
       </div>
 
-      <!-- REGISTER FORM -->
-      <div id="register-form" class="hidden">
+      <div class="booking-card" id="reservar">
+        <div class="booking-title"><i class="ti ti-calendar-heart"></i> Reservar cita real</div>
+        <div class="booking-sub">La solicitud aparecerá en la agenda del sistema para recepción y médicos.</div>
         <div class="form-row">
-          <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="r-name" placeholder="Tu nombre"/></div>
-          <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="r-last" placeholder="Tu apellido"/></div>
+          <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input id="pub-name" placeholder="Nombre"/></div>
+          <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input id="pub-last" placeholder="Apellido"/></div>
         </div>
-        <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="r-email" placeholder="correo@ejemplo.com"/></div>
         <div class="form-row">
-          <div class="field"><label class="field-lbl">Contraseña <span class="req">*</span></label><input type="password" id="r-pass" placeholder="Mín. 6 caracteres"/></div>
-          <div class="field"><label class="field-lbl">Confirmar contraseña</label><input type="password" id="r-pass2" placeholder="Repetir contraseña"/></div>
+          <div class="field"><label class="field-lbl">Correo <span class="req">*</span></label><input id="pub-email" type="email" placeholder="correo@ejemplo.com"/></div>
+          <div class="field"><label class="field-lbl">Teléfono <span class="req">*</span></label><input id="pub-tel" placeholder="0999999999"/></div>
         </div>
-        <div class="alert alert-i mb8"><i class="ti ti-mail-check"></i><span>Te enviaremos un correo de verificación. Luego el administrador podrá asignarte permisos.</span></div>
-        <div id="reg-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
-        <button class="btn-p w100" onclick="doRegister()"><i class="ti ti-user-plus" style="font-size:16px;"></i> Crear cuenta</button>
-        <button class="btn-s w100 mt8" onclick="switchAuth('login')">Ya tengo cuenta</button>
+        <div class="form-row">
+          <div class="field"><label class="field-lbl">Cédula / ID</label><input id="pub-cedula" placeholder="Opcional"/></div>
+          <div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="pub-esp" onchange="fillPublicDoctors('pub')"></select></div>
+        </div>
+        <div class="field"><label class="field-lbl">Médico</label><select id="pub-med"></select></div>
+        <div class="form-row">
+          <div class="field"><label class="field-lbl">Fecha <span class="req">*</span></label><input id="pub-fecha" type="date"/></div>
+          <div class="field"><label class="field-lbl">Hora <span class="req">*</span></label><select id="pub-hora"></select></div>
+        </div>
+        <div class="field"><label class="field-lbl">Motivo de consulta</label><textarea id="pub-motivo" rows="2" placeholder="Cuéntanos brevemente qué necesitas"></textarea></div>
+        <div id="pub-msg" class="alert alert-d hidden"><i class="ti ti-alert-circle"></i><span></span></div>
+        <button class="btn-p w100" onclick="bookPublicAppointment()"><i class="ti ti-send"></i> Solicitar cita</button>
       </div>
+    </section>
+
+    <section class="landing-section" id="servicios-publicos">
+      <div class="section-title">Atención médica integral</div>
+      <div class="section-sub">Agenda por especialidad, expedientes clínicos, recetas, exámenes, cotizaciones y caja conectadas al sistema administrativo.</div>
+      <div class="landing-cards">
+        <div class="landing-card"><i class="ti ti-stethoscope"></i><b>Consultas médicas</b><span>Medicina general, ginecología, pediatría, cardiología, dermatología y más.</span></div>
+        <div class="landing-card"><i class="ti ti-test-pipe"></i><b>Exámenes y estudios</b><span>Laboratorio, imágenes y resultados adjuntos al expediente del paciente.</span></div>
+        <div class="landing-card"><i class="ti ti-notes-medical"></i><b>Historia clínica</b><span>Notas de evolución, diagnósticos CIE-10, recetas e indicaciones médicas.</span></div>
+        <div class="landing-card"><i class="ti ti-cash"></i><b>Cobranza y facturación</b><span>Servicios conectados con caja y emisión de comprobantes desde el sistema.</span></div>
+      </div>
+    </section>
+
+    <section class="landing-section" id="portal-access">
+      <div class="section-title">Portal de acceso</div>
+      <div class="section-sub">Pacientes, médicos, recepción y dueño de la clínica ingresan desde aquí. El sistema muestra el portal correcto según el rol del usuario.</div>
+      <div class="access-grid">
+        <div class="auth-card">
+          <div class="auth-title" id="auth-title">Iniciar sesión</div>
+          <div class="auth-sub" id="auth-sub">Usa tu correo y contraseña para entrar al sistema o al portal de paciente.</div>
+          <div id="login-form">
+            <div class="field"><label class="field-lbl">Correo electrónico</label><input type="email" id="l-email" placeholder="usuario@medicg.com" autocomplete="username"/></div>
+            <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="Contraseña" autocomplete="current-password"/></div>
+            <div id="login-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
+            <button class="btn-p w100" onclick="doLogin()"><i class="ti ti-login" style="font-size:16px;"></i> Ingresar</button>
+            <button class="btn-s w100 mt8" onclick="switchAuth('register')"><i class="ti ti-user-plus" style="font-size:16px;"></i> Registrarme como paciente</button>
+          </div>
+        </div>
+
+        <div class="auth-card">
+          <div class="auth-title">Registro de paciente</div>
+          <div class="auth-sub">Crea tu acceso para ver tus citas, historia clínica, recetas y resultados.</div>
+          <div id="register-form" class="hidden">
+            <div class="form-row">
+              <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="r-name" placeholder="Tu nombre"/></div>
+              <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="r-last" placeholder="Tu apellido"/></div>
+            </div>
+            <div class="form-row">
+              <div class="field"><label class="field-lbl">Cédula / ID</label><input type="text" id="r-cedula" placeholder="Opcional"/></div>
+              <div class="field"><label class="field-lbl">Teléfono</label><input type="text" id="r-tel" placeholder="0999999999"/></div>
+            </div>
+            <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="r-email" placeholder="correo@ejemplo.com"/></div>
+            <div class="form-row">
+              <div class="field"><label class="field-lbl">Contraseña <span class="req">*</span></label><input type="password" id="r-pass" placeholder="Mín. 6 caracteres"/></div>
+              <div class="field"><label class="field-lbl">Confirmar contraseña</label><input type="password" id="r-pass2" placeholder="Repetir contraseña"/></div>
+            </div>
+            <div class="alert alert-i mb8"><i class="ti ti-mail-check"></i><span>Te enviaremos un correo de verificación para activar tu portal de paciente.</span></div>
+            <div id="reg-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
+            <button class="btn-p w100" onclick="doRegister()"><i class="ti ti-user-plus" style="font-size:16px;"></i> Crear cuenta de paciente</button>
+            <button class="btn-s w100 mt8" onclick="switchAuth('login')">Ocultar registro</button>
+          </div>
+          <div id="register-placeholder" class="alert alert-i"><i class="ti ti-info-circle"></i><span>Presiona “Registrarme como paciente” para abrir el formulario.</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ========== PATIENT PORTAL ========== -->
+<div id="patient-screen" class="patient-screen">
+  <div class="patient-top">
+    <div class="patient-top-in">
+      <img class="patient-logo" src="assets/medicg-logo.jpg" alt="Medic G"/>
+      <div style="flex:1;"><div class="fw7" id="pt-brand">Medic G</div><div class="text-xs" style="opacity:.75;">Portal del paciente</div></div>
+      <button class="btn-s btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Salir</button>
     </div>
   </div>
+  <main class="patient-main" id="patient-content"></main>
 </div>
 
 <!-- ========== APP ========== -->
@@ -613,7 +728,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
           <div class="form-row c3">
             <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="u-name"/></div>
             <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="u-last"/></div>
-            <div class="field"><label class="field-lbl">Rol</label><select id="u-rol" onchange="renderCreatePerms()"><option value="recepcion">Recepción</option><option value="secretaria">Secretaria</option><option value="asistente">Asistente clínico</option><option value="medico">Médico</option><option value="admin">Administrador</option></select></div>
+            <div class="field"><label class="field-lbl">Rol</label><select id="u-rol" onchange="renderCreatePerms()"><option value="recepcion">Recepción</option><option value="secretaria">Secretaria</option><option value="asistente">Asistente clínico</option><option value="medico">Médico</option><option value="paciente">Paciente</option><option value="admin">Dueño / Administrador</option></select></div>
           </div>
           <div class="form-row">
             <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="u-email"/></div>
@@ -966,13 +1081,14 @@ const MODULE_PERMS = [
   {id:'caja',label:'Caja / cobranza'},
   {id:'config',label:'Configuración'}
 ];
-const ROLE_LABELS={admin:'Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico',pendiente:'Pendiente de permisos'};
+const ROLE_LABELS={admin:'Dueño / Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico',paciente:'Paciente',pendiente:'Pendiente de permisos'};
 const ROLE_DEFAULT_PERMS={
   admin:MODULE_PERMS.map(p=>p.id),
-  recepcion:['agenda','caja'],
-  secretaria:['agenda','caja'],
+  recepcion:['dashboard','agenda','caja'],
+  secretaria:['dashboard','agenda','caja'],
   asistente:['agenda','caja'],
-  medico:['hce'],
+  medico:['dashboard','agenda','hce'],
+  paciente:[],
   pendiente:[]
 };
 
@@ -1113,14 +1229,106 @@ function getEspColor(name){const e=(DB.get('especialidades')||[]).find(x=>x.nomb
 // AUTH
 // =========================================================
 let currentUser = null;
+let patientPortalData = null;
+let publicOptions = {especialidades:[],medicos:[],servicios:[],config:{}};
+const PUBLIC_HOURS=['07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00'];
+const PUBLIC_FALLBACK={
+  config:{nombre:'Medic G',tel:'',wa:'',email:'',dir:'',color:'#1B4F8A',logo:DEFAULT_LOGO},
+  especialidades:[
+    {id:1,nombre:'Cardiología',color:'#1B4F8A',estado:'activo'},
+    {id:2,nombre:'Pediatría',color:'#0D7A6B',estado:'activo'},
+    {id:3,nombre:'Dermatología',color:'#C47A0A',estado:'activo'},
+    {id:4,nombre:'Ginecología',color:'#2A7A3B',estado:'activo'},
+  ],
+  medicos:[],
+  servicios:[]
+};
+
+async function initPublicLanding(){
+  document.getElementById('pub-fecha').value=today();
+  document.getElementById('pub-hora').innerHTML=PUBLIC_HOURS.map(h=>`<option>${h}</option>`).join('');
+  try{
+    publicOptions=await API.get('/api/public/options');
+  }catch(err){
+    publicOptions=PUBLIC_FALLBACK;
+  }
+  publicOptions.config=publicOptions.config||{};
+  const cfg=publicOptions.config;
+  const brand=cfg.nombre||'Medic G';
+  document.getElementById('landing-brand').textContent=brand;
+  document.getElementById('pt-brand').textContent=brand;
+  if(cfg.logo){
+    document.querySelectorAll('.landing-logo img,.patient-logo').forEach(img=>{img.src=cfg.logo;});
+  }
+  if(cfg.color) applyPublicTheme(cfg.color);
+  fillPublicSpecialties('pub');
+}
+
+function applyPublicTheme(hex){
+  document.documentElement.style.setProperty('--primary',hex);
+  document.documentElement.style.setProperty('--primary-dk',darken(hex,40));
+  document.documentElement.style.setProperty('--primary-lt',lighten(hex));
+}
+
+function fillPublicSpecialties(prefix){
+  const sel=document.getElementById(`${prefix}-esp`);
+  if(!sel)return;
+  const esps=publicOptions.especialidades?.length?publicOptions.especialidades:PUBLIC_FALLBACK.especialidades;
+  sel.innerHTML='<option value="">Seleccionar especialidad...</option>'+esps.map(e=>`<option value="${esc(e.nombre)}">${esc(e.nombre)}</option>`).join('');
+  fillPublicDoctors(prefix);
+}
+
+function fillPublicDoctors(prefix){
+  const esp=document.getElementById(`${prefix}-esp`)?.value||'';
+  const sel=document.getElementById(`${prefix}-med`);
+  if(!sel)return;
+  const meds=(publicOptions.medicos||[]).filter(m=>!esp||m.esp===esp);
+  sel.innerHTML=meds.length
+    ? '<option value="">Primer médico disponible</option>'+meds.map(m=>`<option value="${m.id}">${esc(m.nombre)}${m.horario?' · '+esc(m.horario):''}</option>`).join('')
+    : '<option value="">Primer médico disponible</option>';
+}
+
+function showInlineMsg(id,msg,kind='d'){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.className=`alert alert-${kind}`;
+  const icon=el.querySelector('i');
+  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':'ti ti-alert-circle');
+  el.querySelector('span').textContent=msg;
+}
+
+async function bookPublicAppointment(){
+  const payload={
+    name:document.getElementById('pub-name').value.trim(),
+    last:document.getElementById('pub-last').value.trim(),
+    email:document.getElementById('pub-email').value.trim(),
+    tel:document.getElementById('pub-tel').value.trim(),
+    cedula:document.getElementById('pub-cedula').value.trim(),
+    esp:document.getElementById('pub-esp').value,
+    med:document.getElementById('pub-med').value,
+    fecha:document.getElementById('pub-fecha').value,
+    hora:document.getElementById('pub-hora').value,
+    motivo:document.getElementById('pub-motivo').value.trim(),
+  };
+  try{
+    const res=await API.post('/api/public/appointment',payload);
+    showInlineMsg('pub-msg',res.message||'Cita solicitada correctamente','s');
+    ['pub-name','pub-last','pub-email','pub-tel','pub-cedula','pub-motivo'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('pub-fecha').value=today();
+    toast('Cita enviada a la agenda del sistema','ok');
+  }catch(err){
+    showInlineMsg('pub-msg',err.message||'No se pudo solicitar la cita','d');
+  }
+}
 
 function switchAuth(mode){
-  document.getElementById('login-form').classList.toggle('hidden', mode!=='login');
+  document.getElementById('login-form').classList.remove('hidden');
   document.getElementById('register-form').classList.toggle('hidden', mode!=='register');
+  document.getElementById('register-placeholder')?.classList.toggle('hidden', mode==='register');
   document.getElementById('btn-login')?.classList.toggle('active', mode==='login');
   document.getElementById('btn-register')?.classList.toggle('active', mode==='register');
-  document.getElementById('auth-title').textContent = mode==='login'?'Bienvenido de vuelta':'Crear cuenta nueva';
-  document.getElementById('auth-sub').textContent = mode==='login'?'Inicia sesión para continuar':'Registra tu acceso al sistema';
+  document.getElementById('auth-title').textContent = mode==='login'?'Iniciar sesión':'Registro de paciente';
+  document.getElementById('auth-sub').textContent = mode==='login'?'Usa tu correo para entrar como paciente, médico, recepción o dueño.':'Crea tu portal de paciente con verificación por correo.';
 }
 
 async function doLogin(){
@@ -1130,6 +1338,13 @@ async function doLogin(){
     const auth = await API.post('/api/login',{email,password:pass});
     API.token = auth.token;
     localStorage.setItem('mg_token',auth.token);
+    if(auth.user?.rol==='paciente'){
+      const portal = await API.get('/api/patient/portal');
+      currentUser = portal.user || auth.user;
+      patientPortalData = portal.portal;
+      launchPatientPortal();
+      return;
+    }
     const loaded = await API.get('/api/data');
     DB.load(loaded.data);
     DB.init();
@@ -1148,10 +1363,15 @@ async function doRegister(){
   const password2=document.getElementById('r-pass2').value;
   if(password!==password2) return showAuthErr('reg','Las contraseñas no coinciden');
   try{
-    const result=await API.post('/api/register',{name,last,email,password});
+    const result=await API.post('/api/register',{
+      name,last,email,password,
+      cedula:document.getElementById('r-cedula').value.trim(),
+      tel:document.getElementById('r-tel').value.trim(),
+      origen:'Landing pública'
+    });
     showAuthMsg('reg',result.message||'Cuenta creada. Revisa tu correo para verificarla.',result.emailSent?'s':'w',false);
     if(result.emailSent){
-      ['r-name','r-last','r-email','r-pass','r-pass2'].forEach(id=>document.getElementById(id).value='');
+      ['r-name','r-last','r-email','r-pass','r-pass2','r-cedula','r-tel'].forEach(id=>document.getElementById(id).value='');
     }
   }catch(err){
     showAuthErr('reg',err.message||'No se pudo crear la cuenta');
@@ -1172,14 +1392,16 @@ function showAuthMsg(type,msg,kind='d',autoHide=true){
 function doLogout(){
   API.post('/api/logout',{}).catch(()=>{});
   localStorage.removeItem('mg_token');
-  API.token='';currentUser=null;DB.cache={};
+  API.token='';currentUser=null;DB.cache={};patientPortalData=null;
   document.getElementById('app-screen').style.display='none';
-  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('patient-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='block';
   toast('Sesión cerrada exitosamente','ok');
 }
 
 function launchApp(){
   document.getElementById('auth-screen').style.display='none';
+  document.getElementById('patient-screen').style.display='none';
   document.getElementById('app-screen').style.display='block';
   document.getElementById('sb-uname').textContent=currentUser.name+' '+currentUser.last;
   document.getElementById('sb-urole').textContent=ROLE_LABELS[currentUser.rol]||currentUser.rol;
@@ -1191,6 +1413,170 @@ function launchApp(){
   const first=firstAllowedModule();
   if(first) showMod(first,document.querySelector(`.nav-item[data-module="${first}"]`));
   else showNoAccess();
+}
+
+function portalMedName(id){
+  const med=(publicOptions.medicos||[]).find(m=>String(m.id)===String(id));
+  return med?med.nombre:'Médico por confirmar';
+}
+
+function launchPatientPortal(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('patient-screen').style.display='block';
+  renderPatientPortal();
+}
+
+function renderPatientPortal(){
+  const data=patientPortalData||{};
+  const p=data.patient||{};
+  const citas=data.appointments||[];
+  const notas=data.notes||[];
+  const recetas=data.prescriptions||[];
+  const archivos=data.files||[];
+  const facturas=data.invoices||[];
+  const futuras=citas.filter(c=>!c.fecha||c.fecha>=today()).sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const iniciales=((p.nombres||currentUser?.name||'P')[0]+(p.apellidos||currentUser?.last||'G')[0]).toUpperCase();
+  document.getElementById('patient-content').innerHTML=`
+    <section class="patient-hero">
+      <div class="av lg">${iniciales}</div>
+      <div style="flex:1;">
+        <div class="fw7" style="font-size:20px;">${esc(p.nombres||currentUser?.name||'Paciente')} ${esc(p.apellidos||currentUser?.last||'')}</div>
+        <div class="text-sm text-muted">Historia #HCE-${String(p.id||0).padStart(4,'0')} · ${esc(p.email||currentUser?.email||'')}</div>
+      </div>
+      <span class="badge b-green">Portal activo</span>
+    </section>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-lbl">Citas registradas</div><div class="stat-val">${citas.length}</div><div class="stat-sub">Incluye solicitudes web</div></div>
+      <div class="stat-box"><div class="stat-lbl">Notas clínicas</div><div class="stat-val">${notas.length}</div><div class="stat-sub">Historia y evoluciones</div></div>
+      <div class="stat-box"><div class="stat-lbl">Resultados / estudios</div><div class="stat-val">${archivos.length}</div><div class="stat-sub">Laboratorio, imagen y otros</div></div>
+      <div class="stat-box"><div class="stat-lbl">Recetas</div><div class="stat-val">${recetas.length}</div><div class="stat-sub">Indicaciones médicas</div></div>
+    </div>
+
+    <div class="patient-grid">
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-calendar-event" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Mis citas</span></div>
+        <div class="card-body">
+          <div class="portal-list">
+            ${futuras.length?futuras.map(c=>`
+              <div class="portal-item">
+                <div class="portal-item-head"><i class="ti ti-calendar"></i><b>${fmtDate(c.fecha)} · ${esc(c.hora||'')}</b><span class="badge ${c.estado==='Confirmada'?'b-green':'b-amber'}" style="margin-left:auto;">${esc(c.estado||'Pendiente')}</span></div>
+                <div class="text-sm">${esc(c.esp||'Especialidad')} · ${esc(portalMedName(c.med))}</div>
+                <div class="text-xs text-muted">${esc(c.motivo||c.tipo||'Consulta médica')}</div>
+              </div>`).join(''):'<div class="text-sm text-muted">No tienes citas próximas.</div>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-calendar-plus" style="color:var(--green);font-size:18px;"></i><span class="card-title">Solicitar nueva cita</span></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="field"><label class="field-lbl">Especialidad</label><select id="pt-esp" onchange="fillPublicDoctors('pt')"></select></div>
+            <div class="field"><label class="field-lbl">Médico</label><select id="pt-med"></select></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label class="field-lbl">Fecha</label><input id="pt-fecha" type="date" value="${today()}"/></div>
+            <div class="field"><label class="field-lbl">Hora</label><select id="pt-hora">${PUBLIC_HOURS.map(h=>`<option>${h}</option>`).join('')}</select></div>
+          </div>
+          <div class="field"><label class="field-lbl">Motivo</label><textarea id="pt-motivo" rows="2" placeholder="Describe brevemente el motivo"></textarea></div>
+          <div id="pt-msg" class="alert alert-d hidden"><i class="ti ti-alert-circle"></i><span></span></div>
+          <button class="btn-p w100" onclick="bookPatientAppointment()"><i class="ti ti-send"></i> Enviar solicitud</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-user-heart" style="color:var(--primary);font-size:18px;"></i><span class="card-title">Mis datos</span></div>
+        <div class="card-body">
+          <div class="grid2">
+            <div><span class="field-lbl">Cédula / ID</span><div>${esc(p.cedula||'—')}</div></div>
+            <div><span class="field-lbl">Teléfono</span><div>${esc(p.tel||'—')}</div></div>
+            <div><span class="field-lbl">Fecha nacimiento</span><div>${fmtDate(p.fnac)}</div></div>
+            <div><span class="field-lbl">Seguro</span><div>${esc(p.seguro||'—')}</div></div>
+          </div>
+          ${p.alergias?`<div class="alert alert-d mt12"><i class="ti ti-alert-triangle"></i><span><b>Alergias:</b> ${esc(p.alergias)}</span></div>`:''}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-notes-medical" style="color:var(--secondary);font-size:18px;"></i><span class="card-title">Historia clínica</span></div>
+        <div class="card-body">
+          <div class="portal-list">
+            ${notas.length?notas.slice(0,6).map(n=>`
+              <div class="portal-item">
+                <div class="portal-item-head"><i class="ti ti-notes"></i><b>${fmtDate(n.fecha)}</b><span class="text-xs text-muted" style="margin-left:auto;">${esc(n.esp||'')}</span></div>
+                ${(n.cie10Code||n.dx)?`<div class="text-sm"><b>${n.cie10Code?`CIE-10 ${esc(n.cie10Code)} · `:''}</b>${esc(n.dx||n.cie10Desc||'')}</div>`:''}
+                ${n.plan?`<div class="text-xs text-muted">${esc(n.plan)}</div>`:''}
+              </div>`).join(''):'<div class="text-sm text-muted">Aún no hay notas clínicas publicadas.</div>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-paperclip" style="color:var(--accent);font-size:18px;"></i><span class="card-title">Resultados, imágenes y estudios</span></div>
+        <div class="card-body">
+          <div class="portal-list">
+            ${archivos.length?archivos.map(a=>`
+              <div class="portal-item">
+                <div class="portal-item-head"><i class="ti ${archivoIcon(a)}"></i><b>${esc(a.nombre)}</b><span class="text-xs text-muted" style="margin-left:auto;">${fmtDate(a.fecha)}</span></div>
+                <div class="text-xs text-muted">${esc(a.tipo||'Documento')} · ${fmtBytes(a.size)}</div>
+                ${a.descripcion?`<div class="text-sm">${esc(a.descripcion)}</div>`:''}
+                ${a.dataUrl?`<button class="btn-s btn-xs mt8" onclick="openPatientFile(${a.id})"><i class="ti ti-eye"></i> Abrir</button>`:''}
+              </div>`).join(''):'<div class="text-sm text-muted">Sin resultados adjuntos todavía.</div>'}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr"><i class="ti ti-prescription" style="color:var(--green);font-size:18px;"></i><span class="card-title">Recetas y comprobantes</span></div>
+        <div class="card-body">
+          <div class="portal-list">
+            ${recetas.length?recetas.slice(0,4).map(r=>`
+              <div class="portal-item">
+                <div class="portal-item-head"><i class="ti ti-prescription"></i><b>${fmtDate(r.fecha)}</b><span class="text-xs text-muted" style="margin-left:auto;">${esc(r.medico||'Médico')}</span></div>
+                <div class="text-sm" style="white-space:pre-wrap;">${esc(r.medicamentos||'')}</div>
+              </div>`).join(''):'<div class="text-sm text-muted">Sin recetas registradas.</div>'}
+            ${facturas.length?facturas.slice(0,4).map(f=>`
+              <div class="portal-item">
+                <div class="portal-item-head"><i class="ti ti-receipt"></i><b>${esc(f.id)}</b><span class="fw6" style="margin-left:auto;color:var(--green);">${fmtMoney(f.total)}</span></div>
+                <div class="text-xs text-muted">${fmtDate(f.fecha)} · ${esc(f.serv||'Servicio')}</div>
+              </div>`).join(''):''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  fillPublicSpecialties('pt');
+  const ptFecha=document.getElementById('pt-fecha');
+  if(ptFecha) ptFecha.value=today();
+}
+
+async function bookPatientAppointment(){
+  const payload={
+    esp:document.getElementById('pt-esp').value,
+    med:document.getElementById('pt-med').value,
+    fecha:document.getElementById('pt-fecha').value,
+    hora:document.getElementById('pt-hora').value,
+    motivo:document.getElementById('pt-motivo').value.trim(),
+  };
+  try{
+    const res=await API.post('/api/patient/appointment',payload);
+    patientPortalData=res.portal;
+    renderPatientPortal();
+    toast('Solicitud enviada a la agenda del sistema','ok');
+  }catch(err){
+    showInlineMsg('pt-msg',err.message||'No se pudo solicitar la cita','d');
+  }
+}
+
+function openPatientFile(fileId){
+  const file=(patientPortalData?.files||[]).find(a=>a.id===fileId);
+  if(!file?.dataUrl)return;
+  const w=window.open('','_blank');
+  const content=(file.mime||'').startsWith('image/')
+    ? `<img src="${file.dataUrl}" style="max-width:100%;height:auto;display:block;margin:0 auto;">`
+    : `<iframe src="${file.dataUrl}" style="width:100%;height:96vh;border:0;"></iframe>`;
+  w.document.write(`<!doctype html><html><head><title>${esc(file.nombre)}</title></head><body style="margin:0;background:#111;">${content}</body></html>`);
 }
 
 // =========================================================
@@ -1339,12 +1725,14 @@ function initDashboard(){
   const facs=DB.get('facturas')||[];
   const hoy=today();
   const citasHoy=citas.filter(c=>c.fecha===hoy);
+  const citasOnline=citas.filter(c=>c.origen==='Landing pública'||c.origen==='Portal paciente'||c.estado==='Solicitada online');
   const totalHoy=facs.filter(f=>f.fecha===hoy).reduce((a,f)=>a+f.total,0);
   document.getElementById('dash-stats').innerHTML=`
     <div class="stat-box"><div class="stat-lbl"><i class="ti ti-calendar-check" style="font-size:13px;"></i> Citas hoy</div><div class="stat-val">${citasHoy.length}</div><div class="stat-sub up">+${Math.max(0,citasHoy.length-5)} vs ayer</div></div>
     <div class="stat-box"><div class="stat-lbl"><i class="ti ti-users" style="font-size:13px;"></i> Pacientes activos</div><div class="stat-val">${pacs.length}</div><div class="stat-sub up">Total registrados</div></div>
     <div class="stat-box"><div class="stat-lbl"><i class="ti ti-cash" style="font-size:13px;"></i> Facturado hoy</div><div class="stat-val">${fmtMoney(totalHoy)}</div><div class="stat-sub up">${facs.filter(f=>f.fecha===hoy).length} comprobantes</div></div>
-    <div class="stat-box"><div class="stat-lbl"><i class="ti ti-clock" style="font-size:13px;"></i> Pendientes</div><div class="stat-val">${citasHoy.filter(c=>c.estado==='Pendiente').length}</div><div class="stat-sub dn">Sin confirmar</div></div>
+    <div class="stat-box"><div class="stat-lbl"><i class="ti ti-world-www" style="font-size:13px;"></i> Citas web</div><div class="stat-val">${citasOnline.length}</div><div class="stat-sub up">Solicitadas desde landing/portal</div></div>
+    <div class="stat-box"><div class="stat-lbl"><i class="ti ti-clock" style="font-size:13px;"></i> Pendientes</div><div class="stat-val">${citas.filter(c=>c.estado==='Pendiente'||c.estado==='Solicitada online').length}</div><div class="stat-sub dn">Por confirmar</div></div>
     <div class="stat-box"><div class="stat-lbl"><i class="ti ti-stethoscope" style="font-size:13px;"></i> Médicos</div><div class="stat-val">${(DB.get('medicos')||[]).length}</div><div class="stat-sub">Especialistas</div></div>`;
 
   let citasHtml='';
@@ -1359,8 +1747,14 @@ function initDashboard(){
   });
   document.getElementById('dash-citas').innerHTML=citasHtml;
 
+  const onlineActivity=citasOnline.slice().sort((a,b)=>String(b.createdAt||b.fecha||'').localeCompare(String(a.createdAt||a.fecha||''))).slice(0,4).map(c=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--amber-lt);border-radius:var(--radius);">
+        <i class="ti ti-bell-ringing" style="font-size:20px;color:var(--amber);"></i>
+        <div><div class="fw5" style="font-size:13px;">Nueva cita web: ${getPacName(c.pac)}</div><div class="text-xs text-muted">${c.esp} · ${fmtDate(c.fecha)} ${c.hora} · ${c.estado}</div></div>
+      </div>`).join('');
   document.getElementById('dash-activ').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:10px;">
+      ${onlineActivity}
       ${[{i:'ti-user-check',t:`${pacs.length} pacientes registrados`,s:'Total en el sistema',c:'var(--primary)'},
          {i:'ti-receipt',t:`${fmtMoney(facs.reduce((a,f)=>a+f.total,0))} facturado total`,s:'Todos los periodos',c:'var(--green)'},
          {i:'ti-calendar',t:`${citas.length} citas registradas`,s:'Historial completo',c:'var(--secondary)'},
@@ -2835,8 +3229,16 @@ function saveCfg(){
 // =========================================================
 async function initSession(){
   repairMojibakeText();
+  await initPublicLanding();
   if(!API.token) return;
   try{
+    try{
+      const portal=await API.get('/api/patient/portal');
+      currentUser=portal.user;
+      patientPortalData=portal.portal;
+      launchPatientPortal();
+      return;
+    }catch(patientErr){}
     const loaded=await API.get('/api/data');
     DB.load(loaded.data);
     DB.init();
