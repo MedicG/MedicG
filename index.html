@@ -725,7 +725,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
       <div class="card">
         <div class="card-hdr"><i class="ti ti-users-group" style="color:var(--secondary);font-size:18px;"></i><span class="card-title">Usuarios del sistema</span></div>
         <div class="card-body" id="admin-users-panel">
-          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Los usuarios pueden registrarse con correo verificado, pero solo el administrador puede crear usuarios internos y asignar permisos.</span></div>
+          <div class="alert alert-i"><i class="ti ti-info-circle"></i><span>Los usuarios pueden registrarse con correo verificado. El dueño/administrador puede crear, editar, verificar, eliminar usuarios, cambiar roles y asignar permisos.</span></div>
           <div class="form-row c3">
             <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="u-name"/></div>
             <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="u-last"/></div>
@@ -739,7 +739,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
           <div id="u-perms" class="perm-grid"></div>
           <button class="btn-p btn-sm" onclick="createSystemUser()"><i class="ti ti-user-plus"></i> Crear usuario</button>
           <div class="divider"></div>
-          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Permisos</th><th>Estado</th><th></th></tr></thead><tbody id="users-tbody"></tbody></table></div>
+          <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Email</th><th>Nombre</th><th>Rol</th><th>Permisos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="users-tbody"></tbody></table></div>
         </div>
       </div>
       <div class="card">
@@ -3105,6 +3105,8 @@ function procesarCobro(){
 // =========================================================
 // CONFIG
 // =========================================================
+let editingUserId=null;
+
 function loadConfig(){
   const cfg=DB.get('config')||{};
   document.getElementById('cfg-nombre').value=cfg.nombre||'';
@@ -3123,15 +3125,141 @@ function loadConfig(){
   if(panel) panel.style.display = currentUser?.rol==='admin' ? 'block' : 'none';
   const users=DB.get('users')||[];
   renderCreatePerms();
-  document.getElementById('users-tbody').innerHTML=users.map(u=>`<tr><td class="text-sm">${u.email}</td><td>${u.name} ${u.last}</td><td><span class="badge b-blue">${ROLE_LABELS[u.rol]||u.rol}</span></td><td>${renderUserPerms(u)}</td><td>${renderUserStatus(u)}</td><td>${u.rol==='admin'?'<span class="text-xs text-muted">Permisos completos</span>':`<button class="btn-p btn-xs" onclick="saveUserPerms(${u.id})"><i class="ti ti-device-floppy"></i> Guardar</button>`}</td></tr>`).join('');
+  document.getElementById('users-tbody').innerHTML=users.map(renderUserRow).join('');
   const cieForm=document.getElementById('cie10-admin-form');
   if(cieForm) cieForm.style.display=currentUser?.rol==='admin'?'block':'none';
   renderCie10Catalog();
 }
 
+function userRoleOptions(selected){
+  return Object.entries(ROLE_LABELS)
+    .filter(([role])=>role!=='pendiente')
+    .map(([role,label])=>`<option value="${role}" ${role===selected?'selected':''}>${label}</option>`)
+    .join('');
+}
+
+function renderUserRow(u){
+  if(editingUserId===+u.id) return renderUserEditRow(u);
+  const isSelf=currentUser?.id===u.id;
+  const needsVerify=u.estado==='pendiente_verificacion'||!u.emailVerified;
+  const canSavePerms=u.rol!=='admin'&&u.rol!=='paciente';
+  return `<tr>
+    <td class="text-sm"><div class="fw6">${esc(u.email)}</div><div class="text-xs text-muted">ID ${u.id}</div></td>
+    <td>${esc(u.name||'')} ${esc(u.last||'')}</td>
+    <td><span class="badge b-blue">${ROLE_LABELS[u.rol]||esc(u.rol)}</span></td>
+    <td>${renderUserPerms(u)}</td>
+    <td>${renderUserStatus(u)}</td>
+    <td style="min-width:210px;">
+      <div class="flex gap6" style="flex-wrap:wrap;justify-content:flex-end;">
+        ${canSavePerms?`<button class="btn-p btn-xs" onclick="saveUserPerms(${u.id})"><i class="ti ti-device-floppy"></i> Guardar permisos</button>`:''}
+        <button class="btn-s btn-xs" onclick="editUserRow(${u.id})"><i class="ti ti-edit"></i> Editar</button>
+        ${needsVerify?`<button class="btn-s btn-xs" onclick="verifyUserAccount(${u.id})"><i class="ti ti-mail-check" style="color:var(--green);"></i> Verificar</button>`:''}
+        ${!isSelf?`<button class="btn-s btn-xs" onclick="deleteUserAccount(${u.id})"><i class="ti ti-trash" style="color:var(--red);"></i> Eliminar</button>`:'<span class="text-xs text-muted">Tu usuario</span>'}
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderUserEditRow(u){
+  const isSelf=currentUser?.id===u.id;
+  return `<tr class="row-editing">
+    <td><input id="edit-u-email-${u.id}" type="email" value="${esc(u.email||'')}" style="min-width:190px;"/></td>
+    <td>
+      <div class="form-row" style="gap:6px;grid-template-columns:1fr 1fr;min-width:260px;">
+        <input id="edit-u-name-${u.id}" value="${esc(u.name||'')}" placeholder="Nombre"/>
+        <input id="edit-u-last-${u.id}" value="${esc(u.last||'')}" placeholder="Apellido"/>
+      </div>
+      <input id="edit-u-pass-${u.id}" type="password" placeholder="Nueva clave opcional" style="margin-top:6px;"/>
+    </td>
+    <td><select id="edit-u-rol-${u.id}" ${isSelf?'disabled':''}>${userRoleOptions(u.rol)}</select></td>
+    <td>${renderUserPerms(u)}</td>
+    <td>
+      <select id="edit-u-estado-${u.id}" ${isSelf?'disabled':''}>
+        <option value="activo" ${u.estado==='activo'?'selected':''}>Activo</option>
+        <option value="pendiente_verificacion" ${u.estado==='pendiente_verificacion'?'selected':''}>Pendiente verificacion</option>
+        <option value="inactivo" ${u.estado==='inactivo'?'selected':''}>Inactivo</option>
+      </select>
+      <div class="text-xs text-muted mt8">${u.emailVerified?'Correo verificado':'Correo sin verificar'}</div>
+    </td>
+    <td style="min-width:180px;">
+      <div class="flex gap6" style="flex-wrap:wrap;justify-content:flex-end;">
+        <button class="btn-p btn-xs" onclick="saveUserEdit(${u.id})"><i class="ti ti-device-floppy"></i> Guardar cambios</button>
+        <button class="btn-s btn-xs" onclick="cancelUserEdit()">Cancelar</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function editUserRow(id){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueño/administrador puede editar usuarios','err');return;}
+  editingUserId=+id;
+  loadConfig();
+}
+
+function cancelUserEdit(){
+  editingUserId=null;
+  loadConfig();
+}
+
+function updateLocalUser(user){
+  const users=DB.get('users')||[];
+  const i=users.findIndex(u=>u.id===+user.id);
+  if(i>=0) users[i]=user; else users.push(user);
+  DB.cache.users=users;
+  if(currentUser?.id===+user.id){currentUser=user;applyPermissionUI();}
+}
+
+async function saveUserEdit(userId){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueño/administrador puede editar usuarios','err');return;}
+  const current=(DB.get('users')||[]).find(u=>u.id===+userId);
+  if(!current){toast('Usuario no encontrado','err');return;}
+  const payload={
+    action:'update',
+    userId:+userId,
+    name:document.getElementById(`edit-u-name-${userId}`).value.trim(),
+    last:document.getElementById(`edit-u-last-${userId}`).value.trim(),
+    email:document.getElementById(`edit-u-email-${userId}`).value.trim(),
+    password:document.getElementById(`edit-u-pass-${userId}`).value,
+    rol:document.getElementById(`edit-u-rol-${userId}`)?.value||current.rol,
+    estado:document.getElementById(`edit-u-estado-${userId}`)?.value||current.estado||'activo',
+    permissions:MODULE_PERMS.map(p=>p.id).filter(id=>document.getElementById(`perm-${userId}-${id}`)?.checked)
+  };
+  try{
+    const res=await API.post('/api/users',payload);
+    updateLocalUser(res.user);
+    editingUserId=null;
+    loadConfig();
+    toast('Usuario actualizado','ok');
+  }catch(err){toast(err.message||'No se pudo actualizar el usuario','err');}
+}
+
+async function verifyUserAccount(userId){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueño/administrador puede verificar usuarios','err');return;}
+  try{
+    const res=await API.post('/api/users',{action:'verify',userId:+userId});
+    updateLocalUser(res.user);
+    loadConfig();
+    toast('Cuenta verificada manualmente','ok');
+  }catch(err){toast(err.message||'No se pudo verificar la cuenta','err');}
+}
+
+function deleteUserAccount(userId){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueño/administrador puede eliminar usuarios','err');return;}
+  const u=(DB.get('users')||[]).find(x=>x.id===+userId);
+  if(!u){toast('Usuario no encontrado','err');return;}
+  confirmDelete(`¿Eliminar al usuario ${u.email}?`,async()=>{
+    try{
+      await API.post('/api/users',{action:'delete',userId:+userId});
+      DB.cache.users=(DB.get('users')||[]).filter(x=>x.id!==+userId);
+      if(editingUserId===+userId) editingUserId=null;
+      loadConfig();
+      toast('Usuario eliminado','inf');
+    }catch(err){toast(err.message||'No se pudo eliminar el usuario','err');}
+  });
+}
 function renderUserStatus(u){
   if(u.estado==='pendiente_verificacion'||!u.emailVerified) return '<span class="badge b-amber">Pendiente de verificación</span>';
-  if((u.permissions||[]).length===0&&u.rol!=='admin') return '<span class="badge b-amber">Pendiente de permisos</span>';
+  if((u.permissions||[]).length===0&&u.rol!=='admin'&&u.rol!=='paciente') return '<span class="badge b-amber">Pendiente de permisos</span>';
   if(u.estado&&u.estado!=='activo') return '<span class="badge b-red">Inactivo</span>';
   return '<span class="badge b-green">Activo</span>';
 }
@@ -3172,6 +3300,7 @@ function renderCreatePerms(){
 
 function renderUserPerms(u){
   if(u.rol==='admin') return '<span class="badge b-green">Todos los módulos</span>';
+  if(u.rol==='paciente') return '<span class="badge b-gray">Portal paciente</span>';
   return `<div class="perm-grid" style="min-width:420px;">${MODULE_PERMS.filter(p=>p.id!=='config').map(p=>`<label class="perm-check"><input type="checkbox" id="perm-${u.id}-${p.id}" value="${p.id}" ${hasPerm(p.id,u)?'checked':''}/> ${p.label}</label>`).join('')}</div>`;
 }
 

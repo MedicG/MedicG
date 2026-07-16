@@ -983,6 +983,81 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if path == "/api/users":
             if user.get("rol") != "admin":
                 return make_response(self, 403, {"error": "Solo el administrador puede crear usuarios"})
+            action = payload.get("action") or "create"
+            if action in ("update", "delete", "verify"):
+                user_id = int(payload.get("userId") or 0)
+                with db() as conn:
+                    users = get_json_key(conn, "users", [])
+                    target = next((u for u in users if int(u.get("id", 0)) == user_id), None)
+                    if not target:
+                        return make_response(self, 404, {"error": "Usuario no encontrado"})
+                    is_self = int(user.get("id", 0)) == user_id
+                    admin_count = sum(1 for u in users if u.get("rol") == "admin")
+
+                    if action == "verify":
+                        target["emailVerified"] = True
+                        target["estado"] = "activo"
+                        target.pop("verifyTokenHash", None)
+                        target.pop("verifyExpiresAt", None)
+                        set_json_key(conn, "users", users)
+                        audit(conn, user, "verify_user", "users", {"targetUserId": user_id, "email": target.get("email")})
+                        return make_response(self, 200, {"user": public_user(target)})
+
+                    if action == "delete":
+                        if is_self:
+                            return make_response(self, 400, {"error": "No puedes eliminar tu propio usuario administrador"})
+                        if target.get("rol") == "admin" and admin_count <= 1:
+                            return make_response(self, 400, {"error": "No puedes eliminar el ultimo administrador"})
+                        users = [u for u in users if int(u.get("id", 0)) != user_id]
+                        set_json_key(conn, "users", users)
+                        conn.execute("delete from sessions where user_id = ?", (user_id,))
+                        audit(conn, user, "delete_user", "users", {"targetUserId": user_id, "email": target.get("email"), "rol": target.get("rol")})
+                        return make_response(self, 200, {"ok": True, "deletedUserId": user_id})
+
+                    allowed_roles = set(ROLE_DEFAULT_PERMISSIONS.keys())
+                    name = (payload.get("name") or "").strip()
+                    last = (payload.get("last") or "").strip()
+                    email = (payload.get("email") or "").strip().lower()
+                    rol = (payload.get("rol") or target.get("rol") or "recepcion").strip()
+                    estado = (payload.get("estado") or target.get("estado") or "activo").strip()
+                    password = payload.get("password") or ""
+                    if not name or not last or not email:
+                        return make_response(self, 400, {"error": "Completa nombre, apellido y correo"})
+                    if rol not in allowed_roles:
+                        return make_response(self, 400, {"error": "Rol no valido"})
+                    if any((u.get("email") or "").lower() == email and int(u.get("id", 0)) != user_id for u in users):
+                        return make_response(self, 409, {"error": "Este correo ya esta registrado"})
+                    if is_self and rol != "admin":
+                        return make_response(self, 400, {"error": "No puedes quitarte el rol de administrador"})
+                    if target.get("rol") == "admin" and rol != "admin" and admin_count <= 1:
+                        return make_response(self, 400, {"error": "Debe quedar al menos un administrador"})
+                    if is_self:
+                        estado = "activo"
+                    if password:
+                        if len(password) < 6:
+                            return make_response(self, 400, {"error": "La nueva contrasena debe tener minimo 6 caracteres"})
+                        target["passHash"] = hash_password(password)
+                        target.pop("pass", None)
+                    if rol == "paciente" and not target.get("patientId"):
+                        patient, _ = upsert_patient_from_payload(conn, {
+                            "name": name,
+                            "last": last,
+                            "email": email,
+                            "origen": "Vinculado por administrador",
+                        })
+                        target["patientId"] = patient.get("id")
+                    target.update({
+                        "name": name,
+                        "last": last,
+                        "email": email,
+                        "rol": rol,
+                        "estado": estado,
+                        "permissions": clean_permissions(payload.get("permissions"), rol),
+                        "updatedAt": now_iso(),
+                    })
+                    set_json_key(conn, "users", users)
+                    audit(conn, user, "update_user", "users", {"targetUserId": user_id, "email": email, "rol": rol, "estado": estado})
+                    return make_response(self, 200, {"user": public_user(target)})
             if payload.get("action") == "permissions":
                 user_id = int(payload.get("userId") or 0)
                 permissions = payload.get("permissions") or []
