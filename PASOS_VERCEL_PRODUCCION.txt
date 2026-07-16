@@ -42,13 +42,24 @@ Variables necesarias en Vercel:
 - ALLOWED_ORIGINS: https://medicg.github.io
 
 Correo de verificacion:
-- SMTP_HOST
+Puedes usar SMTP normal o Resend.
+
+SMTP normal:
+- SMTP_HOST=smtp.tudominio.com
 - SMTP_PORT=587
-- SMTP_USER
-- SMTP_PASSWORD
-- SMTP_FROM
+- SMTP_USER=tu-correo@tudominio.com
+- SMTP_PASSWORD=tu-clave-o-app-password
+- SMTP_FROM=no-reply@tudominio.com
+- SMTP_FROM_NAME=Medic G
 - SMTP_TLS=true
 - SMTP_SSL=false
+
+Resend opcional:
+- RESEND_API_KEY=re_xxxxxxxxx
+- RESEND_FROM=Medic G <no-reply@tudominio.com>
+- RESEND_ENDPOINT=https://api.resend.com/emails
+
+Ver tambien: CONFIGURAR_CORREO_VERIFICACION.txt
 
 Despues del deploy prueba:
 https://TU-PROYECTO.vercel.app/api/health

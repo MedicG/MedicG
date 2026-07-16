@@ -1,0 +1,55 @@
+CONFIGURAR CORREO DE VERIFICACION EN VERCEL
+===========================================
+
+El sistema ya envia correos de verificacion cuando un paciente se registra.
+Las credenciales reales NO van en el codigo ni en GitHub. Van en:
+Vercel > Project Settings > Environment Variables > Production.
+
+OPCION 1: SMTP NORMAL
+---------------------
+Agrega estas variables en Vercel:
+
+SMTP_HOST=smtp.tudominio.com
+SMTP_PORT=587
+SMTP_USER=tu-correo@tudominio.com
+SMTP_PASSWORD=tu-clave-o-app-password
+SMTP_FROM=no-reply@tudominio.com
+SMTP_FROM_NAME=Medic G
+SMTP_TLS=true
+SMTP_SSL=false
+
+Si tu proveedor usa puerto 465:
+SMTP_PORT=465
+SMTP_TLS=false
+SMTP_SSL=true
+
+Ejemplos comunes:
+- cPanel/hosting: normalmente smtp.tudominio.com, puerto 465 SSL o 587 TLS.
+- Zoho/Microsoft/Gmail: usa la clave de aplicacion o password SMTP que te entregue el proveedor.
+
+OPCION 2: RESEND EN VERCEL
+--------------------------
+Si usas Resend desde Vercel Marketplace o desde resend.com:
+
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM=Medic G <no-reply@tudominio.com>
+RESEND_ENDPOINT=https://api.resend.com/emails
+
+Con Resend debes verificar tu dominio para enviar desde no-reply@tudominio.com.
+Para pruebas, Resend permite remitentes de prueba segun la configuracion de tu cuenta.
+
+VARIABLES IMPORTANTES
+---------------------
+PUBLIC_API_URL=https://TU-PROYECTO.vercel.app
+SHOW_VERIFICATION_LINK=false
+
+PUBLIC_API_URL debe ser el dominio real de Vercel para que el link del correo abra el backend correcto.
+SHOW_VERIFICATION_LINK debe quedar false en produccion para no mostrar links de verificacion en pantalla.
+
+DESPUES DE CONFIGURAR
+---------------------
+1. Guarda las variables en Vercel.
+2. Redeploy en Production.
+3. Crea una cuenta de paciente desde la landing.
+4. Revisa el correo de verificacion.
+5. Si no llega, revisa Vercel > Deployments > Logs y confirma host, puerto, usuario y password SMTP.

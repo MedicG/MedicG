@@ -2,6 +2,7 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from email.message import EmailMessage
+from email.utils import formataddr
 import hashlib
 import json
 import os
@@ -9,6 +10,8 @@ import secrets
 import smtplib
 import sqlite3
 import time
+import urllib.error
+import urllib.request
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("MEDICG_DB_PATH", BASE_DIR / "medicg.sqlite3"))
@@ -35,8 +38,12 @@ SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER or ADMIN_EMAIL)
+SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", "Medic G")
 SMTP_TLS = os.environ.get("SMTP_TLS", "true").lower() not in ("0", "false", "no")
 SMTP_SSL = os.environ.get("SMTP_SSL", "false").lower() in ("1", "true", "yes")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM = os.environ.get("RESEND_FROM", SMTP_FROM)
+RESEND_ENDPOINT = os.environ.get("RESEND_ENDPOINT", "https://api.resend.com/emails")
 SHOW_VERIFICATION_LINK = os.environ.get("SHOW_VERIFICATION_LINK", "false").lower() in ("1", "true", "yes")
 SESSIONS = {}
 ALLOWED_PERMISSIONS = {
@@ -202,23 +209,75 @@ def app_base_url(handler):
     return f"{proto}://{host}".rstrip("/")
 
 
-def smtp_configured():
-    return bool(SMTP_HOST and SMTP_FROM)
+def email_sender_address(sender_email=None):
+    sender = sender_email or SMTP_FROM
+    return formataddr((SMTP_FROM_NAME, sender)) if SMTP_FROM_NAME else sender
 
 
-def send_verification_email(to_email, name, link):
-    if not smtp_configured():
-        return False, "SMTP no configurado"
-    msg = EmailMessage()
-    msg["Subject"] = "Verifica tu cuenta Medic G"
-    msg["From"] = SMTP_FROM
-    msg["To"] = to_email
-    msg.set_content(
+def email_text(name, link):
+    return (
         f"Hola {name},\n\n"
         "Gracias por registrarte en Medic G.\n\n"
-        f"Verifica tu correo en este enlace:\n{link}\n\n"
-        "Si no solicitaste esta cuenta, puedes ignorar este mensaje."
+        "Para activar tu cuenta y poder iniciar sesion, verifica tu correo en este enlace:\n"
+        f"{link}\n\n"
+        "Este enlace vence por seguridad. Si no solicitaste esta cuenta, puedes ignorar este mensaje."
     )
+
+
+def email_html(name, link):
+    safe_name = str(name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    safe_link = str(link or "").replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;")
+    return f"""
+    <div style="font-family:Arial,sans-serif;background:#f6f9fb;padding:24px;color:#1f2937;">
+      <div style="max-width:560px;margin:auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:26px;">
+        <h1 style="margin:0 0 12px;color:#0f766e;font-size:24px;">Verifica tu cuenta Medic G</h1>
+        <p>Hola {safe_name},</p>
+        <p>Gracias por registrarte en Medic G. Para activar tu cuenta y poder iniciar sesion, confirma tu correo.</p>
+        <p style="margin:24px 0;"><a href="{safe_link}" style="background:#0f766e;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:700;display:inline-block;">Verificar mi correo</a></p>
+        <p style="font-size:13px;color:#6b7280;">Si el boton no funciona, copia este enlace en tu navegador:<br>{safe_link}</p>
+        <p style="font-size:13px;color:#6b7280;">Si no solicitaste esta cuenta, puedes ignorar este mensaje.</p>
+      </div>
+    </div>
+    """
+
+
+def email_configured():
+    return bool((RESEND_API_KEY and RESEND_FROM) or (SMTP_HOST and SMTP_FROM))
+
+
+def send_with_resend(to_email, subject, text_body, html_body):
+    sender = RESEND_FROM if "<" in RESEND_FROM else email_sender_address(RESEND_FROM)
+    payload = json.dumps({
+        "from": sender,
+        "to": [to_email],
+        "subject": subject,
+        "text": text_body,
+        "html": html_body,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        RESEND_ENDPOINT,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        if resp.status < 200 or resp.status >= 300:
+            return False, f"Resend respondio con estado {resp.status}"
+    return True, ""
+
+
+def send_with_smtp(to_email, subject, text_body, html_body):
+    if not (SMTP_HOST and SMTP_FROM):
+        return False, "SMTP no configurado"
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = email_sender_address()
+    msg["To"] = to_email
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
     if SMTP_SSL:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
             if SMTP_USER and SMTP_PASSWORD:
@@ -226,12 +285,31 @@ def send_verification_email(to_email, name, link):
             smtp.send_message(msg)
     else:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
             if SMTP_TLS:
                 smtp.starttls()
+                smtp.ehlo()
             if SMTP_USER and SMTP_PASSWORD:
                 smtp.login(SMTP_USER, SMTP_PASSWORD)
             smtp.send_message(msg)
     return True, ""
+
+
+def send_verification_email(to_email, name, link):
+    if not email_configured():
+        return False, "Configura SMTP_HOST/SMTP_FROM o RESEND_API_KEY/RESEND_FROM"
+    subject = "Verifica tu cuenta Medic G"
+    text_body = email_text(name, link)
+    html_body = email_html(name, link)
+    try:
+        if RESEND_API_KEY and RESEND_FROM:
+            return send_with_resend(to_email, subject, text_body, html_body)
+        return send_with_smtp(to_email, subject, text_body, html_body)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        return False, f"Error Resend {exc.code}: {detail}"
+    except Exception as exc:
+        return False, str(exc)
 
 
 def fix_text(value):
@@ -783,7 +861,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 "message": "Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesión.",
             }
             if not email_sent:
-                response["message"] = "Cuenta creada, pero el servidor de correo no está configurado. Configura SMTP para enviar verificaciones."
+                response["message"] = "Cuenta creada, pero el servidor de correo no está configurado. Configura SMTP o Resend para enviar verificaciones."
                 response["emailError"] = email_error
             if SHOW_VERIFICATION_LINK:
                 response["verificationLink"] = verify_link
