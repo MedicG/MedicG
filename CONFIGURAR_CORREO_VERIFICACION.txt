@@ -53,3 +53,15 @@ DESPUES DE CONFIGURAR
 3. Crea una cuenta de paciente desde la landing.
 4. Revisa el correo de verificacion.
 5. Si no llega, revisa Vercel > Deployments > Logs y confirma host, puerto, usuario y password SMTP.
+REENVIAR CORREO A PACIENTES YA REGISTRADOS
+------------------------------------------
+Si un paciente ya se registro y no recibio el correo:
+1. Abre la landing.
+2. En Iniciar sesion, escribe el correo y la clave del paciente.
+3. Cuando salga "Verifica tu correo", presiona "Reenviar correo de verificacion".
+4. Si el servidor de correo no esta bien configurado, la pantalla mostrara el error para corregir SMTP/Resend.
+
+IMPORTANTE
+----------
+No uses valores de ejemplo como smtp.tudominio.com o no-reply@tudominio.com.
+Debes poner los datos reales de tu correo o usar Resend con un dominio verificado.

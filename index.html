@@ -343,6 +343,7 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
             <div class="field"><label class="field-lbl">Correo electrónico</label><input type="email" id="l-email" placeholder="usuario@medicg.com" autocomplete="username"/></div>
             <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="Contraseña" autocomplete="current-password"/></div>
             <div id="login-err" class="alert alert-d mb8 hidden"><i class="ti ti-alert-circle"></i><span></span></div>
+            <button id="resend-verification-btn" class="btn-s w100 mb8 hidden" onclick="resendVerificationEmail()"><i class="ti ti-mail-forward" style="font-size:16px;"></i> Reenviar correo de verificacion</button>
             <button class="btn-p w100" onclick="doLogin()"><i class="ti ti-login" style="font-size:16px;"></i> Ingresar</button>
             <button class="btn-s w100 mt8" onclick="switchAuth('register')"><i class="ti ti-user-plus" style="font-size:16px;"></i> Registrarme como paciente</button>
           </div>
@@ -1293,7 +1294,7 @@ function showInlineMsg(id,msg,kind='d'){
   if(!el)return;
   el.className=`alert alert-${kind}`;
   const icon=el.querySelector('i');
-  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':'ti ti-alert-circle');
+  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':(kind==='i'?'ti ti-info-circle':'ti ti-alert-circle'));
   el.querySelector('span').textContent=msg;
 }
 
@@ -1334,6 +1335,7 @@ function switchAuth(mode){
 async function doLogin(){
   const email = document.getElementById('l-email').value.trim();
   const pass = document.getElementById('l-pass').value;
+  document.getElementById('resend-verification-btn')?.classList.add('hidden');
   try{
     const auth = await API.post('/api/login',{email,password:pass});
     API.token = auth.token;
@@ -1351,10 +1353,12 @@ async function doLogin(){
     currentUser = loaded.user || auth.user;
     launchApp();
   }catch(err){
-    showAuthErr('login',err.message||'Correo o contraseña incorrectos');
+    const msg=err.message||'Correo o contraseña incorrectos';
+    const needsVerification=msg.toLowerCase().includes('verifica tu correo');
+    showAuthErr('login',msg,!needsVerification);
+    document.getElementById('resend-verification-btn')?.classList.toggle('hidden',!needsVerification);
   }
 }
-
 async function doRegister(){
   const name=document.getElementById('r-name').value.trim();
   const last=document.getElementById('r-last').value.trim();
@@ -1377,14 +1381,31 @@ async function doRegister(){
     showAuthErr('reg',err.message||'No se pudo crear la cuenta');
   }
 }
-function showAuthErr(type,msg){
-  showAuthMsg(type,msg,'d',true);
+async function resendVerificationEmail(){
+  const email=document.getElementById('l-email').value.trim();
+  const btn=document.getElementById('resend-verification-btn');
+  if(!email) return showAuthErr('login','Ingresa el correo registrado para reenviar la verificacion.',false);
+  const original=btn?.innerHTML;
+  if(btn){btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Enviando correo...';}
+  showAuthMsg('login','Enviando nuevo correo de verificacion...','i',false);
+  try{
+    const res=await API.post('/api/resend-verification',{email});
+    showAuthMsg('login',res.message||'Si el correo esta registrado, enviaremos un nuevo enlace.',res.emailSent?'s':'w',false);
+    if(res.emailSent) btn?.classList.add('hidden');
+  }catch(err){
+    showAuthErr('login',err.message||'No se pudo reenviar el correo. Revisa SMTP/Resend en Vercel.',false);
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=original;}
+  }
+}
+function showAuthErr(type,msg,autoHide=true){
+  showAuthMsg(type,msg,'d',autoHide);
 }
 function showAuthMsg(type,msg,kind='d',autoHide=true){
   const el=document.getElementById(type==='login'?'login-err':'reg-err');
   el.className=`alert alert-${kind} mb8`;
   const icon=el.querySelector('i');
-  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':'ti ti-alert-circle');
+  if(icon) icon.className=kind==='s'?'ti ti-check':(kind==='w'?'ti ti-alert-triangle':(kind==='i'?'ti ti-info-circle':'ti ti-alert-circle'));
   el.querySelector('span').textContent=msg;
   if(autoHide) setTimeout(()=>el.classList.add('hidden'),5000);
 }

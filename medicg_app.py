@@ -810,6 +810,54 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 audit(conn, user, "login", "session")
             return make_response(self, 200, {"token": token, "user": public_user(user)})
 
+        if path == "/api/resend-verification":
+            email = (payload.get("email") or "").strip().lower()
+            if not email:
+                return make_response(self, 400, {"error": "Ingresa el correo registrado"})
+            verify_token = secrets.token_urlsafe(32)
+            verify_link = f"{app_base_url(self)}/api/verify-email?token={verify_token}"
+            target_name = "Paciente"
+            with db() as conn:
+                users = get_json_key(conn, "users", [])
+                target = next((u for u in users if (u.get("email") or "").lower() == email), None)
+                if not target:
+                    audit(conn, None, "resend_verification_unknown_email", "users", {"email": email})
+                    return make_response(self, 200, {
+                        "ok": True,
+                        "emailSent": False,
+                        "message": "Si el correo esta registrado, enviaremos un nuevo enlace de verificacion.",
+                    })
+                if user_email_verified(target) and target.get("estado") != "pendiente_verificacion":
+                    return make_response(self, 200, {
+                        "ok": True,
+                        "emailSent": False,
+                        "alreadyVerified": True,
+                        "message": "Este correo ya esta verificado. Intenta iniciar sesion.",
+                    })
+                target["emailVerified"] = False
+                target["estado"] = "pendiente_verificacion"
+                target["verifyTokenHash"] = token_hash(verify_token)
+                target["verifyExpiresAt"] = time.time() + 48 * 3600
+                target_name = target.get("name") or target.get("nombres") or "Paciente"
+                set_json_key(conn, "users", users)
+                audit(conn, None, "resend_verification_requested", "users", {"email": email})
+            email_sent, email_error = send_verification_email(email, target_name, verify_link)
+            with db() as conn:
+                audit(conn, None, "resend_verification_sent" if email_sent else "resend_verification_failed", "users", {
+                    "email": email,
+                    "sent": email_sent,
+                    "error": email_error if not email_sent else "",
+                })
+            response = {
+                "ok": True,
+                "emailSent": email_sent,
+                "message": "Te enviamos un nuevo correo de verificacion. Revisa tambien spam o promociones." if email_sent else "No se pudo enviar el correo. Revisa SMTP/Resend en Vercel y vuelve a intentar.",
+            }
+            if not email_sent:
+                response["emailError"] = email_error
+            if SHOW_VERIFICATION_LINK:
+                response["verificationLink"] = verify_link
+            return make_response(self, 200, response)
         if path == "/api/register":
             name = (payload.get("name") or "").strip()
             last = (payload.get("last") or "").strip()
