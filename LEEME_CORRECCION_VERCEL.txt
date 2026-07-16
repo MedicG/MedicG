@@ -1,0 +1,42 @@
+CORRECCION URGENTE PARA VERCEL / GITHUB
+
+El error del despliegue viene de GitHub, no del ZIP local:
+
+1. En el repositorio MedicG/MedicG todavia existe este archivo:
+   pyproject.toml
+
+   Contiene:
+   [tool.vercel]
+   entrypoint = "api.index:handler"
+
+   Vercel lee ese archivo y busca api/index.py.
+
+2. En GitHub no existe:
+   api/index.py
+
+Por eso Vercel falla.
+
+QUE HACER EN GITHUB:
+
+1. Borra el archivo pyproject.toml de la raiz del repositorio.
+   Esto es obligatorio. No basta con ponerlo en .vercelignore.
+
+2. Sube estos archivos del paquete limpio:
+   api/index.py
+   api/__init__.py
+
+3. Confirma que en la raiz del repositorio queden:
+   index.html
+   config.js
+   vercel.json
+   requirements.txt
+   .python-version
+   .vercelignore
+   medicg_app.py
+   api/index.py
+   api/__init__.py
+
+4. Vuelve a desplegar en Vercel.
+
+Si Vercel compila, el siguiente posible error sera de base de datos.
+En ese caso configura DATABASE_URL o POSTGRES_URL en Variables de entorno de Vercel.
