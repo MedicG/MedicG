@@ -1,0 +1,50 @@
+CONFIGURAR BASE DE DATOS EN VERCEL
+
+Este error:
+{"error": "Base de datos no configurada en Vercel. Conecta Postgres/Neon y agrega DATABASE_URL o POSTGRES_URL."}
+
+significa que el despliegue ya esta ejecutando Python, pero Vercel no tiene una variable de entorno con la conexion a PostgreSQL.
+
+OPCION RECOMENDADA: Neon desde Vercel
+
+1. Entra a tu proyecto en Vercel.
+2. Ve a Storage o Integrations / Marketplace.
+3. Agrega Neon Postgres.
+4. Conecta Neon al proyecto Medic G.
+5. Vercel debe crear automaticamente variables como:
+   - DATABASE_URL
+   - POSTGRES_URL
+   - POSTGRES_URL_NON_POOLING
+6. Ve a Project Settings > Environment Variables y confirma que exista al menos una de esas variables en Production.
+7. Haz Redeploy.
+
+OPCION MANUAL
+
+1. Crea una base de datos PostgreSQL en Neon, Supabase u otro proveedor.
+2. Copia la cadena de conexion.
+3. En Vercel > Project Settings > Environment Variables agrega:
+   DATABASE_URL=postgresql://usuario:password@host:puerto/base?sslmode=require
+4. Marca Production.
+5. Guarda y haz Redeploy.
+
+VARIABLES MINIMAS PARA PRODUCCION
+
+DATABASE_URL=postgresql://...
+ADMIN_EMAIL=tu-correo-admin
+ADMIN_PASSWORD=tu-clave-admin-segura
+PUBLIC_API_URL=https://tu-proyecto.vercel.app
+PUBLIC_APP_URL=https://tu-usuario.github.io/tu-repo
+ALLOWED_ORIGINS=https://tu-usuario.github.io
+
+IMPORTANTE
+
+No actives ALLOW_SQLITE_ON_VERCEL para produccion.
+SQLite en Vercel no es persistente y puedes perder datos.
+
+PRUEBA FINAL
+
+Despues del redeploy abre:
+https://TU-PROYECTO.vercel.app/api/health
+
+Debe responder algo parecido a:
+{"ok": true, "db": "postgres"}

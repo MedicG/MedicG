@@ -29,7 +29,7 @@ Si Vercel dice "No se encontro ningun punto de entrada de Python":
 - Revisa que api/index.py exista dentro de una carpeta llamada api.
 
 Variables necesarias en Vercel:
-- DATABASE_URL o POSTGRES_URL: conexion PostgreSQL/Neon.
+- DATABASE_URL, POSTGRES_URL o POSTGRES_URL_NON_POOLING: conexion PostgreSQL/Neon.
 - ADMIN_EMAIL: correo inicial del administrador.
 - ADMIN_PASSWORD: clave inicial del administrador.
 - PUBLIC_API_URL: URL de Vercel, por ejemplo https://tu-proyecto.vercel.app
@@ -49,7 +49,7 @@ Despues del deploy prueba:
 https://TU-PROYECTO.vercel.app/api/health
 
 Si responde {"ok": true, "db": "postgres"}, ya esta conectado.
-Si dice "Base de datos no configurada en Vercel", falta conectar Neon/Postgres.
+Si dice "Base de datos no configurada en Vercel", falta conectar Neon/Postgres o falta configurar DATABASE_URL/POSTGRES_URL en Vercel.
 
 En GitHub Pages, config.js apunta a:
 https://medic-g-git-main-medicgs-projects.vercel.app

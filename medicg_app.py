@@ -16,6 +16,9 @@ DATABASE_URL = (
     os.environ.get("DATABASE_URL")
     or os.environ.get("POSTGRES_URL")
     or os.environ.get("POSTGRES_URL_NON_POOLING")
+    or os.environ.get("POSTGRES_PRISMA_URL")
+    or os.environ.get("POSTGRES_DATABASE_URL")
+    or os.environ.get("NEON_DATABASE_URL")
 )
 DB_DRIVER = "postgres" if DATABASE_URL else "sqlite"
 HOST = os.environ.get("HOST", "0.0.0.0")
@@ -131,7 +134,7 @@ def db():
         return DatabaseConnection(conn, "postgres")
     if os.environ.get("VERCEL") and os.environ.get("ALLOW_SQLITE_ON_VERCEL", "").lower() not in ("1", "true", "yes"):
         raise RuntimeError(
-            "Base de datos no configurada en Vercel. Conecta Postgres/Neon y agrega DATABASE_URL o POSTGRES_URL."
+            "Base de datos no configurada en Vercel. Conecta Postgres/Neon y agrega DATABASE_URL, POSTGRES_URL o POSTGRES_URL_NON_POOLING."
         )
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
