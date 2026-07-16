@@ -1,3 +1,8 @@
+IMPORTANTE: LANDING COMO PAGINA PRINCIPAL
+Si ves la landing en un dominio preview de Vercel pero medic-g.vercel.app todavia muestra el login viejo,
+el codigo esta bien pero produccion sigue apuntando a un despliegue anterior.
+Solucion: en Vercel abre el despliegue preview que muestra la landing y usa "Promote to Production",
+o sube este paquete al mismo proyecto conectado a medic-g.vercel.app y despliega en Production.
 Medic G en Vercel
 
 Sube a GitHub el contenido de esta carpeta, no una carpeta externa que contenga otra carpeta medicg-db.
