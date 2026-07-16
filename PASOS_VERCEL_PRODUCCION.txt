@@ -7,6 +7,7 @@ Archivos clave que deben quedar en la raiz del repositorio:
 - config.js
 - vercel.json
 - requirements.txt
+- app.py
 - medicg_app.py
 - api/index.py
 - api/__init__.py
@@ -21,6 +22,11 @@ Si Vercel sigue mostrando error de pyproject.toml:
 - Asegurate de subir este .vercelignore actualizado.
 - Si GitHub conserva un pyproject.toml viejo en la raiz, Vercel lo ignorara antes de compilar.
 - Si aun falla, entra al repositorio en GitHub y borra pyproject.toml manualmente.
+
+Si Vercel dice "No se encontro ningun punto de entrada de Python":
+- Falta subir app.py o api/index.py a la raiz correcta del repositorio.
+- Revisa en GitHub que app.py se vea junto a index.html y medicg_app.py.
+- Revisa que api/index.py exista dentro de una carpeta llamada api.
 
 Variables necesarias en Vercel:
 - DATABASE_URL o POSTGRES_URL: conexion PostgreSQL/Neon.

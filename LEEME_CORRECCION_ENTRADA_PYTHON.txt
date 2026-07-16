@@ -1,0 +1,37 @@
+CORRECCION DEL ERROR: NO SE ENCONTRO PUNTO DE ENTRADA PYTHON
+
+Estado confirmado en GitHub:
+- pyproject.toml ya no esta. Eso esta correcto.
+- api/index.py no esta subido.
+- app.py no esta subido.
+
+Por eso Vercel muestra:
+"No se encontro ningun punto de entrada de Python".
+
+Solucion:
+1. Sube app.py a la raiz del repositorio, junto a index.html y medicg_app.py.
+2. Sube la carpeta api completa:
+   - api/index.py
+   - api/__init__.py
+3. Confirma que pyproject.toml NO exista.
+4. Vuelve a desplegar en Vercel.
+
+Archivos que deben verse en la raiz de GitHub:
+- index.html
+- config.js
+- vercel.json
+- requirements.txt
+- .python-version
+- .vercelignore
+- app.py
+- medicg_app.py
+- api/index.py
+- api/__init__.py
+
+Si Vercel compila y luego muestra error de servidor, revisa las variables de entorno:
+- DATABASE_URL o POSTGRES_URL
+- ADMIN_EMAIL
+- ADMIN_PASSWORD
+- PUBLIC_API_URL
+- PUBLIC_APP_URL
+- ALLOWED_ORIGINS
