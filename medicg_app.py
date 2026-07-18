@@ -361,6 +361,7 @@ def public_user(user):
         "rol": user.get("rol", "recepcion"),
         "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
         "patientId": user.get("patientId"),
+        "medicoId": user.get("medicoId"),
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
         "emailVerified": user_email_verified(user),
@@ -375,6 +376,35 @@ def clean_permissions(permissions, role):
     if not isinstance(permissions, list) or not permissions:
         permissions = ROLE_DEFAULT_PERMISSIONS.get(role, ROLE_DEFAULT_PERMISSIONS["recepcion"])
     return [p for p in permissions if p in ALLOWED_PERMISSIONS and p != "config"]
+
+
+def lookup_key(value):
+    return "".join(ch for ch in str(value or "").lower() if ch.isalnum())
+
+
+def resolve_medico_id(conn, payload, name="", last="", email=""):
+    medicos = get_json_key(conn, "medicos", []) or []
+    raw_id = payload.get("medicoId") or payload.get("medico_id") or payload.get("med")
+    if raw_id not in (None, ""):
+        try:
+            medico_id = int(raw_id)
+        except (TypeError, ValueError):
+            medico_id = 0
+        if medico_id and any(int(m.get("id", 0)) == medico_id for m in medicos):
+            return medico_id
+        return 0
+    email_key = (email or "").strip().lower()
+    if email_key:
+        match = next((m for m in medicos if (m.get("email") or "").strip().lower() == email_key), None)
+        if match:
+            return int(match.get("id") or 0)
+    wanted = lookup_key(f"{name} {last}")
+    if wanted:
+        for medico in medicos:
+            med_key = lookup_key(medico.get("nombre", ""))
+            if wanted in med_key or med_key in wanted:
+                return int(medico.get("id") or 0)
+    return 0
 
 
 def can_save_key(user, key):
@@ -453,6 +483,11 @@ def init_db():
                 if user.get("permissions") != cleaned_permissions:
                     user["permissions"] = cleaned_permissions
                     changed = True
+                if user.get("rol") == "medico" and not user.get("medicoId"):
+                    medico_id = resolve_medico_id(conn, {}, user.get("name", ""), user.get("last", ""), user.get("email", ""))
+                    if medico_id:
+                        user["medicoId"] = medico_id
+                        changed = True
             fixed_users = fix_text(users)
             if fixed_users != users:
                 users = fixed_users
@@ -1046,6 +1081,15 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                             "origen": "Vinculado por administrador",
                         })
                         target["patientId"] = patient.get("id")
+                    if rol == "medico":
+                        medico_id = resolve_medico_id(conn, payload, name, last, email)
+                        if not medico_id:
+                            return make_response(self, 400, {"error": "Selecciona el perfil medico vinculado para este usuario"})
+                        target["medicoId"] = medico_id
+                    else:
+                        target.pop("medicoId", None)
+                    if rol != "paciente":
+                        target.pop("patientId", None)
                     target.update({
                         "name": name,
                         "last": last,
@@ -1082,7 +1126,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
                     return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                if rol not in ROLE_DEFAULT_PERMISSIONS:
+                    return make_response(self, 400, {"error": "Rol no valido"})
                 patient_id = None
+                medico_id = None
                 if rol == "paciente":
                     patient, _ = upsert_patient_from_payload(conn, {
                         "name": name,
@@ -1091,6 +1138,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         "origen": "Creado por administrador",
                     })
                     patient_id = patient.get("id")
+                if rol == "medico":
+                    medico_id = resolve_medico_id(conn, payload, name, last, email)
+                    if not medico_id:
+                        return make_response(self, 400, {"error": "Selecciona el perfil medico vinculado para este usuario"})
                 next_ids = get_json_key(conn, "nextIds", {})
                 new_id = int(next_ids.get("user", len(users) + 1))
                 next_ids["user"] = new_id + 1
@@ -1105,6 +1156,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "estado": "activo",
                     "emailVerified": True,
                     "patientId": patient_id,
+                    "medicoId": medico_id,
                     "createdAt": now_iso(),
                 }
                 users.append(new_user)
