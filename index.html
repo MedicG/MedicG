@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
 <script src="config.js"></script>
-<script>window.APP_BUILD="2026-07-16-admin-user-actions-v2";</script>
+<script>window.APP_BUILD="2026-07-26-medico-profile-link-v1";</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -739,6 +739,11 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
             <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="u-email"/></div>
             <div class="field"><label class="field-lbl">Contraseña temporal <span class="req">*</span></label><input type="password" id="u-pass" placeholder="Mín. 6 caracteres"/></div>
           </div>
+          <div class="field" id="u-medico-link-wrap">
+            <label class="field-lbl">Perfil medico vinculado</label>
+            <select id="u-medico-link"></select>
+            <div class="text-xs text-muted mt4">Se usa cuando el rol es Medico para conectar el login con el perfil del modulo Medicos.</div>
+          </div>
           <div class="field-lbl">Permisos del nuevo usuario</div>
           <div id="u-perms" class="perm-grid"></div>
           <button class="btn-p btn-sm" onclick="createSystemUser()"><i class="ti ti-user-plus"></i> Crear usuario</button>
@@ -1227,7 +1232,28 @@ function isAllowedClinicalFile(file){
 }
 function calcEdad(fnac){if(!fnac)return'—';const diff=Date.now()-new Date(fnac).getTime();return Math.floor(diff/31557600000);}
 function getPacName(id){const p=(DB.get('pacientes')||[]).find(x=>x.id===+id);return p?p.nombres+' '+p.apellidos:'—';}
-function getMedName(id){const m=(DB.get('medicos')||[]).find(x=>x.id===+id);return m?m.nombre:'—';}
+function getMedName(id){const m=(DB.get('medicos')||[]).find(x=>x.id===+id);return m?m.nombre:'---';}
+function normalizeLookup(value){return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');}
+function linkedDoctorForUser(user=currentUser){
+  const meds=DB.get('medicos')||[];
+  if(!user)return null;
+  if(user.medicoId){const direct=meds.find(m=>String(m.id)===String(user.medicoId));if(direct)return direct;}
+  const email=(user.email||'').trim().toLowerCase();
+  if(email){const byEmail=meds.find(m=>(m.email||'').trim().toLowerCase()===email);if(byEmail)return byEmail;}
+  const wanted=normalizeLookup(`${user.name||''} ${user.last||''}`);
+  if(wanted){
+    const byName=meds.find(m=>{const key=normalizeLookup(m.nombre||'');return key.includes(wanted)||wanted.includes(key);});
+    if(byName)return byName;
+  }
+  return null;
+}
+function doctorProfileLabel(m){return m?`${m.nombre||'Medico'}${m.esp?' - '+m.esp:''}${m.email?' - '+m.email:''}`:'Sin perfil medico';}
+function renderMedicoLinkOptions(selected=''){
+  const meds=DB.get('medicos')||[];
+  if(!meds.length)return '<option value="">Primero registra medicos en el modulo Medicos</option>';
+  return '<option value="">Seleccionar perfil medico...</option>'+meds.map(m=>`<option value="${m.id}" ${String(m.id)===String(selected||'')?'selected':''}>${esc(doctorProfileLabel(m))}</option>`).join('');
+}
+function currentDoctorId(){const med=linkedDoctorForUser();return currentUser?.rol==='medico'&&med?+med.id:0;}
 function getEspColor(name){const e=(DB.get('especialidades')||[]).find(x=>x.nombre===name);return e?e.color:'#5A5A6A';}
 
 // =========================================================
@@ -3147,10 +3173,12 @@ function renderUserRow(u){
   const isSelf=currentUser?.id===u.id;
   const needsVerify=u.estado==='pendiente_verificacion'||!u.emailVerified;
   const canSavePerms=u.rol!=='admin'&&u.rol!=='paciente';
+  const linkedMed=linkedDoctorForUser(u);
+  const roleExtra=u.rol==='medico'?`<div class="text-xs text-muted mt4">${linkedMed?`Perfil: ${esc(linkedMed.nombre)} - ${esc(linkedMed.esp||'')}`:'Sin perfil medico vinculado'}</div>`:'';
   return `<tr>
     <td class="text-sm"><div class="fw6">${esc(u.email)}</div><div class="text-xs text-muted">ID ${u.id}</div></td>
     <td>${esc(u.name||'')} ${esc(u.last||'')}</td>
-    <td><span class="badge b-blue">${ROLE_LABELS[u.rol]||esc(u.rol)}</span></td>
+    <td><span class="badge b-blue">${ROLE_LABELS[u.rol]||esc(u.rol)}</span>${roleExtra}</td>
     <td>${renderUserPerms(u)}</td>
     <td>${renderUserStatus(u)}</td>
     <td style="min-width:210px;">
@@ -3166,6 +3194,8 @@ function renderUserRow(u){
 
 function renderUserEditRow(u){
   const isSelf=currentUser?.id===u.id;
+  const linkedMed=linkedDoctorForUser(u);
+  const linkedId=u.medicoId||linkedMed?.id||'';
   return `<tr class="row-editing">
     <td><input id="edit-u-email-${u.id}" type="email" value="${esc(u.email||'')}" style="min-width:190px;"/></td>
     <td>
@@ -3175,7 +3205,13 @@ function renderUserEditRow(u){
       </div>
       <input id="edit-u-pass-${u.id}" type="password" placeholder="Nueva clave opcional" style="margin-top:6px;"/>
     </td>
-    <td><select id="edit-u-rol-${u.id}" ${isSelf?'disabled':''}>${userRoleOptions(u.rol)}</select></td>
+    <td>
+      <select id="edit-u-rol-${u.id}" ${isSelf?'disabled':''} onchange="toggleEditMedicoLink(${u.id})">${userRoleOptions(u.rol)}</select>
+      <div id="edit-u-medico-wrap-${u.id}" class="mt8">
+        <label class="field-lbl">Perfil medico vinculado</label>
+        <select id="edit-u-medico-${u.id}" ${u.rol==='medico'?'':'disabled'}>${renderMedicoLinkOptions(linkedId)}</select>
+      </div>
+    </td>
     <td>${renderUserPerms(u)}</td>
     <td>
       <select id="edit-u-estado-${u.id}" ${isSelf?'disabled':''}>
@@ -3225,6 +3261,7 @@ async function saveUserEdit(userId){
     email:document.getElementById(`edit-u-email-${userId}`).value.trim(),
     password:document.getElementById(`edit-u-pass-${userId}`).value,
     rol:document.getElementById(`edit-u-rol-${userId}`)?.value||current.rol,
+    medicoId:document.getElementById(`edit-u-medico-${userId}`)?.value||'',
     estado:document.getElementById(`edit-u-estado-${userId}`)?.value||current.estado||'activo',
     permissions:MODULE_PERMS.map(p=>p.id).filter(id=>document.getElementById(`perm-${userId}-${id}`)?.checked)
   };
@@ -3276,6 +3313,7 @@ async function createSystemUser(){
     email:document.getElementById('u-email').value.trim(),
     password:document.getElementById('u-pass').value,
     rol:document.getElementById('u-rol').value,
+    medicoId:document.getElementById('u-medico-link')?.value||'',
     permissions:getCheckedPerms('u-perm-')
   };
   try{
@@ -3284,6 +3322,8 @@ async function createSystemUser(){
     users.push(res.user);
     DB.cache.users=users;
     ['u-name','u-last','u-email','u-pass'].forEach(id=>document.getElementById(id).value='');
+    const medLink=document.getElementById('u-medico-link');if(medLink)medLink.value='';
+    renderCreatePerms();
     loadConfig();
     toast('Usuario creado correctamente','ok');
   }catch(err){toast(err.message||'No se pudo crear el usuario','err');}
@@ -3300,6 +3340,24 @@ function renderCreatePerms(){
   const role=document.getElementById('u-rol')?.value||'recepcion';
   const perms=defaultPermsForRole(role);
   box.innerHTML=renderPermChecks('u-perm-',perms,role==='admin');
+  renderCreateMedicoLink();
+}
+
+function renderCreateMedicoLink(){
+  const role=document.getElementById('u-rol')?.value||'recepcion';
+  const wrap=document.getElementById('u-medico-link-wrap');
+  const sel=document.getElementById('u-medico-link');
+  if(!wrap||!sel)return;
+  const prev=sel.value||'';
+  sel.innerHTML=renderMedicoLinkOptions(prev);
+  sel.disabled=role!=='medico';
+  wrap.style.opacity=role==='medico'?'1':'.75';
+}
+
+function toggleEditMedicoLink(userId){
+  const role=document.getElementById(`edit-u-rol-${userId}`)?.value||'';
+  const sel=document.getElementById(`edit-u-medico-${userId}`);
+  if(sel)sel.disabled=role!=='medico';
 }
 
 function renderUserPerms(u){
