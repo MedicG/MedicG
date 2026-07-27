@@ -1,8 +1,10 @@
-from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+﻿from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from email.message import EmailMessage
 from email.utils import formataddr
+import base64
+import datetime as dt
 import hashlib
 import json
 import os
@@ -12,6 +14,9 @@ import sqlite3
 import time
 import urllib.error
 import urllib.request
+from decimal import Decimal, ROUND_HALF_UP
+from html import escape as html_escape
+import xml.etree.ElementTree as ET
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.environ.get("MEDICG_DB_PATH", BASE_DIR / "medicg.sqlite3"))
@@ -61,40 +66,40 @@ ROLE_DEFAULT_PERMISSIONS = {
     "pendiente": [],
 }
 MOJIBAKE_REPLACEMENTS = {
-    "GestiÃ³n": "Gestión",
-    "MÃ©dica": "Médica",
-    "MÃ©dicas": "Médicas",
-    "MÃ©dico": "Médico",
-    "mÃ©dico": "médico",
-    "mÃ©dicos": "médicos",
-    "ClÃ­nica": "Clínica",
-    "ElectrÃ³nica": "Electrónica",
-    "FacturaciÃ³n": "Facturación",
-    "estadÃ­sticas": "estadísticas",
-    "sesiÃ³n": "sesión",
-    "SesiÃ³n": "Sesión",
-    "electrÃ³nico": "electrónico",
-    "ContraseÃ±a": "Contraseña",
-    "contraseÃ±a": "contraseña",
-    "RecepciÃ³n": "Recepción",
-    "ConfiguraciÃ³n": "Configuración",
-    "dÃ­a": "día",
-    "PediatrÃ­a": "Pediatría",
-    "CardiologÃ­a": "Cardiología",
-    "DermatologÃ­a": "Dermatología",
-    "NeurologÃ­a": "Neurología",
-    "PÃ©rez": "Pérez",
-    "PÃºblico": "Público",
-    "MarÃ­a": "María",
-    "MuÃ±oz": "Muñoz",
-    "IbÃ¡Ã±ez": "Ibáñez",
-    "RÃ­os": "Ríos",
-    "cirugÃ­as": "cirugías",
-    "atenciÃ³n": "atención",
-    "corazÃ³n": "corazón",
-    "fÃ­sica": "física",
-    "DiagnÃ³stico": "Diagnóstico",
-    "MÃ­n.": "Mín.",
+    "GestiÃƒÂ³n": "GestiÃ³n",
+    "MÃƒÂ©dica": "MÃ©dica",
+    "MÃƒÂ©dicas": "MÃ©dicas",
+    "MÃƒÂ©dico": "MÃ©dico",
+    "mÃƒÂ©dico": "mÃ©dico",
+    "mÃƒÂ©dicos": "mÃ©dicos",
+    "ClÃƒÂ­nica": "ClÃ­nica",
+    "ElectrÃƒÂ³nica": "ElectrÃ³nica",
+    "FacturaciÃƒÂ³n": "FacturaciÃ³n",
+    "estadÃƒÂ­sticas": "estadÃ­sticas",
+    "sesiÃƒÂ³n": "sesiÃ³n",
+    "SesiÃƒÂ³n": "SesiÃ³n",
+    "electrÃƒÂ³nico": "electrÃ³nico",
+    "ContraseÃƒÂ±a": "ContraseÃ±a",
+    "contraseÃƒÂ±a": "contraseÃ±a",
+    "RecepciÃƒÂ³n": "RecepciÃ³n",
+    "ConfiguraciÃƒÂ³n": "ConfiguraciÃ³n",
+    "dÃƒÂ­a": "dÃ­a",
+    "PediatrÃƒÂ­a": "PediatrÃ­a",
+    "CardiologÃƒÂ­a": "CardiologÃ­a",
+    "DermatologÃƒÂ­a": "DermatologÃ­a",
+    "NeurologÃƒÂ­a": "NeurologÃ­a",
+    "PÃƒÂ©rez": "PÃ©rez",
+    "PÃƒÂºblico": "PÃºblico",
+    "MarÃƒÂ­a": "MarÃ­a",
+    "MuÃƒÂ±oz": "MuÃ±oz",
+    "IbÃƒÂ¡ÃƒÂ±ez": "IbÃ¡Ã±ez",
+    "RÃƒÂ­os": "RÃ­os",
+    "cirugÃƒÂ­as": "cirugÃ­as",
+    "atenciÃƒÂ³n": "atenciÃ³n",
+    "corazÃƒÂ³n": "corazÃ³n",
+    "fÃƒÂ­sica": "fÃ­sica",
+    "DiagnÃƒÂ³stico": "DiagnÃ³stico",
+    "MÃƒÂ­n.": "MÃ­n.",
 }
 
 
@@ -310,6 +315,556 @@ def send_verification_email(to_email, name, link):
         return False, f"Error Resend {exc.code}: {detail}"
     except Exception as exc:
         return False, str(exc)
+
+class SRIIntegrationError(Exception):
+    pass
+
+
+SRI_RECEPTION_ENDPOINTS = {
+    "1": "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline",
+    "2": "https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline",
+}
+SRI_AUTH_ENDPOINTS = {
+    "1": "https://celcer.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline",
+    "2": "https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline",
+}
+
+
+def clean_digits(value):
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def sri_bool(value, default=False):
+    if value is None or value == "":
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "si", "on", "prod", "produccion")
+
+
+def money_decimal(value):
+    try:
+        return Decimal(str(value or "0")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
+
+
+def money_text(value):
+    return f"{money_decimal(value):.2f}"
+
+
+def parse_invoice_date(value):
+    raw = str(value or "").strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return dt.datetime.strptime(raw, fmt).date()
+        except ValueError:
+            pass
+    return dt.date.today()
+
+
+def sri_config(config):
+    cfg = config or {}
+    ambiente_raw = os.environ.get("SRI_AMBIENTE") or cfg.get("sriAmbiente") or "1"
+    ambiente = "2" if str(ambiente_raw).strip().lower() in ("2", "prod", "produccion", "production") else "1"
+    iva_rate = money_decimal(os.environ.get("SRI_IVA_RATE") or cfg.get("sriIvaRate") or "15")
+    iva_code = os.environ.get("SRI_IVA_CODE") or cfg.get("sriIvaCode") or ("4" if iva_rate == Decimal("15.00") else "2" if iva_rate == Decimal("12.00") else "0")
+    auto_env = os.environ.get("SRI_AUTO_SEND")
+    auto_send = sri_bool(auto_env, bool(cfg.get("sriAutoSend", True))) if auto_env is not None else bool(cfg.get("sriAutoSend", True))
+    return {
+        "ambiente": ambiente,
+        "tipoEmision": "1",
+        "ruc": clean_digits(os.environ.get("SRI_RUC") or cfg.get("sriRuc") or cfg.get("ruc")),
+        "razonSocial": os.environ.get("SRI_RAZON_SOCIAL") or cfg.get("sriRazonSocial") or cfg.get("nombre") or "Centro Medico",
+        "nombreComercial": os.environ.get("SRI_NOMBRE_COMERCIAL") or cfg.get("sriNombreComercial") or cfg.get("nombre") or "Medic G",
+        "dirMatriz": os.environ.get("SRI_DIR_MATRIZ") or cfg.get("sriDirMatriz") or cfg.get("dir") or "",
+        "dirEstablecimiento": os.environ.get("SRI_DIR_ESTABLECIMIENTO") or cfg.get("sriDirEstablecimiento") or cfg.get("dir") or "",
+        "estab": (os.environ.get("SRI_ESTAB") or cfg.get("sriEstab") or "001").zfill(3)[:3],
+        "ptoEmi": (os.environ.get("SRI_PTO_EMI") or cfg.get("sriPtoEmi") or "001").zfill(3)[:3],
+        "obligadoContabilidad": (os.environ.get("SRI_OBLIGADO_CONTABILIDAD") or cfg.get("sriObligadoContabilidad") or "NO").upper(),
+        "contribuyenteEspecial": os.environ.get("SRI_CONTRIBUYENTE_ESPECIAL") or cfg.get("sriContribuyenteEspecial") or "",
+        "ivaRate": iva_rate,
+        "ivaCode": str(iva_code),
+        "autoSend": auto_send,
+    }
+
+
+def sri_mod11(body):
+    factors = [2, 3, 4, 5, 6, 7]
+    total = 0
+    for idx, digit in enumerate(reversed(body)):
+        total += int(digit) * factors[idx % len(factors)]
+    check = 11 - (total % 11)
+    if check == 11:
+        return "0"
+    if check == 10:
+        return "1"
+    return str(check)
+
+
+def build_access_key(fecha, sri, secuencial):
+    ruc = clean_digits(sri.get("ruc"))
+    if len(ruc) != 13:
+        raise SRIIntegrationError("Configura un RUC valido de 13 digitos para facturacion electronica SRI")
+    numeric_code = clean_digits(os.environ.get("SRI_NUMERIC_CODE") or f"{int(time.time()) % 100000000:08d}").zfill(8)[-8:]
+    body = (
+        fecha.strftime("%d%m%Y")
+        + "01"
+        + ruc
+        + sri["ambiente"]
+        + sri["estab"]
+        + sri["ptoEmi"]
+        + str(secuencial).zfill(9)[-9:]
+        + numeric_code
+        + sri["tipoEmision"]
+    )
+    return body + sri_mod11(body)
+
+
+def id_type_for_patient(patient):
+    doc = clean_digits(patient.get("cedula") or patient.get("ruc") or patient.get("documento"))
+    if len(doc) == 13:
+        return "04", doc
+    if len(doc) == 10:
+        return "05", doc
+    if doc:
+        return "06", doc
+    return "07", "9999999999999"
+
+
+def payment_code(payment):
+    value = str(payment or "").lower()
+    if "debito" in value or "debito" in value:
+        return "16"
+    if "credito" in value or "credito" in value or "tarjeta" in value:
+        return "19"
+    if "transfer" in value or "seguro" in value or "iess" in value:
+        return "20"
+    return "01"
+
+
+def add_text(parent, name, text):
+    child = ET.SubElement(parent, name)
+    child.text = str(text if text is not None else "")
+    return child
+
+
+def build_invoice_xml(invoice, patient, config):
+    sri = invoice["sri"]
+    fecha = parse_invoice_date(invoice.get("fecha"))
+    tipo_id, identificacion = id_type_for_patient(patient)
+    subtotal = money_decimal(invoice.get("sub"))
+    iva = money_decimal(invoice.get("iva"))
+    total = money_decimal(invoice.get("total"))
+    root = ET.Element("factura", {"id": "comprobante", "version": "1.1.0"})
+    info_trib = ET.SubElement(root, "infoTributaria")
+    add_text(info_trib, "ambiente", sri["ambiente"])
+    add_text(info_trib, "tipoEmision", sri["tipoEmision"])
+    add_text(info_trib, "razonSocial", sri["razonSocial"][:300])
+    add_text(info_trib, "nombreComercial", sri["nombreComercial"][:300])
+    add_text(info_trib, "ruc", sri["ruc"])
+    add_text(info_trib, "claveAcceso", invoice["claveAcceso"])
+    add_text(info_trib, "codDoc", "01")
+    add_text(info_trib, "estab", sri["estab"])
+    add_text(info_trib, "ptoEmi", sri["ptoEmi"])
+    add_text(info_trib, "secuencial", invoice["secuencial"])
+    add_text(info_trib, "dirMatriz", sri["dirMatriz"][:300])
+
+    info_fact = ET.SubElement(root, "infoFactura")
+    add_text(info_fact, "fechaEmision", fecha.strftime("%d/%m/%Y"))
+    add_text(info_fact, "dirEstablecimiento", sri["dirEstablecimiento"][:300])
+    if sri.get("contribuyenteEspecial"):
+        add_text(info_fact, "contribuyenteEspecial", sri["contribuyenteEspecial"])
+    add_text(info_fact, "obligadoContabilidad", sri["obligadoContabilidad"] if sri["obligadoContabilidad"] in ("SI", "NO") else "NO")
+    add_text(info_fact, "tipoIdentificacionComprador", tipo_id)
+    buyer_name = f"{patient.get('nombres','')} {patient.get('apellidos','')}".strip() or "CONSUMIDOR FINAL"
+    add_text(info_fact, "razonSocialComprador", buyer_name[:300])
+    add_text(info_fact, "identificacionComprador", identificacion)
+    add_text(info_fact, "direccionComprador", (patient.get("dir") or "Consumidor final")[:300])
+    add_text(info_fact, "totalSinImpuestos", money_text(subtotal))
+    add_text(info_fact, "totalDescuento", "0.00")
+    total_imp = ET.SubElement(info_fact, "totalConImpuestos")
+    imp = ET.SubElement(total_imp, "totalImpuesto")
+    add_text(imp, "codigo", "2")
+    add_text(imp, "codigoPorcentaje", sri["ivaCode"])
+    add_text(imp, "baseImponible", money_text(subtotal))
+    add_text(imp, "valor", money_text(iva))
+    add_text(info_fact, "propina", "0.00")
+    add_text(info_fact, "importeTotal", money_text(total))
+    add_text(info_fact, "moneda", "DOLAR")
+    pagos = ET.SubElement(info_fact, "pagos")
+    pago = ET.SubElement(pagos, "pago")
+    add_text(pago, "formaPago", payment_code(invoice.get("pago")))
+    add_text(pago, "total", money_text(total))
+    add_text(pago, "plazo", "0")
+    add_text(pago, "unidadTiempo", "dias")
+
+    detalles = ET.SubElement(root, "detalles")
+    for idx, item in enumerate(invoice.get("items") or [], start=1):
+        qty = money_decimal(item.get("cant") or 1)
+        unit = money_decimal(item.get("unit"))
+        line_base = money_decimal(item.get("total") or (qty * unit))
+        line_tax = money_decimal(line_base * sri["ivaRate"] / Decimal("100"))
+        det = ET.SubElement(detalles, "detalle")
+        add_text(det, "codigoPrincipal", str(item.get("codigo") or f"MED{idx:03d}"))
+        add_text(det, "descripcion", str(item.get("desc") or "Servicio medico")[:300])
+        add_text(det, "cantidad", money_text(qty))
+        add_text(det, "precioUnitario", money_text(unit))
+        add_text(det, "descuento", "0.00")
+        add_text(det, "precioTotalSinImpuesto", money_text(line_base))
+        impuestos = ET.SubElement(det, "impuestos")
+        impuesto = ET.SubElement(impuestos, "impuesto")
+        add_text(impuesto, "codigo", "2")
+        add_text(impuesto, "codigoPorcentaje", sri["ivaCode"])
+        add_text(impuesto, "tarifa", money_text(sri["ivaRate"]))
+        add_text(impuesto, "baseImponible", money_text(line_base))
+        add_text(impuesto, "valor", money_text(line_tax))
+
+    info_ad = ET.SubElement(root, "infoAdicional")
+    if patient.get("email"):
+        add_text(info_ad, "campoAdicional", patient.get("email")).set("nombre", "Email")
+    add_text(info_ad, "campoAdicional", buyer_name[:300]).set("nombre", "Paciente")
+    add_text(info_ad, "campoAdicional", f"HCE-{str(patient.get('id') or 0).zfill(4)}").set("nombre", "HistoriaClinica")
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+
+
+def load_sri_certificate_bytes():
+    if SRI_CERT_P12_BASE64:
+        return base64.b64decode(SRI_CERT_P12_BASE64)
+    if SRI_CERT_P12_PATH:
+        cert_path = Path(SRI_CERT_P12_PATH)
+        if cert_path.exists():
+            return cert_path.read_bytes()
+    raise SRIIntegrationError("Configura SRI_CERT_P12_BASE64 y SRI_CERT_PASSWORD en Vercel para firmar XML")
+
+
+def sign_invoice_xml(unsigned_xml):
+    try:
+        from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, pkcs12
+        from signxml import methods
+        from signxml.xades import XAdESDataObjectFormat, XAdESSigner
+        from lxml import etree
+    except Exception as exc:
+        raise SRIIntegrationError("Faltan dependencias para firma XAdES. Reinstala requirements.txt en Vercel.") from exc
+    try:
+        key, cert, _extra = pkcs12.load_key_and_certificates(
+            load_sri_certificate_bytes(),
+            SRI_CERT_PASSWORD.encode("utf-8") if SRI_CERT_PASSWORD else None,
+        )
+        if not key or not cert:
+            raise SRIIntegrationError("El certificado P12 no contiene clave privada o certificado valido")
+        key_pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+        cert_pem = cert.public_bytes(Encoding.PEM)
+        root = etree.fromstring(unsigned_xml.encode("utf-8"))
+        signer = XAdESSigner(
+            method=methods.enveloped,
+            signature_algorithm="rsa-sha256",
+            digest_algorithm="sha256",
+            c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+            data_object_format=XAdESDataObjectFormat(Description="Factura electronica SRI", MimeType="text/xml"),
+        )
+        signer.use_deprecated_legacy_signing_certificate = True
+        signed = signer.sign(root, key=key_pem, cert=cert_pem, reference_uri="#comprobante")
+        return etree.tostring(signed, encoding="utf-8", xml_declaration=True).decode("utf-8")
+    except SRIIntegrationError:
+        raise
+    except Exception as exc:
+        raise SRIIntegrationError(f"No se pudo firmar el XML con el certificado digital: {exc}") from exc
+
+
+def xml_local_name(tag):
+    return str(tag).split("}", 1)[-1]
+
+
+def xml_first_text(root, name):
+    for node in root.iter():
+        if xml_local_name(node.tag) == name and node.text:
+            return node.text.strip()
+    return ""
+
+
+def xml_messages(root):
+    messages = []
+    for msg in root.iter():
+        if xml_local_name(msg.tag) != "mensaje":
+            continue
+        detail = {}
+        for child in list(msg):
+            detail[xml_local_name(child.tag)] = (child.text or "").strip()
+        if detail:
+            messages.append(detail)
+    return messages
+
+
+def sri_soap_request(url, action_body):
+    envelope = f'''<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Header/>
+  <soapenv:Body>{action_body}</soapenv:Body>
+</soapenv:Envelope>'''.encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=envelope,
+        method="POST",
+        headers={"Content-Type": "text/xml; charset=utf-8", "SOAPAction": ""},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=SRI_TIMEOUT_SECONDS) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise SRIIntegrationError(f"SRI respondio HTTP {exc.code}: {detail[:500]}") from exc
+    except Exception as exc:
+        raise SRIIntegrationError(f"No se pudo conectar con el SRI: {exc}") from exc
+
+
+def sri_recepcion(signed_xml, ambiente):
+    payload = base64.b64encode(signed_xml.encode("utf-8")).decode("ascii")
+    body = f'''<validarComprobante xmlns="http://ec.gob.sri.ws.recepcion">
+  <xml>{payload}</xml>
+</validarComprobante>'''
+    raw = sri_soap_request(SRI_RECEPTION_ENDPOINTS[ambiente], body)
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise SRIIntegrationError(f"Respuesta SRI recepcion invalida: {raw[:300]}") from exc
+    return {"estado": xml_first_text(root, "estado") or "SIN_RESPUESTA", "mensajes": xml_messages(root), "raw": raw[:3000]}
+
+
+def sri_autorizacion(clave, ambiente):
+    body = f'''<autorizacionComprobante xmlns="http://ec.gob.sri.ws.autorizacion">
+  <claveAccesoComprobante>{html_escape(clave)}</claveAccesoComprobante>
+</autorizacionComprobante>'''
+    raw = sri_soap_request(SRI_AUTH_ENDPOINTS[ambiente], body)
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise SRIIntegrationError(f"Respuesta SRI autorizacion invalida: {raw[:300]}") from exc
+    auth_node = None
+    for node in root.iter():
+        if xml_local_name(node.tag) == "autorizacion":
+            auth_node = node
+            break
+    if auth_node is None:
+        return {"estado": xml_first_text(root, "estado") or "EN_PROCESO", "mensajes": xml_messages(root), "raw": raw[:3000]}
+    comprobante = xml_first_text(auth_node, "comprobante")
+    return {
+        "estado": xml_first_text(auth_node, "estado") or "EN_PROCESO",
+        "numeroAutorizacion": xml_first_text(auth_node, "numeroAutorizacion"),
+        "fechaAutorizacion": xml_first_text(auth_node, "fechaAutorizacion"),
+        "ambiente": xml_first_text(auth_node, "ambiente"),
+        "comprobante": comprobante,
+        "mensajes": xml_messages(auth_node),
+        "raw": raw[:3000],
+    }
+
+
+def ride_html(invoice, patient, config, ticket=False):
+    cfg = config or {}
+    rows = "".join(
+        f"<tr><td>{html_escape(str(i.get('desc','')))}</td><td>{html_escape(str(i.get('cant',1)))}</td><td>{money_text(i.get('unit'))}</td><td>{money_text(i.get('total'))}</td></tr>"
+        for i in (invoice.get("items") or [])
+    )
+    patient_name = f"{patient.get('nombres','')} {patient.get('apellidos','')}".strip()
+    width = "width:80mm;font-size:11px;" if ticket else "max-width:760px;"
+    return f"""<!doctype html><html lang='es'><meta charset='utf-8'><title>RIDE {html_escape(invoice.get('id',''))}</title>
+<body style='font-family:Arial,sans-serif;color:#111;margin:0;padding:18px;{width}'>
+  <div style='display:flex;gap:12px;align-items:center;border-bottom:2px solid #0f766e;padding-bottom:10px;margin-bottom:12px;'>
+    <img src='{html_escape(cfg.get('logo') or 'assets/medicg-logo.jpg')}' style='width:72px;height:72px;object-fit:contain;'>
+    <div><h2 style='margin:0;'>{html_escape(cfg.get('nombre') or 'Centro Medico')}</h2><div>RUC: {html_escape((invoice.get('sri') or {}).get('ruc') or cfg.get('ruc') or '')}</div><div>{html_escape(cfg.get('dir') or '')}</div></div>
+  </div>
+  <h3>RIDE - Factura electronica</h3>
+  <p><b>No.:</b> {html_escape(invoice.get('id',''))}<br><b>Fecha:</b> {html_escape(invoice.get('fecha',''))}<br><b>Estado SRI:</b> {html_escape(invoice.get('sriEstado') or invoice.get('estado',''))}</p>
+  <p><b>Cliente:</b> {html_escape(patient_name)}<br><b>Identificacion:</b> {html_escape(patient.get('cedula') or '9999999999999')}<br><b>Email:</b> {html_escape(patient.get('email') or '')}</p>
+  <table width='100%' border='1' cellspacing='0' cellpadding='6'><thead><tr><th>Detalle</th><th>Cant.</th><th>P.Unit.</th><th>Total</th></tr></thead><tbody>{rows}</tbody></table>
+  <div style='text-align:right;margin-top:12px;'><div>Subtotal: ${money_text(invoice.get('sub'))}</div><div>IVA: ${money_text(invoice.get('iva'))}</div><h3>Total: ${money_text(invoice.get('total'))}</h3></div>
+  <p style='word-break:break-all;'><b>Clave de acceso:</b><br>{html_escape(invoice.get('claveAcceso') or '')}</p>
+  <p style='word-break:break-all;'><b>Autorizacion:</b><br>{html_escape(invoice.get('autorizacion') or '')}</p>
+</body></html>"""
+
+
+def send_transaction_email(to_email, subject, text_body, html_body, attachments=None):
+    attachments = attachments or []
+    if not email_configured():
+        return False, "Configura SMTP o Resend para enviar correos"
+    try:
+        if RESEND_API_KEY and RESEND_FROM:
+            sender = RESEND_FROM if "<" in RESEND_FROM else email_sender_address(RESEND_FROM)
+            payload = {
+                "from": sender,
+                "to": [to_email],
+                "subject": subject,
+                "text": text_body,
+                "html": html_body,
+            }
+            if attachments:
+                payload["attachments"] = [
+                    {"filename": a["filename"], "content": base64.b64encode(a["content"]).decode("ascii")}
+                    for a in attachments
+                ]
+            req = urllib.request.Request(
+                RESEND_ENDPOINT,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if resp.status < 200 or resp.status >= 300:
+                    return False, f"Resend respondio con estado {resp.status}"
+            return True, ""
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = email_sender_address()
+        msg["To"] = to_email
+        msg.set_content(text_body)
+        msg.add_alternative(html_body, subtype="html")
+        for att in attachments:
+            maintype, subtype = (att.get("mime") or "application/octet-stream").split("/", 1)
+            msg.add_attachment(att["content"], maintype=maintype, subtype=subtype, filename=att["filename"])
+        if SMTP_SSL:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+                if SMTP_USER and SMTP_PASSWORD:
+                    smtp.login(SMTP_USER, SMTP_PASSWORD)
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as smtp:
+                smtp.ehlo()
+                if SMTP_TLS:
+                    smtp.starttls(); smtp.ehlo()
+                if SMTP_USER and SMTP_PASSWORD:
+                    smtp.login(SMTP_USER, SMTP_PASSWORD)
+                smtp.send_message(msg)
+        return True, ""
+    except urllib.error.HTTPError as exc:
+        return False, exc.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        return False, str(exc)
+
+
+def send_invoice_email(invoice, patient, config):
+    to_email = (patient.get("email") or "").strip()
+    if not to_email:
+        return False, "El paciente no tiene correo registrado"
+    subject = f"Factura electronica {invoice.get('id')} - {config.get('nombre','Medic G')}"
+    text = (
+        f"Adjuntamos tu factura electronica {invoice.get('id')}\n"
+        f"Estado SRI: {invoice.get('sriEstado') or invoice.get('estado')}\n"
+        f"Total: ${money_text(invoice.get('total'))}\n"
+        f"Clave de acceso: {invoice.get('claveAcceso') or ''}\n"
+    )
+    html = ride_html(invoice, patient, config)
+    xml_content = (invoice.get("authorizedXml") or invoice.get("signedXml") or invoice.get("xml") or "").encode("utf-8")
+    attachments = [
+        {"filename": f"RIDE-{invoice.get('id')}.html", "content": html.encode("utf-8"), "mime": "text/html"},
+    ]
+    if xml_content:
+        attachments.append({"filename": f"{invoice.get('id')}.xml", "content": xml_content, "mime": "application/xml"})
+    return send_transaction_email(to_email, subject, text, html, attachments)
+
+
+def can_invoice_sri(user):
+    if not user:
+        return False
+    if user.get("rol") == "admin":
+        return True
+    perms = set(clean_permissions(user.get("permissions"), user.get("rol", "recepcion")))
+    return bool({"facturacion", "caja"} & perms)
+
+
+def prepare_invoice_from_payload(conn, user, payload):
+    patients = get_json_key(conn, "pacientes", []) or []
+    patient_id = int(payload.get("pac") or payload.get("patientId") or 0)
+    patient = find_patient(patients, patient_id=patient_id)
+    if not patient:
+        raise SRIIntegrationError("Selecciona un paciente registrado para emitir factura")
+    items = []
+    for raw in payload.get("items") or []:
+        desc = str(raw.get("desc") or raw.get("descripcion") or "").strip()
+        qty = money_decimal(raw.get("cant") or raw.get("cantidad") or 1)
+        unit = money_decimal(raw.get("unit") or raw.get("precio") or 0)
+        if desc and qty > 0 and unit >= 0:
+            items.append({"desc": desc, "cant": float(qty), "unit": float(unit), "total": float(money_decimal(qty * unit))})
+    if not items:
+        raise SRIIntegrationError("Agrega al menos un servicio o examen facturable")
+    config = get_json_key(conn, "config", {}) or {}
+    sri = sri_config(config)
+    next_ids = get_json_key(conn, "nextIds", {}) or {}
+    seq_int = next_id(next_ids, "fac", 1)
+    secuencial = str(seq_int).zfill(9)[-9:]
+    fecha = parse_invoice_date(payload.get("fecha"))
+    subtotal = sum(money_decimal(i["total"]) for i in items)
+    iva = money_decimal(subtotal * sri["ivaRate"] / Decimal("100"))
+    total = money_decimal(subtotal + iva)
+    clave = build_access_key(fecha, sri, secuencial)
+    invoice = {
+        "id": f"{sri['estab']}-{sri['ptoEmi']}-{secuencial}",
+        "secuencial": secuencial,
+        "claveAcceso": clave,
+        "autorizacion": "",
+        "fecha": fecha.isoformat(),
+        "pac": patient_id,
+        "esp": payload.get("esp") or patient.get("esp") or "General",
+        "serv": ", ".join(i["desc"] for i in items),
+        "items": items,
+        "sub": float(subtotal),
+        "iva": float(iva),
+        "total": float(total),
+        "pago": payload.get("pago") or "Efectivo",
+        "estado": "Pendiente SRI",
+        "sriEstado": "GENERADO",
+        "sriMensaje": "XML generado pendiente de envio",
+        "sri": sri,
+        "emailAuto": bool(payload.get("emailAuto", True)),
+        "emailEnviado": False,
+        "createdAt": now_iso(),
+        "createdBy": user.get("email") if user else "sistema",
+    }
+    invoice["xml"] = build_invoice_xml(invoice, patient, config)
+    set_json_key(conn, "nextIds", next_ids)
+    return invoice, patient, config
+
+
+def send_invoice_to_sri(invoice):
+    invoice["signedXml"] = sign_invoice_xml(invoice["xml"])
+    reception = sri_recepcion(invoice["signedXml"], invoice["sri"]["ambiente"])
+    invoice["sriRecepcion"] = reception
+    if reception.get("estado") != "RECIBIDA":
+        invoice["estado"] = "Devuelta SRI"
+        invoice["sriEstado"] = reception.get("estado") or "DEVUELTA"
+        invoice["sriMensaje"] = "; ".join(m.get("mensaje", "") for m in reception.get("mensajes", [])) or "Comprobante devuelto por el SRI"
+        return invoice
+    invoice["estado"] = "Recibida SRI"
+    invoice["sriEstado"] = "RECIBIDA"
+    invoice["sriMensaje"] = "Comprobante recibido; consultando autorizacion"
+    last_auth = None
+    for _ in range(max(1, SRI_AUTH_RETRIES)):
+        last_auth = sri_autorizacion(invoice["claveAcceso"], invoice["sri"]["ambiente"])
+        if last_auth.get("estado") in ("AUTORIZADO", "NO AUTORIZADO"):
+            break
+        time.sleep(max(0.1, SRI_AUTH_SLEEP_SECONDS))
+    invoice["sriAutorizacion"] = last_auth or {}
+    if last_auth and last_auth.get("estado") == "AUTORIZADO":
+        invoice["estado"] = "Autorizado SRI"
+        invoice["sriEstado"] = "AUTORIZADO"
+        invoice["autorizacion"] = last_auth.get("numeroAutorizacion") or invoice["claveAcceso"]
+        invoice["fechaAutorizacion"] = last_auth.get("fechaAutorizacion") or now_iso()
+        if last_auth.get("comprobante"):
+            invoice["authorizedXml"] = last_auth["comprobante"]
+        invoice["sriMensaje"] = "Autorizado por el SRI"
+    elif last_auth and last_auth.get("estado") == "NO AUTORIZADO":
+        invoice["estado"] = "No autorizado SRI"
+        invoice["sriEstado"] = "NO AUTORIZADO"
+        invoice["sriMensaje"] = "; ".join(m.get("mensaje", "") for m in last_auth.get("mensajes", [])) or "No autorizado por el SRI"
+    else:
+        invoice["estado"] = "En proceso SRI"
+        invoice["sriEstado"] = "EN_PROCESO"
+        invoice["sriMensaje"] = "El SRI aun no devuelve autorizacion; usa Reintentar SRI"
+    return invoice
+
+
+def save_invoice_record(conn, invoice):
+    invoices = get_json_key(conn, "facturas", []) or []
+    invoices = [f for f in invoices if f.get("id") != invoice.get("id")]
+    invoices.insert(0, invoice)
+    set_json_key(conn, "facturas", invoices)
 
 
 def fix_text(value):
@@ -633,7 +1188,7 @@ def upsert_patient_from_payload(conn, payload):
             "antec": payload.get("antec") or "",
             "esp": payload.get("esp") or payload.get("especialidad") or "",
             "ultima": "",
-            "origen": payload.get("origen") or "Landing pública",
+            "origen": payload.get("origen") or "Landing pÃºblica",
             "createdAt": now_iso(),
         }
         patients.append(patient)
@@ -683,7 +1238,7 @@ def create_online_appointment(conn, patient, payload, user=None):
         "motivo": payload.get("motivo") or "",
         "estado": "Solicitada online",
         "notif": "Sistema",
-        "origen": payload.get("origen") or "Landing pública",
+        "origen": payload.get("origen") or "Landing pÃºblica",
         "createdAt": now_iso(),
         "createdBy": user.get("email") if user else "paciente-web",
     }
@@ -696,7 +1251,7 @@ def create_online_appointment(conn, patient, payload, user=None):
         "tipo": "cita_online",
         "fecha": now_iso(),
         "titulo": "Nueva cita solicitada desde la landing",
-        "detalle": f"{patient.get('nombres', '')} {patient.get('apellidos', '')} pidió cita de {esp} el {appointment['fecha']} a las {appointment['hora']}",
+        "detalle": f"{patient.get('nombres', '')} {patient.get('apellidos', '')} pidiÃ³ cita de {esp} el {appointment['fecha']} a las {appointment['hora']}",
         "citaId": appointment["id"],
         "leida": False,
     })
@@ -762,7 +1317,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if path == "/api/verify-email":
             token = parse_qs(urlparse(self.path).query).get("token", [""])[0]
             if not token:
-                return make_html_response(self, 400, "<h1>Enlace inválido</h1><p>Falta el token de verificación.</p>")
+                return make_html_response(self, 400, "<h1>Enlace invÃ¡lido</h1><p>Falta el token de verificaciÃ³n.</p>")
             hashed_token = token_hash(token)
             with db() as conn:
                 users = get_json_key(conn, "users", [])
@@ -770,7 +1325,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 if not target:
                     return make_html_response(self, 404, "<h1>Enlace no encontrado</h1><p>Solicita un nuevo registro o contacta al administrador.</p>")
                 if float(target.get("verifyExpiresAt") or 0) < time.time():
-                    return make_html_response(self, 410, "<h1>Enlace expirado</h1><p>Regístrate nuevamente para recibir otro correo de verificación.</p>")
+                    return make_html_response(self, 410, "<h1>Enlace expirado</h1><p>RegÃ­strate nuevamente para recibir otro correo de verificaciÃ³n.</p>")
                 target["emailVerified"] = True
                 target["estado"] = "activo"
                 target.pop("verifyTokenHash", None)
@@ -784,14 +1339,14 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 "<title>Cuenta verificada</title>"
                 "<body style='font-family:Arial,sans-serif;padding:32px;color:#1f2937;'>"
                 "<h1>Correo verificado correctamente</h1>"
-                "<p>Ya puedes iniciar sesión en Medic G. Si todavía no ves módulos, el administrador debe asignarte permisos.</p>"
+                "<p>Ya puedes iniciar sesiÃ³n en Medic G. Si todavÃ­a no ves mÃ³dulos, el administrador debe asignarte permisos.</p>"
                 "<p><a href='/' style='color:#0d7a6b;font-weight:700;'>Ir al sistema</a></p>"
                 "</body></html>",
             )
         if path == "/api/data":
             user = auth_user(self)
             if not user:
-                return make_response(self, 401, {"error": "Sesión no válida"})
+                return make_response(self, 401, {"error": "SesiÃ³n no vÃ¡lida"})
             if user.get("rol") == "paciente":
                 return make_response(self, 403, {"error": "Usa el portal del paciente"})
             with db() as conn:
@@ -802,7 +1357,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if path == "/api/patient/portal":
             user = auth_user(self)
             if not user:
-                return make_response(self, 401, {"error": "Sesión no válida"})
+                return make_response(self, 401, {"error": "SesiÃ³n no vÃ¡lida"})
             if user.get("rol") != "paciente":
                 return make_response(self, 403, {"error": "Portal disponible solo para pacientes"})
             with db() as conn:
@@ -819,9 +1374,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         except ValueError as exc:
             if str(exc) == "payload_too_large":
                 return make_response(self, 413, {"error": "Archivo o solicitud demasiado grande"})
-            return make_response(self, 400, {"error": "JSON inválido"})
+            return make_response(self, 400, {"error": "JSON invÃ¡lido"})
         except Exception:
-            return make_response(self, 400, {"error": "JSON inválido"})
+            return make_response(self, 400, {"error": "JSON invÃ¡lido"})
 
         if path == "/api/login":
             email = (payload.get("email") or "").strip().lower()
@@ -830,9 +1385,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 users = get_json_key(conn, "users", [])
             user = next((u for u in users if (u.get("email") or "").lower() == email), None)
             if not user or not verify_password(password, user.get("passHash") or user.get("pass")):
-                return make_response(self, 401, {"error": "Correo o contraseña incorrectos"})
+                return make_response(self, 401, {"error": "Correo o contraseÃ±a incorrectos"})
             if not user_email_verified(user) or user.get("estado") == "pendiente_verificacion":
-                return make_response(self, 403, {"error": "Verifica tu correo electrónico antes de iniciar sesión"})
+                return make_response(self, 403, {"error": "Verifica tu correo electrÃ³nico antes de iniciar sesiÃ³n"})
             if user.get("estado", "activo") != "activo":
                 return make_response(self, 403, {"error": "Usuario no activo"})
             token = secrets.token_urlsafe(32)
@@ -899,13 +1454,13 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             email = (payload.get("email") or "").strip().lower()
             password = payload.get("password") or ""
             if not name or not last or not email or len(password) < 6:
-                return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres"})
+                return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseÃ±a de mÃ­nimo 6 caracteres"})
             verify_token = secrets.token_urlsafe(32)
             verify_link = f"{app_base_url(self)}/api/verify-email?token={verify_token}"
             with db() as conn:
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
-                    return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                    return make_response(self, 409, {"error": "Este correo ya estÃ¡ registrado"})
                 patient, _ = upsert_patient_from_payload(conn, {
                     **payload,
                     "name": name,
@@ -941,10 +1496,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             response = {
                 "ok": True,
                 "emailSent": email_sent,
-                "message": "Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesión.",
+                "message": "Cuenta creada. Revisa tu correo para verificar tu cuenta antes de iniciar sesiÃ³n.",
             }
             if not email_sent:
-                response["message"] = "Cuenta creada, pero el servidor de correo no está configurado. Configura SMTP o Resend para enviar verificaciones."
+                response["message"] = "Cuenta creada, pero el servidor de correo no estÃ¡ configurado. Configura SMTP o Resend para enviar verificaciones."
                 response["emailError"] = email_error
             if SHOW_VERIFICATION_LINK:
                 response["verificationLink"] = verify_link
@@ -961,16 +1516,16 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 payload.get("hora"),
             ]
             if any(not str(v or "").strip() for v in required):
-                return make_response(self, 400, {"error": "Completa paciente, correo, teléfono, especialidad, fecha y hora"})
+                return make_response(self, 400, {"error": "Completa paciente, correo, telÃ©fono, especialidad, fecha y hora"})
             with db() as conn:
-                patient, patient_created = upsert_patient_from_payload(conn, {**payload, "origen": "Landing pública"})
+                patient, patient_created = upsert_patient_from_payload(conn, {**payload, "origen": "Landing pÃºblica"})
                 appointment = create_online_appointment(conn, patient, payload)
                 audit(conn, None, "public_appointment", "citas", {"appointmentId": appointment["id"], "patientId": patient.get("id")})
             return make_response(self, 201, {
                 "ok": True,
                 "patientCreated": patient_created,
                 "appointment": appointment,
-                "message": "Cita solicitada correctamente. El centro médico la verá en agenda y te confirmará la atención.",
+                "message": "Cita solicitada correctamente. El centro mÃ©dico la verÃ¡ en agenda y te confirmarÃ¡ la atenciÃ³n.",
             })
 
         if path == "/api/logout":
@@ -985,7 +1540,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
 
         user = auth_user(self)
         if not user:
-            return make_response(self, 401, {"error": "Sesión no válida"})
+            return make_response(self, 401, {"error": "SesiÃ³n no vÃ¡lida"})
 
         if path == "/api/patient/appointment":
             if user.get("rol") != "paciente":
@@ -1009,7 +1564,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if key == "users" and user.get("rol") != "admin":
                 return make_response(self, 403, {"error": "Solo el administrador puede modificar usuarios"})
             if key != "users" and not can_save_key(user, key):
-                return make_response(self, 403, {"error": "No tienes permiso para guardar este módulo"})
+                return make_response(self, 403, {"error": "No tienes permiso para guardar este mÃ³dulo"})
             with db() as conn:
                 set_json_key(conn, key, value)
                 audit(conn, user, "save", key)
@@ -1120,12 +1675,12 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             password = payload.get("password") or ""
             rol = payload.get("rol") or "recepcion"
             if not name or not last or not email or len(password) < 6:
-                return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres"})
+                return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseÃ±a de mÃ­nimo 6 caracteres"})
             permissions = clean_permissions(payload.get("permissions"), rol)
             with db() as conn:
                 users = get_json_key(conn, "users", [])
                 if any((u.get("email") or "").lower() == email for u in users):
-                    return make_response(self, 409, {"error": "Este correo ya está registrado"})
+                    return make_response(self, 409, {"error": "Este correo ya estÃ¡ registrado"})
                 if rol not in ROLE_DEFAULT_PERMISSIONS:
                     return make_response(self, 400, {"error": "Rol no valido"})
                 patient_id = None
@@ -1193,4 +1748,6 @@ if __name__ == "__main__":
     print(f"Abre: http://{HOST}:{PORT}")
     print(f"Base de datos: {DB_PATH if DB_DRIVER == 'sqlite' else 'PostgreSQL'}")
     server.serve_forever()
+
+
 
