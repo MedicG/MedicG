@@ -1,0 +1,43 @@
+﻿CONFIGURAR FACTURACION ELECTRONICA SRI ECUADOR
+
+Que hace el sistema:
+- Genera XML de factura electronica.
+- Calcula clave de acceso con modulo 11.
+- Firma el XML con certificado digital .p12/.pfx usando XAdES.
+- Envia al Web Service de recepcion del SRI.
+- Consulta autorizacion automaticamente varios intentos.
+- Guarda estado, clave, autorizacion, XML firmado/autorizado y mensajes del SRI en la base de datos.
+- Envia automaticamente por email el RIDE HTML y XML cuando el comprobante queda autorizado.
+- Permite reintentar SRI, reenviar email, imprimir RIDE A4, imprimir ticket y descargar XML.
+
+Variables obligatorias en Vercel:
+DATABASE_URL o POSTGRES_URL
+SMTP_* o RESEND_* para enviar emails
+SRI_CERT_P12_BASE64
+SRI_CERT_PASSWORD
+
+Variables SRI principales:
+SRI_AMBIENTE=1 para pruebas, 2 para produccion
+SRI_RUC=RUC del centro medico, 13 digitos
+SRI_RAZON_SOCIAL=Razon social registrada
+SRI_NOMBRE_COMERCIAL=Nombre comercial
+SRI_DIR_MATRIZ=Direccion matriz
+SRI_DIR_ESTABLECIMIENTO=Direccion del establecimiento
+SRI_ESTAB=001
+SRI_PTO_EMI=001
+SRI_OBLIGADO_CONTABILIDAD=SI o NO
+SRI_IVA_RATE=15
+SRI_IVA_CODE=4
+SRI_AUTO_SEND=true
+
+Convertir certificado .p12/.pfx a Base64 en Windows PowerShell:
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\ruta\certificado.p12")) | Set-Clipboard
+
+Luego pega el resultado en Vercel como SRI_CERT_P12_BASE64.
+Nunca subas el certificado ni su clave al repositorio de GitHub.
+
+Importante:
+- Primero prueba con SRI_AMBIENTE=1.
+- Para produccion cambia SRI_AMBIENTE=2 cuando el contribuyente y el certificado esten habilitados en SRI.
+- Si aparece Error SRI por certificado, RUC o red, la factura queda guardada y puedes usar Reintentar SRI.
+- La anulacion oficial de comprobantes autorizados no se realiza desde este boton local; debe manejarse segun procedimiento SRI correspondiente.

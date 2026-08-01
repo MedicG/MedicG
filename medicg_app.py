@@ -8,6 +8,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import secrets
 import smtplib
 import sqlite3
@@ -49,6 +50,12 @@ SMTP_SSL = os.environ.get("SMTP_SSL", "false").lower() in ("1", "true", "yes")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM = os.environ.get("RESEND_FROM", SMTP_FROM)
 RESEND_ENDPOINT = os.environ.get("RESEND_ENDPOINT", "https://api.resend.com/emails")
+SRI_CERT_P12_BASE64 = os.environ.get("SRI_CERT_P12_BASE64", "")
+SRI_CERT_P12_PATH = os.environ.get("SRI_CERT_P12_PATH", "")
+SRI_CERT_PASSWORD = os.environ.get("SRI_CERT_PASSWORD", "")
+SRI_AUTH_RETRIES = int(os.environ.get("SRI_AUTH_RETRIES", "4"))
+SRI_AUTH_SLEEP_SECONDS = float(os.environ.get("SRI_AUTH_SLEEP_SECONDS", "1.2"))
+SRI_TIMEOUT_SECONDS = int(os.environ.get("SRI_TIMEOUT_SECONDS", "18"))
 SHOW_VERIFICATION_LINK = os.environ.get("SHOW_VERIFICATION_LINK", "false").lower() in ("1", "true", "yes")
 SESSIONS = {}
 ALLOWED_PERMISSIONS = {
@@ -454,6 +461,7 @@ def build_invoice_xml(invoice, patient, config):
     subtotal = money_decimal(invoice.get("sub"))
     iva = money_decimal(invoice.get("iva"))
     total = money_decimal(invoice.get("total"))
+    iva_rate = money_decimal(sri.get("ivaRate") or 15)
     root = ET.Element("factura", {"id": "comprobante", "version": "1.1.0"})
     info_trib = ET.SubElement(root, "infoTributaria")
     add_text(info_trib, "ambiente", sri["ambiente"])
@@ -502,7 +510,7 @@ def build_invoice_xml(invoice, patient, config):
         qty = money_decimal(item.get("cant") or 1)
         unit = money_decimal(item.get("unit"))
         line_base = money_decimal(item.get("total") or (qty * unit))
-        line_tax = money_decimal(line_base * sri["ivaRate"] / Decimal("100"))
+        line_tax = money_decimal(line_base * iva_rate / Decimal("100"))
         det = ET.SubElement(detalles, "detalle")
         add_text(det, "codigoPrincipal", str(item.get("codigo") or f"MED{idx:03d}"))
         add_text(det, "descripcion", str(item.get("desc") or "Servicio medico")[:300])
@@ -514,7 +522,7 @@ def build_invoice_xml(invoice, patient, config):
         impuesto = ET.SubElement(impuestos, "impuesto")
         add_text(impuesto, "codigo", "2")
         add_text(impuesto, "codigoPorcentaje", sri["ivaCode"])
-        add_text(impuesto, "tarifa", money_text(sri["ivaRate"]))
+        add_text(impuesto, "tarifa", money_text(iva_rate))
         add_text(impuesto, "baseImponible", money_text(line_base))
         add_text(impuesto, "valor", money_text(line_tax))
 
@@ -791,7 +799,8 @@ def prepare_invoice_from_payload(conn, user, payload):
     secuencial = str(seq_int).zfill(9)[-9:]
     fecha = parse_invoice_date(payload.get("fecha"))
     subtotal = sum(money_decimal(i["total"]) for i in items)
-    iva = money_decimal(subtotal * sri["ivaRate"] / Decimal("100"))
+    iva_rate = money_decimal(sri.get("ivaRate") or 15)
+    iva = money_decimal(subtotal * iva_rate / Decimal("100"))
     total = money_decimal(subtotal + iva)
     clave = build_access_key(fecha, sri, secuencial)
     invoice = {
@@ -811,7 +820,7 @@ def prepare_invoice_from_payload(conn, user, payload):
         "estado": "Pendiente SRI",
         "sriEstado": "GENERADO",
         "sriMensaje": "XML generado pendiente de envio",
-        "sri": sri,
+        "sri": {**sri, "ivaRate": float(iva_rate)},
         "emailAuto": bool(payload.get("emailAuto", True)),
         "emailEnviado": False,
         "createdAt": now_iso(),
@@ -867,6 +876,33 @@ def save_invoice_record(conn, invoice):
     set_json_key(conn, "facturas", invoices)
 
 
+
+def invoice_context(conn, invoice_id):
+    invoices = get_json_key(conn, "facturas", []) or []
+    invoice = next((f for f in invoices if str(f.get("id")) == str(invoice_id)), None)
+    if not invoice:
+        raise SRIIntegrationError("Factura no encontrada")
+    patients = get_json_key(conn, "pacientes", []) or []
+    patient = find_patient(patients, patient_id=int(invoice.get("pac") or 0)) or {}
+    config = get_json_key(conn, "config", {}) or {}
+    if not invoice.get("sri"):
+        invoice["sri"] = sri_config(config)
+    if not invoice.get("secuencial"):
+        invoice["secuencial"] = clean_digits(invoice.get("id"))[-9:].zfill(9)
+    if not invoice.get("xml"):
+        invoice["xml"] = build_invoice_xml(invoice, patient, config)
+    return invoice, patient, config
+
+
+def persist_invoice_update(conn, invoice):
+    invoices = get_json_key(conn, "facturas", []) or []
+    for idx, item in enumerate(invoices):
+        if str(item.get("id")) == str(invoice.get("id")):
+            invoices[idx] = invoice
+            set_json_key(conn, "facturas", invoices)
+            return
+    invoices.insert(0, invoice)
+    set_json_key(conn, "facturas", invoices)
 def fix_text(value):
     if isinstance(value, str):
         for bad, good in MOJIBAKE_REPLACEMENTS.items():
@@ -1542,6 +1578,117 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if not user:
             return make_response(self, 401, {"error": "SesiÃ³n no vÃ¡lida"})
 
+        if path == "/api/invoices":
+            if not can_invoice_sri(user):
+                return make_response(self, 403, {"error": "No tienes permiso para emitir facturas"})
+            try:
+                with db() as conn:
+                    invoice, patient, config = prepare_invoice_from_payload(conn, user, payload)
+                    try:
+                        if invoice.get("sri", {}).get("autoSend") and payload.get("sendSri", True):
+                            invoice = send_invoice_to_sri(invoice)
+                        else:
+                            invoice["estado"] = "Pendiente SRI"
+                            invoice["sriEstado"] = "GENERADO"
+                            invoice["sriMensaje"] = "XML generado; envio SRI pendiente"
+                    except SRIIntegrationError as exc:
+                        invoice["estado"] = "Error SRI"
+                        invoice["sriEstado"] = "ERROR"
+                        invoice["sriMensaje"] = str(exc)
+                    email_sent = False
+                    email_error = ""
+                    if invoice.get("estado") == "Autorizado SRI" and invoice.get("emailAuto", True):
+                        email_sent, email_error = send_invoice_email(invoice, patient, config)
+                        invoice["emailEnviado"] = email_sent
+                        invoice["emailError"] = email_error
+                    save_invoice_record(conn, invoice)
+                    audit(conn, user, "sri_invoice_emit", "facturas", {"invoiceId": invoice.get("id"), "estado": invoice.get("estado"), "emailSent": email_sent})
+                return make_response(self, 201, {"ok": True, "invoice": invoice, "emailSent": email_sent, "emailError": email_error})
+            except SRIIntegrationError as exc:
+                return make_response(self, 400, {"error": str(exc)})
+            except Exception as exc:
+                return make_response(self, 500, {"error": f"No se pudo emitir la factura: {exc}"})
+
+        if path == "/api/invoices/sri-retry":
+            if not can_invoice_sri(user):
+                return make_response(self, 403, {"error": "No tienes permiso para reenviar facturas al SRI"})
+            invoice_id = payload.get("id") or payload.get("invoiceId")
+            if not invoice_id:
+                return make_response(self, 400, {"error": "Falta el numero de factura"})
+            try:
+                with db() as conn:
+                    invoice, patient, config = invoice_context(conn, invoice_id)
+                    try:
+                        invoice = send_invoice_to_sri(invoice)
+                    except SRIIntegrationError as exc:
+                        invoice["estado"] = "Error SRI"
+                        invoice["sriEstado"] = "ERROR"
+                        invoice["sriMensaje"] = str(exc)
+                    email_sent = False
+                    email_error = ""
+                    if invoice.get("estado") == "Autorizado SRI" and payload.get("emailAuto", invoice.get("emailAuto", True)):
+                        email_sent, email_error = send_invoice_email(invoice, patient, config)
+                        invoice["emailEnviado"] = email_sent
+                        invoice["emailError"] = email_error
+                    persist_invoice_update(conn, invoice)
+                    audit(conn, user, "sri_invoice_retry", "facturas", {"invoiceId": invoice.get("id"), "estado": invoice.get("estado"), "emailSent": email_sent})
+                return make_response(self, 200, {"ok": True, "invoice": invoice, "emailSent": email_sent, "emailError": email_error})
+            except SRIIntegrationError as exc:
+                return make_response(self, 404, {"error": str(exc)})
+            except Exception as exc:
+                return make_response(self, 500, {"error": f"No se pudo consultar el SRI: {exc}"})
+
+        if path == "/api/invoices/email":
+            if not can_invoice_sri(user):
+                return make_response(self, 403, {"error": "No tienes permiso para enviar facturas por correo"})
+            invoice_id = payload.get("id") or payload.get("invoiceId")
+            if not invoice_id:
+                return make_response(self, 400, {"error": "Falta el numero de factura"})
+            try:
+                with db() as conn:
+                    invoice, patient, config = invoice_context(conn, invoice_id)
+                    email_sent, email_error = send_invoice_email(invoice, patient, config)
+                    invoice["emailEnviado"] = email_sent
+                    invoice["emailError"] = email_error
+                    persist_invoice_update(conn, invoice)
+                    audit(conn, user, "sri_invoice_email", "facturas", {"invoiceId": invoice.get("id"), "emailSent": email_sent, "error": email_error})
+                if not email_sent:
+                    return make_response(self, 400, {"error": email_error or "No se pudo enviar el correo", "invoice": invoice})
+                return make_response(self, 200, {"ok": True, "invoice": invoice, "emailSent": True})
+            except SRIIntegrationError as exc:
+                return make_response(self, 404, {"error": str(exc)})
+
+        if path == "/api/invoices/ride":
+            if not can_invoice_sri(user) and user.get("rol") != "paciente":
+                return make_response(self, 403, {"error": "No tienes permiso para imprimir RIDE"})
+            invoice_id = payload.get("id") or payload.get("invoiceId")
+            if not invoice_id:
+                return make_response(self, 400, {"error": "Falta el numero de factura"})
+            try:
+                with db() as conn:
+                    invoice, patient, config = invoice_context(conn, invoice_id)
+                    if user.get("rol") == "paciente" and int(invoice.get("pac") or 0) != int(user.get("patientId") or 0):
+                        return make_response(self, 403, {"error": "No puedes ver esta factura"})
+                html = ride_html(invoice, patient, config, ticket=(payload.get("format") == "ticket"))
+                return make_response(self, 200, {"ok": True, "html": html, "filename": f"RIDE-{invoice.get('id')}.html"})
+            except SRIIntegrationError as exc:
+                return make_response(self, 404, {"error": str(exc)})
+
+        if path == "/api/invoices/xml":
+            if not can_invoice_sri(user) and user.get("rol") != "paciente":
+                return make_response(self, 403, {"error": "No tienes permiso para descargar XML"})
+            invoice_id = payload.get("id") or payload.get("invoiceId")
+            if not invoice_id:
+                return make_response(self, 400, {"error": "Falta el numero de factura"})
+            try:
+                with db() as conn:
+                    invoice, _patient, _config = invoice_context(conn, invoice_id)
+                    if user.get("rol") == "paciente" and int(invoice.get("pac") or 0) != int(user.get("patientId") or 0):
+                        return make_response(self, 403, {"error": "No puedes ver esta factura"})
+                xml = invoice.get("authorizedXml") or invoice.get("signedXml") or invoice.get("xml") or ""
+                return make_response(self, 200, {"ok": True, "xml": xml, "filename": f"{invoice.get('id')}.xml", "authorized": invoice.get("estado") == "Autorizado SRI"})
+            except SRIIntegrationError as exc:
+                return make_response(self, 404, {"error": str(exc)})
         if path == "/api/patient/appointment":
             if user.get("rol") != "paciente":
                 return make_response(self, 403, {"error": "Ruta disponible solo para pacientes"})
@@ -1748,6 +1895,15 @@ if __name__ == "__main__":
     print(f"Abre: http://{HOST}:{PORT}")
     print(f"Base de datos: {DB_PATH if DB_DRIVER == 'sqlite' else 'PostgreSQL'}")
     server.serve_forever()
+
+
+
+
+
+
+
+
+
 
 
 

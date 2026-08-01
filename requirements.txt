@@ -1,1 +1,4 @@
-psycopg[binary]>=3.2,<4
+﻿psycopg[binary]>=3.2,<4
+cryptography>=42,<46
+lxml>=5,<7
+signxml>=3.2,<5
