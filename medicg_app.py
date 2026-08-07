@@ -1,4 +1,4 @@
-﻿from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 from email.message import EmailMessage
@@ -534,17 +534,69 @@ def build_invoice_xml(invoice, patient, config):
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
-def load_sri_certificate_bytes():
-    if SRI_CERT_P12_BASE64:
-        return base64.b64decode(SRI_CERT_P12_BASE64)
+def normalize_cert_base64(value):
+    raw = str(value or "").strip()
+    if raw.lower().startswith("data:") and "," in raw:
+        raw = raw.split(",", 1)[1]
+    return "".join(raw.split())
+
+
+def saved_sri_certificate_status(cert):
+    cert = cert if isinstance(cert, dict) else {}
+    has_env_cert = bool(normalize_cert_base64(SRI_CERT_P12_BASE64))
+    saved_b64 = normalize_cert_base64(cert.get("p12Base64"))
+    configured = bool(has_env_cert or saved_b64)
+    return {
+        "configured": configured,
+        "source": "Variables privadas de Vercel" if has_env_cert else ("Base de datos" if saved_b64 else "No configurado"),
+        "filename": "SRI_CERT_P12_BASE64" if has_env_cert else cert.get("filename", ""),
+        "updatedAt": "" if has_env_cert else cert.get("updatedAt", ""),
+        "hasPassword": bool(SRI_CERT_PASSWORD or cert.get("password")),
+        "envLocked": has_env_cert,
+    }
+
+
+def get_sri_certificate(conn):
+    env_b64 = normalize_cert_base64(SRI_CERT_P12_BASE64)
+    if env_b64:
+        return {
+            "p12Base64": env_b64,
+            "password": SRI_CERT_PASSWORD,
+            "filename": "SRI_CERT_P12_BASE64",
+            "source": "Variables privadas de Vercel",
+        }
+    saved = get_json_key(conn, "sriCertificate", {}) or {}
+    return {
+        "p12Base64": normalize_cert_base64(saved.get("p12Base64")),
+        "password": saved.get("password") or SRI_CERT_PASSWORD,
+        "filename": saved.get("filename", ""),
+        "updatedAt": saved.get("updatedAt", ""),
+        "uploadedBy": saved.get("uploadedBy", ""),
+        "source": "Base de datos" if saved.get("p12Base64") else "No configurado",
+    }
+
+
+def sri_certificate_status(conn):
+    saved = get_json_key(conn, "sriCertificate", {}) or {}
+    return saved_sri_certificate_status(saved)
+
+
+def load_sri_certificate_bytes(cert_info=None):
+    cert_info = cert_info or {}
+    cert_b64 = normalize_cert_base64(cert_info.get("p12Base64") or SRI_CERT_P12_BASE64)
+    if cert_b64:
+        try:
+            return base64.b64decode(cert_b64, validate=True)
+        except Exception as exc:
+            raise SRIIntegrationError("El certificado .p12/.pfx guardado no es valido. Vuelve a subirlo desde Configuracion.") from exc
     if SRI_CERT_P12_PATH:
         cert_path = Path(SRI_CERT_P12_PATH)
         if cert_path.exists():
             return cert_path.read_bytes()
-    raise SRIIntegrationError("Configura SRI_CERT_P12_BASE64 y SRI_CERT_PASSWORD en Vercel para firmar XML")
+    raise SRIIntegrationError("Sube el certificado .p12/.pfx y su clave en Configuracion > Facturacion electronica SRI, o configura SRI_CERT_P12_BASE64 y SRI_CERT_PASSWORD en Vercel")
 
 
-def sign_invoice_xml(unsigned_xml):
+def sign_invoice_xml(unsigned_xml, cert_info=None):
     try:
         from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, pkcs12
         from signxml import methods
@@ -553,9 +605,11 @@ def sign_invoice_xml(unsigned_xml):
     except Exception as exc:
         raise SRIIntegrationError("Faltan dependencias para firma XAdES. Reinstala requirements.txt en Vercel.") from exc
     try:
+        cert_info = cert_info or {}
+        cert_password = cert_info.get("password") or SRI_CERT_PASSWORD
         key, cert, _extra = pkcs12.load_key_and_certificates(
-            load_sri_certificate_bytes(),
-            SRI_CERT_PASSWORD.encode("utf-8") if SRI_CERT_PASSWORD else None,
+            load_sri_certificate_bytes(cert_info),
+            cert_password.encode("utf-8") if cert_password else None,
         )
         if not key or not cert:
             raise SRIIntegrationError("El certificado P12 no contiene clave privada o certificado valido")
@@ -831,8 +885,8 @@ def prepare_invoice_from_payload(conn, user, payload):
     return invoice, patient, config
 
 
-def send_invoice_to_sri(invoice):
-    invoice["signedXml"] = sign_invoice_xml(invoice["xml"])
+def send_invoice_to_sri(invoice, cert_info=None):
+    invoice["signedXml"] = sign_invoice_xml(invoice["xml"], cert_info)
     reception = sri_recepcion(invoice["signedXml"], invoice["sri"]["ambiente"])
     invoice["sriRecepcion"] = reception
     if reception.get("estado") != "RECIBIDA":
@@ -1105,6 +1159,8 @@ def init_db():
             set_json_key(conn, "archivosClinicos", {})
         if get_json_key(conn, "notificaciones") is None:
             set_json_key(conn, "notificaciones", [])
+        if get_json_key(conn, "sriCertificate") is None:
+            set_json_key(conn, "sriCertificate", {})
 
 
 def make_response(handler, status, payload):
@@ -1331,6 +1387,20 @@ def public_catalog_payload(conn):
     }
 
 
+def sanitize_app_data_for_user(data, user=None):
+    data = dict(data or {})
+    saved_cert = data.pop("sriCertificate", None)
+    config = data.get("config") or {}
+    if isinstance(config, dict):
+        config = dict(config)
+        for secret_key in ("sriCertP12Base64", "sriCertPassword", "sriCertificate", "sriCertificatePassword"):
+            config.pop(secret_key, None)
+        data["config"] = config
+    data["users"] = [public_user(u) for u in data.get("users", [])]
+    data["sriCertificateStatus"] = saved_sri_certificate_status(saved_cert)
+    return data
+
+
 class MedicGHandler(SimpleHTTPRequestHandler):
     extensions_map = {
         **SimpleHTTPRequestHandler.extensions_map,
@@ -1388,7 +1458,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             with db() as conn:
                 rows = conn.execute("select key,value from app_data").fetchall()
             data = {row["key"]: json.loads(row["value"]) for row in rows}
-            data["users"] = [public_user(u) for u in data.get("users", [])]
+            data = sanitize_app_data_for_user(data, user)
             return make_response(self, 200, {"user": public_user(user), "data": data})
         if path == "/api/patient/portal":
             user = auth_user(self)
@@ -1578,15 +1648,49 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         if not user:
             return make_response(self, 401, {"error": "SesiÃ³n no vÃ¡lida"})
 
+        if path == "/api/sri/certificate":
+            if user.get("rol") != "admin":
+                return make_response(self, 403, {"error": "Solo el dueno/administrador puede configurar el certificado SRI"})
+            action = (payload.get("action") or "save").strip().lower()
+            with db() as conn:
+                if action == "status":
+                    return make_response(self, 200, {"ok": True, "status": sri_certificate_status(conn)})
+                if action == "delete":
+                    if SRI_CERT_P12_BASE64:
+                        return make_response(self, 400, {"error": "El certificado viene de variables privadas de Vercel. Eliminalo desde Vercel si deseas cambiarlo."})
+                    set_json_key(conn, "sriCertificate", {})
+                    audit(conn, user, "delete_sri_certificate", "sriCertificate")
+                    return make_response(self, 200, {"ok": True, "status": sri_certificate_status(conn)})
+                cert_b64 = normalize_cert_base64(payload.get("p12Base64") or payload.get("certificate") or "")
+                password = str(payload.get("password") or "")
+                filename = str(payload.get("filename") or "certificado-sri.p12")[:160]
+                if not cert_b64:
+                    return make_response(self, 400, {"error": "Selecciona el archivo .p12 o .pfx del certificado digital"})
+                if not password:
+                    return make_response(self, 400, {"error": "Ingresa la clave del certificado digital"})
+                try:
+                    base64.b64decode(cert_b64, validate=True)
+                except Exception:
+                    return make_response(self, 400, {"error": "No se pudo leer el certificado. Sube un archivo .p12/.pfx valido."})
+                set_json_key(conn, "sriCertificate", {
+                    "p12Base64": cert_b64,
+                    "password": password,
+                    "filename": filename,
+                    "updatedAt": now_iso(),
+                    "uploadedBy": user.get("email", ""),
+                })
+                audit(conn, user, "save_sri_certificate", "sriCertificate", {"filename": filename})
+                return make_response(self, 200, {"ok": True, "status": sri_certificate_status(conn)})
         if path == "/api/invoices":
             if not can_invoice_sri(user):
                 return make_response(self, 403, {"error": "No tienes permiso para emitir facturas"})
             try:
                 with db() as conn:
                     invoice, patient, config = prepare_invoice_from_payload(conn, user, payload)
+                    cert_info = get_sri_certificate(conn)
                     try:
                         if invoice.get("sri", {}).get("autoSend") and payload.get("sendSri", True):
-                            invoice = send_invoice_to_sri(invoice)
+                            invoice = send_invoice_to_sri(invoice, cert_info)
                         else:
                             invoice["estado"] = "Pendiente SRI"
                             invoice["sriEstado"] = "GENERADO"
@@ -1618,8 +1722,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             try:
                 with db() as conn:
                     invoice, patient, config = invoice_context(conn, invoice_id)
+                    cert_info = get_sri_certificate(conn)
                     try:
-                        invoice = send_invoice_to_sri(invoice)
+                        invoice = send_invoice_to_sri(invoice, cert_info)
                     except SRIIntegrationError as exc:
                         invoice["estado"] = "Error SRI"
                         invoice["sriEstado"] = "ERROR"

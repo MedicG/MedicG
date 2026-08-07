@@ -1,4 +1,4 @@
-﻿CONFIGURAR FACTURACION ELECTRONICA SRI ECUADOR
+CONFIGURAR FACTURACION ELECTRONICA SRI ECUADOR
 
 Que hace el sistema:
 - Genera XML de factura electronica.
@@ -41,3 +41,13 @@ Importante:
 - Para produccion cambia SRI_AMBIENTE=2 cuando el contribuyente y el certificado esten habilitados en SRI.
 - Si aparece Error SRI por certificado, RUC o red, la factura queda guardada y puedes usar Reintentar SRI.
 - La anulacion oficial de comprobantes autorizados no se realiza desde este boton local; debe manejarse segun procedimiento SRI correspondiente.
+OPCION DESDE EL PANEL DEL SISTEMA
+---------------------------------
+1. Entra con el usuario dueno/administrador.
+2. Abre Configuracion > Facturacion electronica SRI.
+3. Selecciona el archivo del certificado digital .p12 o .pfx.
+4. Escribe la clave del certificado.
+5. Pulsa Guardar certificado SRI.
+6. El sistema mostrara Certificado configurado y ya podra firmar XML al emitir o reenviar facturas.
+
+Seguridad: el sistema solo devuelve al navegador el estado del certificado, no el archivo ni la clave. Si configuras SRI_CERT_P12_BASE64 en Vercel, esa variable privada tiene prioridad y el boton eliminar queda bloqueado porque el certificado se administra desde Vercel.

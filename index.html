@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -713,7 +713,16 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
             <div class="field"><label class="field-lbl">Obligado contabilidad</label><select id="cfg-sri-contab"><option value="NO">NO</option><option value="SI">SI</option></select></div>
           </div>
           <label class="perm-check mb8"><input type="checkbox" id="cfg-sri-auto" checked/> Enviar automaticamente al SRI al emitir factura</label>
-          <div class="alert alert-i mb8"><i class="ti ti-shield-lock"></i><span>El certificado digital no se guarda aqui. En Vercel configura SRI_CERT_P12_BASE64 y SRI_CERT_PASSWORD como variables privadas.</span></div>
+          <div class="alert alert-i mb8"><i class="ti ti-shield-lock"></i><span>Sube aqui el certificado digital .p12/.pfx y su clave para firmar facturas. Solo el dueno/administrador puede guardarlo; el sistema no vuelve a mostrar la clave ni el archivo.</span></div>
+          <div class="form-row">
+            <div class="field"><label class="field-lbl">Certificado SRI (.p12 / .pfx)</label><input type="file" id="cfg-sri-cert-file" accept=".p12,.pfx,application/x-pkcs12" onchange="readSriCertFile(event)"/></div>
+            <div class="field"><label class="field-lbl">Clave del certificado</label><input type="password" id="cfg-sri-cert-pass" placeholder="Clave del archivo .p12" autocomplete="new-password"/></div>
+          </div>
+          <div class="flex gap8 mb8" style="flex-wrap:wrap;">
+            <button class="btn-p btn-sm" onclick="saveSriCertificate()"><i class="ti ti-certificate"></i> Guardar certificado SRI</button>
+            <button class="btn-s btn-sm" onclick="deleteSriCertificate()"><i class="ti ti-trash"></i> Eliminar certificado</button>
+          </div>
+          <div id="sri-cert-status" class="text-xs text-muted mb8">Certificado SRI no configurado</div>
           <div class="field"><label class="field-lbl">Logo del centro</label><input type="file" id="cfg-logo" accept="image/*" onchange="previewLogo(event)"/></div>
           <div id="cfg-logo-preview" class="text-sm text-muted mb8">Sin logo cargado</div>
           <button class="btn-p mt8" onclick="saveCfg()"><i class="ti ti-device-floppy"></i> Guardar cambios</button>
@@ -3252,6 +3261,8 @@ function procesarCobro(){
 // CONFIG
 // =========================================================
 let editingUserId=null;
+let pendingSriCertBase64="";
+let pendingSriCertName="";
 
 function loadConfig(){
   const cfg=DB.get('config')||{};
@@ -3272,6 +3283,10 @@ function loadConfig(){
   setVal('cfg-sri-iva-code',cfg.sriIvaCode||'4');
   setVal('cfg-sri-contab',cfg.sriObligadoContabilidad||'NO');
   setChecked('cfg-sri-auto',cfg.sriAutoSend!==false);
+  const sriPass=document.getElementById('cfg-sri-cert-pass');if(sriPass)sriPass.value='';
+  const sriFile=document.getElementById('cfg-sri-cert-file');if(sriFile)sriFile.value='';
+  pendingSriCertBase64='';pendingSriCertName='';
+  renderSriCertStatus();
   showLogoPreview(cfg.logo||'');
   document.getElementById('cfg-wtoken').value=cfg.wtoken||'';
   document.getElementById('cfg-remind').value=cfg.remind||'24 horas antes';
@@ -3548,6 +3563,71 @@ function deleteCie10Code(code){
   });
 }
 
+function renderSriCertStatus(){
+  const el=document.getElementById('sri-cert-status');
+  if(!el)return;
+  const st=DB.get('sriCertificateStatus')||{};
+  const fileTxt=st.filename?` Archivo: ${esc(st.filename)}.`:'';
+  const dateTxt=st.updatedAt?` Actualizado: ${fmtDate(String(st.updatedAt).slice(0,10))}.`:'';
+  if(st.configured){
+    el.innerHTML=`<span class="badge b-green">Certificado configurado</span> ${esc(st.source||'Base de datos')}.${fileTxt}${dateTxt} ${st.hasPassword?'Clave guardada.':'Falta clave.'}`;
+  }else{
+    el.innerHTML='<span class="badge b-amber">Certificado SRI pendiente</span> Sube el archivo .p12/.pfx y escribe la clave para poder enviar facturas al SRI.';
+  }
+  const delBtn=[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Eliminar certificado'));
+  if(delBtn) delBtn.disabled=!!st.envLocked;
+}
+
+function readSriCertFile(event){
+  const file=event.target.files&&event.target.files[0];
+  pendingSriCertBase64='';
+  pendingSriCertName='';
+  if(!file){renderSriCertStatus();return;}
+  const name=file.name||'certificado-sri.p12';
+  if(!/\.(p12|pfx)$/i.test(name)){toast('Selecciona un archivo .p12 o .pfx','err');event.target.value='';return;}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    pendingSriCertBase64=String(reader.result||'').split(',').pop();
+    pendingSriCertName=name;
+    const el=document.getElementById('sri-cert-status');
+    if(el)el.innerHTML=`<span class="badge b-blue">Archivo listo</span> ${esc(name)} seleccionado. Escribe la clave y pulsa Guardar certificado SRI.`;
+  };
+  reader.onerror=()=>toast('No se pudo leer el certificado seleccionado','err');
+  reader.readAsDataURL(file);
+}
+
+async function saveSriCertificate(){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueno/administrador puede guardar el certificado SRI','err');return;}
+  const password=document.getElementById('cfg-sri-cert-pass')?.value||'';
+  if(!pendingSriCertBase64){toast('Primero selecciona el archivo .p12 o .pfx','err');return;}
+  if(!password){toast('Ingresa la clave del certificado','err');return;}
+  try{
+    const res=await API.post('/api/sri/certificate',{action:'save',filename:pendingSriCertName,p12Base64:pendingSriCertBase64,password});
+    DB.cache.sriCertificateStatus=res.status||{};
+    pendingSriCertBase64='';pendingSriCertName='';
+    const file=document.getElementById('cfg-sri-cert-file');if(file)file.value='';
+    const pass=document.getElementById('cfg-sri-cert-pass');if(pass)pass.value='';
+    renderSriCertStatus();
+    toast('Certificado SRI guardado correctamente','ok');
+  }catch(err){toast(err.message||'No se pudo guardar el certificado SRI','err');}
+}
+
+function deleteSriCertificate(){
+  if(currentUser?.rol!=='admin'){toast('Solo el dueno/administrador puede eliminar el certificado SRI','err');return;}
+  const st=DB.get('sriCertificateStatus')||{};
+  if(st.envLocked){toast('El certificado viene de variables privadas de Vercel. Cambialo en Vercel.','err');return;}
+  confirmDelete('Eliminar el certificado SRI guardado?',async()=>{
+    try{
+      const res=await API.post('/api/sri/certificate',{action:'delete'});
+      DB.cache.sriCertificateStatus=res.status||{};
+      pendingSriCertBase64='';pendingSriCertName='';
+      const file=document.getElementById('cfg-sri-cert-file');if(file)file.value='';
+      const pass=document.getElementById('cfg-sri-cert-pass');if(pass)pass.value='';
+      renderSriCertStatus();
+      toast('Certificado SRI eliminado','inf');
+    }catch(err){toast(err.message||'No se pudo eliminar el certificado SRI','err');}
+  });
+}
 function saveCfg(){
   const cfg=DB.get('config')||{};
   cfg.nombre=document.getElementById('cfg-nombre').value;
