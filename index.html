@@ -210,6 +210,13 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 .file-name{font-size:12px;font-weight:600;word-break:break-word;}
 .file-desc{font-size:11px;color:var(--text2);white-space:pre-wrap;margin-top:4px;}
 .file-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.hcu-section{border:1px solid var(--gray-bd);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;background:var(--white);}
+.hcu-section-title{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--primary);letter-spacing:.02em;margin-bottom:6px;}
+.hcu-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.hcu-mini{background:var(--gray-lt);border:1px solid var(--gray-bd);border-radius:6px;padding:6px 8px;font-size:11px;}
+.hcu-mini b{display:block;color:var(--text3);font-size:10px;text-transform:uppercase;margin-bottom:2px;}
+.official-strip{display:flex;align-items:center;gap:8px;background:var(--primary-lt);color:var(--primary);border:1px solid #b9d8ef;border-radius:var(--radius);padding:8px 10px;font-size:12px;margin-bottom:12px;}
+@media(max-width:900px){.hcu-grid{grid-template-columns:1fr 1fr;}}
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0 12px;}
 .perm-check{display:flex;align-items:center;gap:7px;background:var(--gray-lt);border:1px solid var(--gray-bd);border-radius:var(--radius);padding:7px 9px;font-size:12px;}
 .perm-check input{width:auto;margin:0;}
@@ -913,51 +920,66 @@ button:hover{opacity:.86;}button:active{transform:scale(.98);}
 
 <!-- RECETA MÃ‰DICA -->
 <div class="modal-bg" id="m-receta">
-  <div class="modal">
-    <div class="modal-hdr"><i class="ti ti-prescription" style="color:var(--green);font-size:20px;"></i><span class="modal-title">Receta mÃ©dica</span><button class="btn-ic" onclick="closeM('m-receta')"><i class="ti ti-x"></i></button></div>
+  <div class="modal lg">
+    <div class="modal-hdr"><i class="ti ti-prescription" style="color:var(--green);font-size:20px;"></i><span class="modal-title">Receta medica - requisitos ACESS/MSP</span><button class="btn-ic" onclick="closeM('m-receta')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body">
       <input type="hidden" id="rx-pac-id"/>
-      <div class="field"><label class="field-lbl">MÃ©dico</label><input id="rx-medico"/></div>
-      <div class="field"><label class="field-lbl">Medicamentos <span class="req">*</span></label><textarea id="rx-meds" rows="5" placeholder="Ej: Paracetamol 500 mg, 1 tableta cada 8 horas por 5 dÃ­as"></textarea></div>
-      <div class="field"><label class="field-lbl">Indicaciones</label><textarea id="rx-ind" rows="3" placeholder="Tomar con alimentos, reposo, control..."></textarea></div>
+      <div class="official-strip"><i class="ti ti-shield-check"></i><span>Formato con datos minimos de receta medica: paciente, diagnostico, medicamento, prescriptor e indicaciones.</span></div>
+      <div class="form-row"><div class="field"><label class="field-lbl">Prescriptor</label><input id="rx-medico"/></div><div class="field"><label class="field-lbl">Registro profesional ACESS/SENESCYT</label><input id="rx-registro" placeholder="Numero de registro profesional"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl">Diagnostico / CIE-10 <span class="req">*</span></label><input id="rx-dx" placeholder="Ej: J03.9 - Amigdalitis aguda"/></div><div class="field"><label class="field-lbl">Antecedentes de alergias</label><input id="rx-alergias" placeholder="Sin alergias conocidas"/></div></div>
+      <div class="field"><label class="field-lbl">Medicamentos prescritos <span class="req">*</span></label><textarea id="rx-meds" rows="6" placeholder="Una linea por medicamento: DCI/nombre generico | forma farmaceutica | concentracion | via | dosis | frecuencia | duracion | cantidad"></textarea><div class="text-xs text-muted mt4">Evita abreviaturas o textos ambiguos. Incluye dosis, frecuencia, via de administracion y duracion.</div></div>
+      <div class="field"><label class="field-lbl">Indicaciones para el paciente</label><textarea id="rx-ind" rows="3" placeholder="Indicaciones claras para administracion, cuidados, signos de alarma y control."></textarea></div>
+      <div class="field"><label class="field-lbl">Validez / observacion</label><input id="rx-validez" placeholder="Ej: Valida por 72 horas, salvo medicamentos sujetos a fiscalizacion."/></div>
     </div>
     <div class="modal-footer"><button class="btn-s" onclick="closeM('m-receta')">Cancelar</button><button class="btn-p" onclick="saveReceta()"><i class="ti ti-device-floppy"></i> Guardar receta</button><button class="btn-g" onclick="saveReceta(true)"><i class="ti ti-printer"></i> Guardar e imprimir</button></div>
   </div>
 </div>
-
-<!-- NOTA CLÃNICA -->
 <div class="modal-bg" id="m-nota">
   <div class="modal lg">
-    <div class="modal-hdr"><i class="ti ti-notes-medical" style="color:var(--secondary);font-size:20px;"></i><span class="modal-title">Nueva nota clÃ­nica</span><button class="btn-ic" onclick="closeM('m-nota')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-hdr"><i class="ti ti-notes-medical" style="color:var(--secondary);font-size:20px;"></i><span class="modal-title">Historia Clinica Unica - Consulta externa MSP</span><button class="btn-ic" onclick="closeM('m-nota')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body">
-      <div class="form-row"><div class="field"><label class="field-lbl">Especialidad</label><select id="n-esp"></select></div><div class="field"><label class="field-lbl">MÃ©dico</label><select id="n-med"></select></div></div>
-      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr;">
-        <div class="field"><label class="field-lbl">PA (mmHg)</label><input type="text" id="n-pa" placeholder="120/80"/></div>
-        <div class="field"><label class="field-lbl">FC (lpm)</label><input type="number" id="n-fc" placeholder="75"/></div>
-        <div class="field"><label class="field-lbl">Temp (Â°C)</label><input type="number" id="n-temp" step="0.1" placeholder="36.5"/></div>
-        <div class="field"><label class="field-lbl">Peso (kg)</label><input type="number" id="n-peso" placeholder="70"/></div>
-      </div>
-      <div class="field"><label class="field-lbl">Motivo de consulta</label><input type="text" id="n-motivo" placeholder="DescripciÃ³n del motivo principal"/></div>
-      <div class="field"><label class="field-lbl">ExploraciÃ³n fÃ­sica / Hallazgos</label><textarea id="n-explora" rows="2" placeholder="Hallazgos del examen fÃ­sico..."></textarea></div>
-      <div class="field">
-        <label class="field-lbl">DiagnÃ³stico CIE-10</label>
-        <div class="form-row">
-          <div class="field" style="margin-bottom:0;"><input type="text" id="n-cie-search" placeholder="Buscar por cÃ³digo o diagnÃ³stico..." oninput="fillCie10Select()"/></div>
-          <div class="field" style="margin-bottom:0;"><select id="n-cie" onchange="applyCie10Selection()"></select></div>
-        </div>
-        <input type="hidden" id="n-cie-code"/>
-        <input type="hidden" id="n-cie-desc"/>
-        <input type="text" id="n-dx" class="mt8" placeholder="DiagnÃ³stico seleccionado o escrito manualmente"/>
-        <div class="text-xs text-muted mt4">CIE-10 clasifica enfermedades, sÃ­ntomas, hallazgos anormales y causas externas. Si no encuentras un cÃ³digo, puedes escribir el diagnÃ³stico manualmente.</div>
-      </div>
-      <div class="field"><label class="field-lbl">Plan de tratamiento</label><textarea id="n-plan" rows="2" placeholder="MedicaciÃ³n, indicaciones, prÃ³ximo control..."></textarea></div>
       <input type="hidden" id="n-pac-id"/>
+      <div class="official-strip"><i class="ti ti-clipboard-check"></i><span>SNS-MSP / HCU-form.002 / 2021 - Consulta externa. Basado en Reglamento e Instructivo de Manejo de la Historia Clinica Unica.</span></div>
+      <div class="form-row"><div class="field"><label class="field-lbl">Especialidad</label><select id="n-esp"></select></div><div class="field"><label class="field-lbl">Profesional responsable</label><select id="n-med"></select></div></div>
+      <div class="hcu-section"><div class="hcu-section-title">1. Motivo de consulta y antecedentes</div>
+        <div class="field"><label class="field-lbl">Motivo de consulta <span class="req">*</span></label><input type="text" id="n-motivo" placeholder="Motivo principal referido por el paciente"/></div>
+        <div class="form-row"><div class="field"><label class="field-lbl">Antecedentes personales</label><textarea id="n-ap" rows="2" placeholder="Clinicos, quirurgicos, gineco-obstetricos, traumaticos, farmacologicos, alergicos..."></textarea></div><div class="field"><label class="field-lbl">Antecedentes familiares</label><textarea id="n-af" rows="2" placeholder="HTA, diabetes, cancer, cardiopatias, otros..."></textarea></div></div>
+        <div class="field"><label class="field-lbl">Enfermedad o problema actual</label><textarea id="n-enf" rows="3" placeholder="Inicio, evolucion cronologica, sintomas asociados, tratamientos previos..."></textarea></div>
+      </div>
+      <div class="hcu-section"><div class="hcu-section-title">2. Revision de organos y sistemas</div><textarea id="n-ros" rows="3" placeholder="Respiratorio, cardiovascular, digestivo, genitourinario, musculoesqueletico, endocrino, neurologico, piel, otros."></textarea></div>
+      <div class="hcu-section"><div class="hcu-section-title">3. Signos vitales y antropometria</div>
+        <div class="form-row" style="grid-template-columns:repeat(4,1fr);">
+          <div class="field"><label class="field-lbl">PA (mmHg)</label><input type="text" id="n-pa" placeholder="120/80"/></div>
+          <div class="field"><label class="field-lbl">FC (lpm)</label><input type="number" id="n-fc" placeholder="75"/></div>
+          <div class="field"><label class="field-lbl">FR (rpm)</label><input type="number" id="n-fr" placeholder="18"/></div>
+          <div class="field"><label class="field-lbl">Temp (C)</label><input type="number" id="n-temp" step="0.1" placeholder="36.5"/></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:repeat(4,1fr);">
+          <div class="field"><label class="field-lbl">SpO2 (%)</label><input type="number" id="n-spo2" placeholder="98"/></div>
+          <div class="field"><label class="field-lbl">Peso (kg)</label><input type="number" id="n-peso" step="0.1" oninput="calcNotaImc()"/></div>
+          <div class="field"><label class="field-lbl">Talla (cm)</label><input type="number" id="n-talla" step="0.1" oninput="calcNotaImc()"/></div>
+          <div class="field"><label class="field-lbl">IMC</label><input type="text" id="n-imc" readonly/></div>
+        </div>
+      </div>
+      <div class="hcu-section"><div class="hcu-section-title">4. Examen fisico</div>
+        <div class="field"><label class="field-lbl">Examen fisico general</label><textarea id="n-explora" rows="3" placeholder="Estado general, conciencia, hidratacion, piel, mucosas..."></textarea></div>
+        <div class="field"><label class="field-lbl">Organos, aparatos y regiones</label><textarea id="n-organos" rows="3" placeholder="Cabeza, cuello, torax, abdomen, pelvis, extremidades, neurologico, otros hallazgos."></textarea></div>
+      </div>
+      <div class="hcu-section"><div class="hcu-section-title">5. Diagnostico CIE-10</div>
+        <div class="form-row"><div class="field"><label class="field-lbl">Buscar diagnostico</label><input type="text" id="n-cie-search" placeholder="Buscar por codigo o diagnostico..." oninput="fillCie10Select()"/></div><div class="field"><label class="field-lbl">Codigo CIE-10</label><select id="n-cie" onchange="applyCie10Selection()"></select></div></div>
+        <input type="hidden" id="n-cie-code"/><input type="hidden" id="n-cie-desc"/>
+        <div class="form-row"><div class="field"><label class="field-lbl">Tipo</label><select id="n-dx-tipo"><option>Presuntivo</option><option>Definitivo</option></select></div><div class="field"><label class="field-lbl">Diagnostico principal</label><input type="text" id="n-dx" placeholder="Diagnostico seleccionado o escrito manualmente"/></div></div>
+        <div class="field"><label class="field-lbl">Diagnosticos adicionales</label><textarea id="n-dx-add" rows="2" placeholder="Otros codigos CIE-10 o diagnosticos relacionados, si aplica."></textarea></div>
+      </div>
+      <div class="hcu-section"><div class="hcu-section-title">6. Planes de tratamiento</div>
+        <div class="form-row"><div class="field"><label class="field-lbl">Plan diagnostico</label><textarea id="n-plan-dx" rows="2" placeholder="Laboratorio, imagenes, interconsultas..."></textarea></div><div class="field"><label class="field-lbl">Plan terapeutico</label><textarea id="n-plan-tx" rows="2" placeholder="Tratamiento, procedimientos, medicacion..."></textarea></div></div>
+        <div class="field"><label class="field-lbl">Plan educacional / indicaciones</label><textarea id="n-plan-edu" rows="2" placeholder="Educacion, signos de alarma, control, recomendaciones."></textarea></div>
+        <div class="field"><label class="field-lbl">Observaciones</label><textarea id="n-observaciones" rows="2"></textarea></div>
+      </div>
     </div>
-    <div class="modal-footer"><button class="btn-s" onclick="closeM('m-nota')">Cancelar</button><button class="btn-p" onclick="saveNota()"><i class="ti ti-device-floppy"></i> Guardar nota</button></div>
+    <div class="modal-footer"><button class="btn-s" onclick="closeM('m-nota')">Cancelar</button><button class="btn-p" onclick="saveNota()"><i class="ti ti-device-floppy"></i> Guardar HCU</button></div>
   </div>
 </div>
-
-<!-- ARCHIVO CLÃNICO -->
 <div class="modal-bg" id="m-archivo">
   <div class="modal">
     <div class="modal-hdr"><i class="ti ti-paperclip" style="color:var(--primary);font-size:20px;"></i><span class="modal-title">Adjuntar resultado o estudio</span><button class="btn-ic" onclick="closeM('m-archivo')"><i class="ti ti-x"></i></button></div>
@@ -2052,70 +2074,50 @@ function renderHCE(id){
   if(!p)return;
   const notas=(DB.get('notas')||{})[id]||[];
   const archivos=(DB.get('archivosClinicos')||{})[id]||[];
-  const ini=(p.nombres[0]+p.apellidos[0]).toUpperCase();
+  const recetas=((DB.get('recetas')||{})[id]||[]);
+  const ini=((p.nombres||'P')[0]+(p.apellidos||'G')[0]).toUpperCase();
   const espColor=getEspColor(p.esp);
   document.getElementById('hce-detail').innerHTML=`
   <div class="card">
     <div class="card-hdr">
       <div class="av lg" style="background:${espColor}22;color:${espColor};">${ini}</div>
       <div style="flex:1;">
-        <div class="fw7" style="font-size:16px;">${p.nombres} ${p.apellidos}</div>
-        <div class="text-xs text-muted">Historia #HCE-${String(id).padStart(4,'0')} Â· ${p.esp}</div>
+        <div class="fw7" style="font-size:16px;">${esc(p.nombres)} ${esc(p.apellidos)}</div>
+        <div class="text-xs text-muted">HCU #HCE-${String(id).padStart(4,'0')} - ${esc(p.esp||'Consulta externa')}</div>
       </div>
-      <button class="btn-p btn-sm flex gap6" onclick="openNotaModal(${id})"><i class="ti ti-pencil"></i>Nueva nota</button>
+      <button class="btn-p btn-sm flex gap6" onclick="openNotaModal(${id})"><i class="ti ti-pencil"></i>Nueva HCU</button>
+      ${notas.length?`<button class="btn-s btn-sm" onclick="printHcuNota(${id},0)"><i class="ti ti-printer"></i>Imprimir HCU</button>`:''}
       ${currentUser?.rol==='medico'||currentUser?.rol==='admin'?`<button class="btn-g btn-sm flex gap6" onclick="openRecetaModal(${id})"><i class="ti ti-prescription"></i>Receta</button><button class="btn-s btn-sm" onclick="printEtiqueta(${id})"><i class="ti ti-tag"></i>Etiqueta</button>`:''}
       <button class="btn-s btn-sm" onclick="openArchivoModal(${id})"><i class="ti ti-paperclip"></i>Adjuntar</button>
       <button class="btn-s btn-sm" onclick="editPacModal(${id})"><i class="ti ti-edit"></i>Editar</button>
     </div>
     <div class="card-body">
+      <div class="official-strip"><i class="ti ti-shield-check"></i><span>Expediente estructurado como Historia Clinica Unica MSP: datos del paciente, antecedentes, enfermedad actual, revision por sistemas, signos vitales, examen fisico, diagnostico CIE-10 y planes.</span></div>
       <div class="grid3 mb16" style="gap:10px;">
-        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Fecha nacimiento</div><div style="font-size:14px;font-weight:600;">${fmtDate(p.fnac)}</div><div class="stat-sub">${calcEdad(p.fnac)} aÃ±os Â· ${p.genero}</div></div>
-        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Tipo de sangre</div><div style="font-size:14px;font-weight:600;color:var(--red);">${p.sangre||'?'}</div><div class="stat-sub">CÃ©dula: ${p.cedula}</div></div>
-        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Seguro mÃ©dico</div><div style="font-size:14px;font-weight:600;">${p.seguro||'Ninguno'}</div><div class="stat-sub">${p.afiliado||'â€”'}</div></div>
+        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Fecha nacimiento</div><div style="font-size:14px;font-weight:600;">${fmtDate(p.fnac)}</div><div class="stat-sub">${calcEdad(p.fnac)} anios - ${esc(p.genero||'')}</div></div>
+        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Tipo de sangre</div><div style="font-size:14px;font-weight:600;color:var(--red);">${esc(p.sangre||'?')}</div><div class="stat-sub">Cedula: ${esc(p.cedula||'')}</div></div>
+        <div class="stat-box" style="padding:10px 12px;"><div class="stat-lbl">Seguro medico</div><div style="font-size:14px;font-weight:600;">${esc(p.seguro||'Ninguno')}</div><div class="stat-sub">${esc(p.afiliado||'---')}</div></div>
       </div>
-      ${p.alergias?`<div class="alert alert-d mb12"><i class="ti ti-alert-triangle" style="font-size:16px;"></i><strong>Alergias:</strong> ${p.alergias}</div>`:''}
+      ${p.alergias?`<div class="alert alert-d mb12"><i class="ti ti-alert-triangle" style="font-size:16px;"></i><strong>Alergias:</strong> ${esc(p.alergias)}</div>`:''}
       <div class="grid2 mb12" style="gap:10px;">
-        <div><span class="field-lbl">TelÃ©fono</span><div>${p.tel||'â€”'}</div></div>
-        <div><span class="field-lbl">Correo</span><div>${p.email||'â€”'}</div></div>
-        <div><span class="field-lbl">DirecciÃ³n</span><div>${p.dir||'â€”'}</div></div>
-        <div><span class="field-lbl">Antecedentes</span><div class="text-sm">${p.antec||'Sin antecedentes'}</div></div>
+        <div><span class="field-lbl">Telefono</span><div>${esc(p.tel||'---')}</div></div>
+        <div><span class="field-lbl">Correo</span><div>${esc(p.email||'---')}</div></div>
+        <div><span class="field-lbl">Direccion</span><div>${esc(p.dir||'---')}</div></div>
+        <div><span class="field-lbl">Antecedentes registrados</span><div class="text-sm">${esc(p.antec||'Sin antecedentes')}</div></div>
       </div>
       <div class="divider"></div>
       <div class="tabs">
-        <div class="tab active" onclick="swTab('t-evo',this)">Evoluciones (${notas.length})</div>
-        <div class="tab" onclick="swTab('t-recetas',this)">Recetas</div>
+        <div class="tab active" onclick="swTab('t-evo',this)">HCU / Evoluciones (${notas.length})</div>
+        <div class="tab" onclick="swTab('t-recetas',this)">Recetas (${recetas.length})</div>
         <div class="tab" onclick="swTab('t-archivos',this)">Archivos (${archivos.length})</div>
         <div class="tab" onclick="swTab('t-citas',this)">Citas</div>
         <div class="tab" onclick="swTab('t-fac',this)">Facturas</div>
       </div>
       <div id="t-evo" class="tab-panel active">
-        ${notas.length?notas.map(n=>`
-          <div class="card mb12" style="border-left:3px solid ${getEspColor(n.esp)||'#1B4F8A'};">
-            <div class="card-hdr" style="padding:10px 14px;">
-              <i class="ti ti-notes-medical" style="color:${getEspColor(n.esp)};font-size:16px;"></i>
-              <div style="flex:1;"><div class="fw5 text-sm">${n.med} Â· ${n.esp}</div><div class="text-xs text-muted">${fmtDate(n.fecha)}</div></div>
-            </div>
-            <div class="card-body" style="padding:10px 14px;">
-              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
-                ${n.pa?`<span style="background:var(--primary-lt);color:var(--primary);padding:3px 9px;border-radius:20px;font-size:11px;">PA: ${n.pa}</span>`:''}
-                ${n.fc?`<span style="background:var(--red-lt);color:var(--red);padding:3px 9px;border-radius:20px;font-size:11px;">FC: ${n.fc} lpm</span>`:''}
-                ${n.temp?`<span style="background:var(--amber-lt);color:var(--amber);padding:3px 9px;border-radius:20px;font-size:11px;">Temp: ${n.temp}Â°C</span>`:''}
-                ${n.peso?`<span style="background:var(--green-lt);color:var(--green);padding:3px 9px;border-radius:20px;font-size:11px;">Peso: ${n.peso} kg</span>`:''}
-              </div>
-              ${n.motivo?`<div class="mb4"><span class="field-lbl">Motivo:</span> <span class="text-sm">${n.motivo}</span></div>`:''}
-              ${n.explora?`<div class="mb4"><span class="field-lbl">ExploraciÃ³n:</span> <span class="text-sm">${n.explora}</span></div>`:''}
-              ${(n.dx||n.cie10Desc)?`<div class="mb4"><span class="field-lbl">DiagnÃ³stico:</span> ${n.cie10Code?`<span class="badge b-blue">CIE-10 ${esc(n.cie10Code)}</span> `:''}<strong class="text-sm">${esc(n.dx||n.cie10Desc)}</strong></div>`:''}
-              ${n.plan?`<div><span class="field-lbl">Plan:</span> <span class="text-sm">${n.plan}</span></div>`:''}
-            </div>
-          </div>`).join('')
-        :'<div style="text-align:center;padding:20px;color:var(--text3);">Sin notas. <button class="btn-s btn-sm mt8" onclick="openNotaModal('+id+')">Agregar primera nota</button></div>'}
+        ${notas.length?notas.map((n,idx)=>renderHcuNotaCard(n,id,idx)).join(''):'<div style="text-align:center;padding:20px;color:var(--text3);">Sin Historia Clinica Unica registrada. <button class="btn-s btn-sm mt8" onclick="openNotaModal('+id+')">Agregar HCU</button></div>'}
       </div>
       <div id="t-recetas" class="tab-panel">
-        ${((DB.get('recetas')||{})[id]||[]).map(r=>`
-          <div class="card mb12">
-            <div class="card-hdr" style="padding:10px 14px;"><i class="ti ti-prescription" style="color:var(--green);font-size:16px;"></i><div style="flex:1;"><div class="fw5 text-sm">${r.medico}</div><div class="text-xs text-muted">${fmtDate(r.fecha)}</div></div><button class="btn-s btn-xs" onclick="printReceta(${id},${r.id})"><i class="ti ti-printer"></i> Imprimir</button></div>
-            <div class="card-body" style="padding:10px 14px;"><div class="field-lbl">Medicamentos</div><div style="white-space:pre-wrap;">${r.medicamentos}</div>${r.indicaciones?`<div class="field-lbl mt8">Indicaciones</div><div style="white-space:pre-wrap;">${r.indicaciones}</div>`:''}</div>
-          </div>`).join('')||'<div class="text-muted text-sm">Sin recetas registradas.</div>'}
+        ${recetas.map(r=>renderRecetaCard(r,id)).join('')||'<div class="text-muted text-sm">Sin recetas registradas.</div>'}
       </div>
       <div id="t-archivos" class="tab-panel">
         <div class="mb12"><button class="btn-p btn-sm" onclick="openArchivoModal(${id})"><i class="ti ti-upload"></i> Adjuntar resultado, imagen o estudio</button></div>
@@ -2124,37 +2126,36 @@ function renderHCE(id){
             <div class="file-icon"><i class="ti ${archivoIcon(a)}"></i></div>
             <div style="flex:1;min-width:0;">
               <div class="file-name">${esc(a.nombre)}</div>
-              <div class="text-xs text-muted">${esc(a.tipo||'Documento')} Â· ${fmtDate(a.fecha)} Â· ${fmtBytes(a.size)}</div>
+              <div class="text-xs text-muted">${esc(a.tipo||'Documento')} - ${fmtDate(a.fecha)} - ${fmtBytes(a.size)}</div>
               ${a.descripcion?`<div class="file-desc">${esc(a.descripcion)}</div>`:''}
-              <div class="text-xs text-muted mt4">Subido por: ${esc(a.subidoPor||'â€”')}</div>
+              <div class="text-xs text-muted mt4">Subido por: ${esc(a.subidoPor||'---')}</div>
               <div class="file-actions">
                 <button class="btn-s btn-xs" onclick="openArchivoClinico(${id},${a.id})"><i class="ti ti-eye"></i> Abrir</button>
                 <button class="btn-s btn-xs" onclick="downloadArchivoClinico(${id},${a.id})"><i class="ti ti-download"></i> Descargar</button>
                 <button class="btn-d btn-xs" onclick="deleteArchivoClinico(${id},${a.id})"><i class="ti ti-trash"></i></button>
               </div>
             </div>
-          </div>`).join('')}</div>`:'<div class="text-muted text-sm">Sin archivos adjuntos. Puedes agregar resultados de laboratorio, imÃ¡genes, estudios o documentos cuando sea necesario.</div>'}
+          </div>`).join('')}</div>`:'<div class="text-muted text-sm">Sin archivos adjuntos.</div>'}
       </div>
       <div id="t-citas" class="tab-panel">
         ${(DB.get('citas')||[]).filter(c=>c.pac===+id).map(c=>`
           <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--gray-lt);border-radius:var(--radius);margin-bottom:8px;">
             <i class="ti ti-calendar" style="color:${getEspColor(c.esp)};font-size:18px;"></i>
-            <div style="flex:1;"><div class="fw5 text-sm">${fmtDate(c.fecha)} ${c.hora} Â· ${c.esp}</div><div class="text-xs text-muted">${getMedName(c.med)} Â· ${c.tipo} Â· ${c.motivo||'â€”'}</div></div>
-            <span class="badge ${c.estado==='Confirmada'?'b-green':'b-amber'}">${c.estado}</span>
+            <div style="flex:1;"><div class="fw5 text-sm">${fmtDate(c.fecha)} ${esc(c.hora)} - ${esc(c.esp)}</div><div class="text-xs text-muted">${esc(getMedName(c.med))} - ${esc(c.tipo)} - ${esc(c.motivo||'---')}</div></div>
+            <span class="badge ${c.estado==='Confirmada'?'b-green':'b-amber'}">${esc(c.estado)}</span>
           </div>`).join('')||'<div class="text-muted text-sm">Sin citas registradas.</div>'}
       </div>
       <div id="t-fac" class="tab-panel">
         ${(DB.get('facturas')||[]).filter(f=>f.pac===+id).map(f=>`
           <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--gray-lt);border-radius:var(--radius);margin-bottom:8px;">
             <i class="ti ti-receipt" style="color:var(--primary);font-size:18px;"></i>
-            <div style="flex:1;"><div class="fw5 text-sm">${f.id}</div><div class="text-xs text-muted">${fmtDate(f.fecha)} Â· ${f.serv} Â· ${f.pago}</div></div>
+            <div style="flex:1;"><div class="fw5 text-sm">${esc(f.id)}</div><div class="text-xs text-muted">${fmtDate(f.fecha)} - ${esc(f.serv)} - ${esc(f.pago)}</div></div>
             <span class="fw6" style="color:var(--green);">${fmtMoney(f.total)}</span>
           </div>`).join('')||'<div class="text-muted text-sm">Sin facturas registradas.</div>'}
       </div>
     </div>
   </div>`;
 }
-
 function swTab(id,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -2190,34 +2191,97 @@ function applyCie10Selection(){
   document.getElementById('n-dx').value=`${normalizeCie10Code(item.code)} â€” ${item.desc}`;
 }
 
+function hcuText(value){return esc(value||'---').replace(/\n/g,'<br>');}
+function hcuLine(label,value){return `<div class="hcu-mini"><b>${label}</b>${hcuText(value)}</div>`;}
+function hcuDateTime(n){return `${fmtDate(n.fecha)} ${esc(n.hora||'')}`.trim();}
+function renderHcuNotaCard(n,pacId,idx){
+  const formato=n.formato||'Nota clinica anterior';
+  const dx=n.dx||n.cie10Desc||'';
+  const plan=n.plan||[n.planDiagnostico,n.planTerapeutico,n.planEducacional].filter(Boolean).join('\n');
+  return `<div class="card mb12" style="border-left:3px solid ${getEspColor(n.esp)||'#1B4F8A'};">
+    <div class="card-hdr" style="padding:10px 14px;">
+      <i class="ti ti-notes-medical" style="color:${getEspColor(n.esp)};font-size:16px;"></i>
+      <div style="flex:1;"><div class="fw5 text-sm">${esc(n.med||'Profesional')} - ${esc(n.esp||'Consulta externa')}</div><div class="text-xs text-muted">${hcuDateTime(n)} - ${esc(formato)}</div></div>
+      <button class="btn-s btn-xs" onclick="printHcuNota(${pacId},${idx})"><i class="ti ti-printer"></i> Imprimir HCU</button>
+    </div>
+    <div class="card-body" style="padding:10px 14px;">
+      <div class="hcu-grid mb8">${hcuLine('PA',n.pa)}${hcuLine('FC',n.fc?n.fc+' lpm':'')}${hcuLine('FR',n.fr?n.fr+' rpm':'')}${hcuLine('Temp',n.temp?n.temp+' C':'')}${hcuLine('SpO2',n.spo2?n.spo2+' %':'')}${hcuLine('Peso',n.peso?n.peso+' kg':'')}${hcuLine('Talla',n.talla?n.talla+' cm':'')}${hcuLine('IMC',n.imc)}</div>
+      <div class="hcu-section"><div class="hcu-section-title">Motivo y enfermedad actual</div><div class="text-sm"><b>Motivo:</b> ${hcuText(n.motivo)}<br><b>Enfermedad actual:</b> ${hcuText(n.enfermedadActual||n.enfActual)}</div></div>
+      ${(n.antecedentesPersonales||n.antecedentesFamiliares)?`<div class="hcu-section"><div class="hcu-section-title">Antecedentes</div><div class="text-sm"><b>Personales:</b> ${hcuText(n.antecedentesPersonales)}<br><b>Familiares:</b> ${hcuText(n.antecedentesFamiliares)}</div></div>`:''}
+      ${(n.revisionSistemas||n.explora||n.examenFisico)?`<div class="hcu-section"><div class="hcu-section-title">Revision y examen fisico</div><div class="text-sm"><b>Revision sistemas:</b> ${hcuText(n.revisionSistemas)}<br><b>Examen fisico:</b> ${hcuText(n.examenFisico||n.explora)}${n.organosRegionales?`<br><b>Organos/regiones:</b> ${hcuText(n.organosRegionales)}`:''}</div></div>`:''}
+      ${(dx||n.cie10Code)?`<div class="hcu-section"><div class="hcu-section-title">Diagnostico</div>${n.cie10Code?`<span class="badge b-blue">CIE-10 ${esc(n.cie10Code)}</span> `:''}<span class="badge b-gray">${esc(n.dxTipo||'')}</span><div class="text-sm mt4"><strong>${hcuText(dx)}</strong></div>${n.dxAdicionales?`<div class="text-sm mt4">${hcuText(n.dxAdicionales)}</div>`:''}</div>`:''}
+      ${plan?`<div class="hcu-section"><div class="hcu-section-title">Plan</div><div class="text-sm">${hcuText(plan)}</div></div>`:''}
+    </div>
+  </div>`;
+}
+
+function calcNotaImc(){
+  const peso=+(document.getElementById('n-peso')?.value||0);
+  const tallaCm=+(document.getElementById('n-talla')?.value||0);
+  const imc=document.getElementById('n-imc');
+  if(!imc)return;
+  if(peso>0&&tallaCm>0){const t=tallaCm/100;imc.value=(peso/(t*t)).toFixed(2);}else imc.value='';
+}
+
+function selectedMedicoFromNota(){
+  const id=+(document.getElementById('n-med')?.value||0);
+  return (DB.get('medicos')||[]).find(m=>+m.id===id)||{};
+}
+
 function openNotaModal(pacId){
-  if(!hasPerm('hce')){toast('No tienes permiso para crear notas de evoluciÃ³n','err');return;}
+  if(!hasPerm('hce')){toast('No tienes permiso para crear Historia Clinica Unica','err');return;}
+  const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId)||{};
   document.getElementById('n-pac-id').value=pacId;
   const esps=DB.get('especialidades')||[];
   const meds=DB.get('medicos')||[];
-  document.getElementById('n-esp').innerHTML=esps.map(e=>`<option>${e.nombre}</option>`).join('');
-  document.getElementById('n-med').innerHTML=meds.map(m=>`<option>${m.nombre}</option>`).join('');
-  ['n-pa','n-fc','n-temp','n-peso','n-motivo','n-explora','n-cie-search','n-cie-code','n-cie-desc','n-dx','n-plan'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('n-esp').innerHTML=esps.map(e=>`<option>${esc(e.nombre)}</option>`).join('');
+  if(p.esp)document.getElementById('n-esp').value=p.esp;
+  document.getElementById('n-med').innerHTML=meds.map(m=>`<option value="${m.id}">${esc(m.nombre)} - ${esc(m.esp||'')}</option>`).join('');
+  const medId=currentDoctorId()||+(meds.find(m=>m.esp===p.esp)?.id||0);
+  if(medId)document.getElementById('n-med').value=String(medId);
+  ['n-pa','n-fc','n-fr','n-temp','n-spo2','n-peso','n-talla','n-imc','n-motivo','n-ap','n-af','n-enf','n-ros','n-explora','n-organos','n-cie-search','n-cie-code','n-cie-desc','n-dx','n-dx-add','n-plan-dx','n-plan-tx','n-plan-edu','n-observaciones'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('n-ap').value=p.antec||'';
+  document.getElementById('n-dx-tipo').value='Presuntivo';
   fillCie10Select();
   openM('m-nota');
 }
 
 function saveNota(){
-  if(!hasPerm('hce')){toast('No tienes permiso para guardar notas de evoluciÃ³n','err');return;}
+  if(!hasPerm('hce')){toast('No tienes permiso para guardar Historia Clinica Unica','err');return;}
   const pacId=document.getElementById('n-pac-id').value;
+  const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId)||{};
+  const cfg=DB.get('config')||{};
+  const med=selectedMedicoFromNota();
   const cieItem=getCie10ByCode(document.getElementById('n-cie-code').value || document.getElementById('n-cie').value);
   const dx=document.getElementById('n-dx').value.trim();
-  const nota={esp:document.getElementById('n-esp').value,med:document.getElementById('n-med').value,fecha:today(),pa:document.getElementById('n-pa').value,fc:document.getElementById('n-fc').value,temp:document.getElementById('n-temp').value,peso:document.getElementById('n-peso').value,motivo:document.getElementById('n-motivo').value,explora:document.getElementById('n-explora').value,cie10Code:cieItem?normalizeCie10Code(cieItem.code):'',cie10Desc:cieItem?cieItem.desc:'',dx:dx||(cieItem?`${normalizeCie10Code(cieItem.code)} â€” ${cieItem.desc}`:''),plan:document.getElementById('n-plan').value};
+  const motivo=document.getElementById('n-motivo').value.trim();
+  if(!motivo){toast('Ingresa el motivo de consulta','err');return;}
+  const nota={
+    id:Date.now(),formato:'SNS-MSP/HCU-form.002/2021',tipo:'Consulta externa',establecimiento:cfg.nombre||'Centro medico',historia:`HCE-${String(pacId).padStart(4,'0')}`,
+    esp:document.getElementById('n-esp').value,med:med.nombre||currentUser.name+' '+currentUser.last,medId:med.id||0,medCedula:med.cedula||'',medSen:med.sen||'',fecha:today(),hora:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),
+    motivo,antecedentesPersonales:document.getElementById('n-ap').value.trim(),antecedentesFamiliares:document.getElementById('n-af').value.trim(),enfermedadActual:document.getElementById('n-enf').value.trim(),revisionSistemas:document.getElementById('n-ros').value.trim(),
+    pa:document.getElementById('n-pa').value,fc:document.getElementById('n-fc').value,fr:document.getElementById('n-fr').value,temp:document.getElementById('n-temp').value,spo2:document.getElementById('n-spo2').value,peso:document.getElementById('n-peso').value,talla:document.getElementById('n-talla').value,imc:document.getElementById('n-imc').value,
+    examenFisico:document.getElementById('n-explora').value.trim(),organosRegionales:document.getElementById('n-organos').value.trim(),cie10Code:cieItem?normalizeCie10Code(cieItem.code):'',cie10Desc:cieItem?cieItem.desc:'',dxTipo:document.getElementById('n-dx-tipo').value,dx:dx||(cieItem?`${normalizeCie10Code(cieItem.code)} - ${cieItem.desc}`:''),dxAdicionales:document.getElementById('n-dx-add').value.trim(),
+    planDiagnostico:document.getElementById('n-plan-dx').value.trim(),planTerapeutico:document.getElementById('n-plan-tx').value.trim(),planEducacional:document.getElementById('n-plan-edu').value.trim(),observaciones:document.getElementById('n-observaciones').value.trim()
+  };
+  nota.plan=[nota.planDiagnostico,nota.planTerapeutico,nota.planEducacional,nota.observaciones].filter(Boolean).join('\n');
   const notas=DB.get('notas')||{};
   if(!notas[pacId]) notas[pacId]=[];
   notas[pacId].unshift(nota);
   DB.set('notas',notas);
-  // update ultima visita
   const pacs=DB.get('pacientes')||[];const i=pacs.findIndex(x=>x.id===+pacId);if(i>=0){pacs[i].ultima=today();DB.set('pacientes',pacs);}
-  closeM('m-nota');toast('Nota clÃ­nica guardada','ok');
+  closeM('m-nota');toast('Historia Clinica Unica guardada','ok');
   if(selPac===+pacId) renderHCE(pacId);
 }
 
+function printHcuNota(pacId,idx){
+  if(!hasPerm('hce')){toast('No tienes permiso para imprimir HCU','err');return;}
+  const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId);const n=((DB.get('notas')||{})[pacId]||[])[idx];if(!p||!n)return;
+  const cfg=DB.get('config')||{};const logo=cfg.logo||DEFAULT_LOGO;
+  const patientRows=`<tr><td><b>Paciente</b><br>${esc(p.apellidos||'')} ${esc(p.nombres||'')}</td><td><b>Cedula</b><br>${esc(p.cedula||'---')}</td><td><b>Edad</b><br>${calcEdad(p.fnac)}</td><td><b>Sexo</b><br>${esc(p.genero||'---')}</td></tr><tr><td><b>HCU</b><br>HCE-${String(pacId).padStart(4,'0')}</td><td><b>Fecha</b><br>${fmtDate(n.fecha)} ${esc(n.hora||'')}</td><td><b>Especialidad</b><br>${esc(n.esp||'')}</td><td><b>Alergias</b><br>${esc(p.alergias||'No registradas')}</td></tr>`;
+  const vitals=`<tr><td>PA: ${esc(n.pa||'---')}</td><td>FC: ${esc(n.fc||'---')}</td><td>FR: ${esc(n.fr||'---')}</td><td>Temp: ${esc(n.temp||'---')}</td></tr><tr><td>SpO2: ${esc(n.spo2||'---')}</td><td>Peso: ${esc(n.peso||'---')}</td><td>Talla: ${esc(n.talla||'---')}</td><td>IMC: ${esc(n.imc||'---')}</td></tr>`;
+  printDoc('Historia Clinica Unica MSP',`<div class="hdr"><img class="logo" src="${logo}"><div><div class="big">${esc(cfg.nombre||'Centro Medico')}</div><div class="muted">${esc(cfg.dir||'')} - ${esc(cfg.tel||'')}</div><div class="muted">SNS-MSP / HCU-form.002 / 2021 - Consulta externa</div></div></div><table width="100%" border="1" cellspacing="0" cellpadding="6">${patientRows}</table><div class="box"><div class="label">1. Motivo de consulta</div>${hcuText(n.motivo)}</div><div class="box"><div class="label">2. Antecedentes personales y familiares</div><b>Personales:</b><br>${hcuText(n.antecedentesPersonales)}<br><b>Familiares:</b><br>${hcuText(n.antecedentesFamiliares)}</div><div class="box"><div class="label">3. Enfermedad actual</div>${hcuText(n.enfermedadActual)}</div><div class="box"><div class="label">4. Revision de organos y sistemas</div>${hcuText(n.revisionSistemas)}</div><table width="100%" border="1" cellspacing="0" cellpadding="6"><caption style="text-align:left;font-weight:bold;margin:8px 0;">5. Signos vitales y antropometria</caption>${vitals}</table><div class="box"><div class="label">6. Examen fisico</div>${hcuText(n.examenFisico)}<br><b>Organos/regiones:</b><br>${hcuText(n.organosRegionales)}</div><div class="box"><div class="label">7. Diagnostico CIE-10</div>${n.cie10Code?`<b>${esc(n.cie10Code)}</b> - `:''}${hcuText(n.dx||n.cie10Desc)}<br><b>Tipo:</b> ${esc(n.dxTipo||'')}<br>${hcuText(n.dxAdicionales)}</div><div class="box"><div class="label">8. Planes</div><b>Diagnostico:</b><br>${hcuText(n.planDiagnostico)}<br><b>Terapeutico:</b><br>${hcuText(n.planTerapeutico)}<br><b>Educacional:</b><br>${hcuText(n.planEducacional)}</div><div style="margin-top:50px;display:flex;justify-content:space-between;gap:20px;"><div style="border-top:1px solid #333;width:260px;text-align:center;">${esc(n.med||'Profesional')}<br><span class="muted">Registro: ${esc(n.medSen||n.medCedula||'---')}</span></div><div class="muted">Documento generado desde Medic G. Adjuntar firma/sello fisico o firma electronica si aplica.</div></div>`);
+}
 function archivoIcon(a){
   const mime=(a?.mime||'').toLowerCase();
   const tipo=(a?.tipo||'').toLowerCase();
@@ -2322,10 +2386,17 @@ function deleteArchivoClinico(pacId,archivoId){
 
 function openRecetaModal(pacId){
   if(!hasPerm('hce')){toast('No tienes permiso para generar recetas','err');return;}
+  const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId)||{};
+  const med=linkedDoctorForUser()||{};
+  const latest=((DB.get('notas')||{})[pacId]||[])[0]||{};
   document.getElementById('rx-pac-id').value=pacId;
-  document.getElementById('rx-medico').value=currentUser.name+' '+currentUser.last;
+  document.getElementById('rx-medico').value=med.nombre||currentUser.name+' '+currentUser.last;
+  document.getElementById('rx-registro').value=med.sen||med.cedula||'';
+  document.getElementById('rx-dx').value=latest.dx||latest.cie10Desc||'';
+  document.getElementById('rx-alergias').value=p.alergias||'Sin alergias conocidas';
   document.getElementById('rx-meds').value='';
   document.getElementById('rx-ind').value='';
+  document.getElementById('rx-validez').value='';
   openM('m-receta');
 }
 
@@ -2333,21 +2404,27 @@ function saveReceta(print=false){
   if(!hasPerm('hce')){toast('No tienes permiso para guardar recetas','err');return;}
   const pacId=document.getElementById('rx-pac-id').value;
   const medicamentos=document.getElementById('rx-meds').value.trim();
+  const dx=document.getElementById('rx-dx').value.trim();
+  if(!dx){toast('Ingresa diagnostico o CIE-10 para la receta','err');return;}
   if(!medicamentos){toast('Ingresa los medicamentos de la receta','err');return;}
   const recetas=DB.get('recetas')||{};
   if(!recetas[pacId]) recetas[pacId]=[];
-  const receta={id:Date.now(),fecha:today(),medico:document.getElementById('rx-medico').value.trim()||currentUser.name+' '+currentUser.last,medicamentos,indicaciones:document.getElementById('rx-ind').value.trim()};
+  const receta={id:Date.now(),numero:`RX-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,formato:'Receta medica - AM 00031-2020 / ACESS',fecha:today(),hora:new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}),medico:document.getElementById('rx-medico').value.trim()||currentUser.name+' '+currentUser.last,registro:document.getElementById('rx-registro').value.trim(),diagnostico:dx,alergias:document.getElementById('rx-alergias').value.trim(),medicamentos,indicaciones:document.getElementById('rx-ind').value.trim(),validez:document.getElementById('rx-validez').value.trim()};
   recetas[pacId].unshift(receta);
   DB.set('recetas',recetas);
-  closeM('m-receta');toast('Receta mÃ©dica guardada','ok');
+  closeM('m-receta');toast('Receta medica guardada','ok');
   if(selPac===+pacId) renderHCE(pacId);
   if(print) printReceta(+pacId,receta.id);
+}
+
+function renderRecetaCard(r,pacId){
+  return `<div class="card mb12"><div class="card-hdr" style="padding:10px 14px;"><i class="ti ti-prescription" style="color:var(--green);font-size:16px;"></i><div style="flex:1;"><div class="fw5 text-sm">${esc(r.numero||'Receta')} - ${esc(r.medico||'Medico')}</div><div class="text-xs text-muted">${fmtDate(r.fecha)} ${esc(r.hora||'')} - ${esc(r.formato||'Receta medica')}</div></div><button class="btn-s btn-xs" onclick="printReceta(${pacId},${r.id})"><i class="ti ti-printer"></i> Imprimir</button></div><div class="card-body" style="padding:10px 14px;"><div class="field-lbl">Diagnostico</div><div class="text-sm mb8">${hcuText(r.diagnostico||r.dx||'---')}</div><div class="field-lbl">Medicamentos</div><div style="white-space:pre-wrap;">${esc(r.medicamentos)}</div>${r.indicaciones?`<div class="field-lbl mt8">Indicaciones</div><div style="white-space:pre-wrap;">${esc(r.indicaciones)}</div>`:''}</div></div>`;
 }
 
 function printDoc(title,html){
   const w=window.open('','_blank','width=820,height=900');
   if(!w){toast('Permite ventanas emergentes para imprimir','err');return;}
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}.hdr{display:flex;gap:14px;align-items:center;border-bottom:2px solid #1B4F8A;padding-bottom:12px;margin-bottom:18px}.logo{max-width:80px;max-height:80px}.muted{color:#666;font-size:12px}.row{display:flex;justify-content:space-between;gap:12px}.box{border:1px solid #ccc;padding:12px;margin:12px 0}.label{font-weight:bold;font-size:12px;color:#555}.big{font-size:18px;font-weight:bold}pre{white-space:pre-wrap;font-family:inherit}.tag{width:360px;border:1px solid #111;padding:12px}.barcode{letter-spacing:3px;text-align:center;font-size:22px;margin-top:8px}@media print{button{display:none}}</style></head><body>${html}<button onclick="window.print()">Imprimir</button><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}.hdr{display:flex;gap:14px;align-items:center;border-bottom:2px solid #1B4F8A;padding-bottom:12px;margin-bottom:18px}.logo{max-width:80px;max-height:80px}.muted{color:#666;font-size:12px}.row{display:flex;justify-content:space-between;gap:12px}.box{border:1px solid #ccc;padding:12px;margin:12px 0}.label{font-weight:bold;font-size:12px;color:#555;text-transform:uppercase}.big{font-size:18px;font-weight:bold}pre{white-space:pre-wrap;font-family:inherit}.tag{width:360px;border:1px solid #111;padding:12px}.barcode{letter-spacing:3px;text-align:center;font-size:22px;margin-top:8px}table{border-collapse:collapse;margin:10px 0}td,th{vertical-align:top;font-size:12px}.rx-title{text-align:center;font-size:20px;font-weight:bold;margin:10px 0}.rx-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media print{button{display:none}body{padding:12mm}}</style></head><body>${html}<button onclick="window.print()">Imprimir</button><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
 
@@ -2356,15 +2433,14 @@ function printReceta(pacId,recetaId){
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId);const r=((DB.get('recetas')||{})[pacId]||[]).find(x=>x.id===recetaId);if(!p||!r)return;
   const cfg=DB.get('config')||{};
   const logo=cfg.logo||DEFAULT_LOGO;
-  printDoc('Receta mÃ©dica',`<div class="hdr"><img class="logo" src="${logo}"><div><div class="big">${cfg.nombre||'Centro MÃ©dico'}</div><div class="muted">RUC: ${cfg.ruc||'â€”'} Â· ${cfg.tel||''}</div><div class="muted">${cfg.dir||''}</div></div></div><div class="row"><div><div class="label">Paciente</div>${p.nombres} ${p.apellidos}</div><div><div class="label">Fecha</div>${fmtDate(r.fecha)}</div></div><div class="box"><div class="label">Receta</div><pre>${r.medicamentos}</pre></div>${r.indicaciones?`<div class="box"><div class="label">Indicaciones</div><pre>${r.indicaciones}</pre></div>`:''}<div style="margin-top:60px;text-align:center;border-top:1px solid #333;width:260px;">${r.medico}<br><span class="muted">MÃ©dico</span></div>`);
+  printDoc('Receta medica',`<div class="hdr"><img class="logo" src="${logo}"><div><div class="big">${esc(cfg.nombre||'Centro Medico')}</div><div class="muted">RUC: ${esc(cfg.ruc||'---')} - ${esc(cfg.tel||'')} - ${esc(cfg.email||'')}</div><div class="muted">${esc(cfg.dir||'')}</div></div></div><div class="rx-title">RECETA MEDICA</div><div class="row"><div><div class="label">Numero</div>${esc(r.numero||String(r.id))}</div><div><div class="label">Fecha de emision</div>${fmtDate(r.fecha)} ${esc(r.hora||'')}</div></div><table width="100%" border="1" cellspacing="0" cellpadding="6"><tr><td><b>Paciente</b><br>${esc(p.apellidos||'')} ${esc(p.nombres||'')}</td><td><b>Identificacion</b><br>${esc(p.cedula||'---')}</td><td><b>Edad</b><br>${calcEdad(p.fnac)}</td><td><b>HCU</b><br>HCE-${String(pacId).padStart(4,'0')}</td></tr><tr><td colspan="2"><b>Diagnostico</b><br>${hcuText(r.diagnostico||'---')}</td><td colspan="2"><b>Antecedentes de alergias</b><br>${hcuText(r.alergias||p.alergias||'No registradas')}</td></tr></table><div class="box"><div class="label">Medicamento: DCI, forma farmaceutica, concentracion, via, cantidad, dosis, frecuencia y duracion</div><pre>${esc(r.medicamentos)}</pre></div><div class="box"><div class="label">Indicaciones para el paciente</div><pre>${esc(r.indicaciones||'---')}</pre></div>${r.validez?`<div class="box"><div class="label">Validez / observacion</div>${hcuText(r.validez)}</div>`:''}<div style="margin-top:58px;display:flex;justify-content:space-between;gap:20px;"><div style="text-align:center;border-top:1px solid #333;width:280px;">${esc(r.medico)}<br><span class="muted">Registro profesional: ${esc(r.registro||'---')}</span><br><span class="muted">Firma y sello</span></div><div class="muted" style="max-width:300px;">Para medicamentos sujetos a fiscalizacion debe usarse receta especial segun normativa aplicable.</div></div>`);
 }
 
 function printEtiqueta(pacId){
-  if(!hasPerm('hce')){toast('No tienes permiso para imprimir etiquetas clÃ­nicas','err');return;}
+  if(!hasPerm('hce')){toast('No tienes permiso para imprimir etiquetas clinicas','err');return;}
   const p=(DB.get('pacientes')||[]).find(x=>x.id===+pacId);if(!p)return;
-  printDoc('Etiqueta paciente',`<div class="tag"><div class="big">${p.nombres} ${p.apellidos}</div><div>CÃ©dula: ${p.cedula||'â€”'}</div><div>HCE-${String(p.id).padStart(4,'0')} Â· ${p.esp||'â€”'}</div><div>Sangre: ${p.sangre||'â€”'} Â· Alergias: ${p.alergias||'Ninguna'}</div><div class="barcode">*HCE${String(p.id).padStart(4,'0')}*</div></div>`);
+  printDoc('Etiqueta paciente',`<div class="tag"><div class="big">${esc(p.nombres)} ${esc(p.apellidos)}</div><div>Cedula: ${esc(p.cedula||'---')}</div><div>HCE-${String(p.id).padStart(4,'0')} - ${esc(p.esp||'---')}</div><div>Sangre: ${esc(p.sangre||'---')} - Alergias: ${esc(p.alergias||'Ninguna')}</div><div class="barcode">*HCE${String(p.id).padStart(4,'0')}*</div></div>`);
 }
-
 // =========================================================
 // FACTURACIÃ“N
 // =========================================================

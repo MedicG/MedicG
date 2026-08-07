@@ -1,0 +1,37 @@
+HISTORIA CLINICA UNICA MSP ECUADOR Y RECETA MEDICA
+===================================================
+
+Cambios agregados al sistema:
+
+1. Historia Clinica Unica - Consulta Externa
+   - El boton Nueva HCU reemplaza la nota libre anterior.
+   - Guarda la estructura SNS-MSP / HCU-form.002 / 2021:
+     * Motivo de consulta.
+     * Antecedentes personales y familiares.
+     * Enfermedad o problema actual.
+     * Revision de organos y sistemas.
+     * Signos vitales y antropometria: PA, FC, FR, temperatura, SpO2, peso, talla e IMC.
+     * Examen fisico general y organos/aparatos/regiones.
+     * Diagnostico CIE-10 con tipo presuntivo o definitivo.
+     * Plan diagnostico, terapeutico y educacional.
+     * Profesional responsable y registro.
+   - Se puede imprimir como HCU desde el expediente del paciente.
+   - Se guarda en la misma coleccion notas, por lo tanto persiste en la base de datos.
+
+2. Receta medica
+   - El formulario de receta ahora incluye:
+     * Datos del paciente.
+     * Diagnostico / CIE-10.
+     * Antecedentes de alergias.
+     * Medicamentos prescritos con DCI/nombre generico, forma farmaceutica, concentracion, via, dosis, frecuencia, duracion y cantidad.
+     * Datos del prescriptor, registro profesional y firma/sello al imprimir.
+     * Indicaciones para el paciente.
+   - Se guarda en la coleccion recetas y aparece en el portal del paciente.
+
+Normativa base usada:
+- ACUERDO MINISTERIAL 00115-2021: Reglamento e instructivo de manejo de la Historia Clinica Unica.
+- ACUERDO MINISTERIAL 00031-2020 y reforma 00052-2022: contenido y requisitos de receta medica.
+- Resolucion ACESS-2023-0030: control de emision de receta medica, prescripcion, dispensacion y expendio.
+
+Nota operativa:
+Este sistema organiza los campos para cumplir la estructura normativa, pero el centro medico debe validar internamente el uso de firma/sello, consentimiento, custodia, confidencialidad, respaldo y recetas especiales para medicamentos sujetos a fiscalizacion.
