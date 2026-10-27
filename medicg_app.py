@@ -592,7 +592,7 @@ MOJIBAKE_REPLACEMENTS = {
 from medicg.storage import DatabaseConnection, connect as connect_database
 
 
-SCHEMA_VERSION = "2026-10-pharmacy-v1"
+SCHEMA_VERSION = "2026-10-reminders-v1"
 LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "8"))
 LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))
 log = logging.getLogger("medicg")
@@ -1423,6 +1423,10 @@ def audit(conn, user, action, key, detail=None):
     )
 
 
+def user_display_name(user):
+    return (str(user.get("name", "")) + " " + str(user.get("last", ""))).strip() or user.get("email", "")
+
+
 def public_user(user):
     return {
         "id": user.get("id"),
@@ -1639,6 +1643,9 @@ def init_db():
         from medicg.pharmacy import table_sql as pharmacy_moves_table
         conn.execute(pharmacy_moves_table())
         conn.execute("create index if not exists pharmacy_moves_product_idx on pharmacy_moves(product_id, ts)")
+        from medicg.reminders import table_sql as reminder_table
+        conn.execute(reminder_table())
+        conn.execute("create index if not exists reminder_log_cita_idx on reminder_log(cita_id, channel, kind)")
         conn.execute("create table if not exists login_attempts(attempt_key text primary key, failures integer not null, first_at double precision not null, locked_until double precision not null)")
         conn.execute("create index if not exists sessions_expires_idx on sessions(expires_at)")
         conn.execute("create index if not exists sessions_user_idx on sessions(user_id)")
@@ -2085,6 +2092,7 @@ def sanitize_app_data_for_user(data, user=None):
         from medicg.doctor_scope import filter_data
         data = filter_data(data, user)
     data.pop("outgoingEmailPrivate", None)
+    data.pop("remindersPrivate", None)
     data.pop("outlookPendingPrivate", None)
     saved_cert = data.pop("sriCertificate", None)
     config = data.get("config") or {}
@@ -2333,6 +2341,28 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 403, {"error": "Acceso clínico restringido."})
             from medicg.clinical import PROFILES, VERSION, SOURCES
             return make_response(self, 200, {"profiles": PROFILES, "version": VERSION, "sources": SOURCES})
+        if path == "/api/reminders/cron":
+            # Daily Vercel cron. Idempotent and rate limited; with CRON_SECRET set, it must match.
+            secret = os.environ.get("CRON_SECRET", "")
+            if secret and self.headers.get("Authorization", "") != "Bearer " + secret:
+                return make_response(self, 401, {"error": "No autorizado"})
+            from medicg.reminders import run as run_reminders
+            with db(lock="reminders") as conn:
+                return make_response(self, 200, run_reminders(conn, force=bool(secret)))
+        if path in ("/api/reminders/settings", "/api/reminders/status"):
+            user = auth_user(self)
+            if not user:
+                return make_response(self, 401, {"error": "Sesión no válida"})
+            from medicg.reminders import public_settings as reminder_settings, status as reminder_status
+            with db(read_only=True) as conn:
+                if path.endswith("settings"):
+                    if user.get("rol") != "admin":
+                        return make_response(self, 403, {"error": "Solo el administrador configura los recordatorios."})
+                    return make_response(self, 200, {"settings": reminder_settings(conn)})
+                if not can_save_key(user, "citas"):
+                    return make_response(self, 403, {"error": "Sin permiso de agenda."})
+                ids = [i for i in (parse_qs(parsed_url.query).get("ids", [""])[0] or "").split(",") if i][:300]
+                return make_response(self, 200, {"status": reminder_status(conn, ids)})
         if path in ("/api/pharmacy/queue", "/api/pharmacy/kardex"):
             user = auth_user(self)
             if not user:
@@ -2652,6 +2682,26 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 200, result)
             except CashError as exc:
                 return make_response(self, 409, {"error": str(exc)})
+        if path.startswith("/api/reminders/"):
+            from medicg import reminders
+            try:
+                if path == "/api/reminders/settings":
+                    with db() as conn:
+                        return make_response(self, 200, {"ok": True, "settings": reminders.save_settings(conn, user, payload)})
+                if path == "/api/reminders/run":
+                    if not can_save_key(user, "citas"):
+                        return make_response(self, 403, {"error": "Sin permiso de agenda."})
+                    with db(lock="reminders") as conn:
+                        return make_response(self, 200, reminders.run(conn, force=bool(payload.get("force")) and user.get("rol") == "admin"))
+                if path == "/api/reminders/send":
+                    with db(lock="reminders") as conn:
+                        return make_response(self, 200, reminders.send_now(conn, user, payload))
+                if path == "/api/reminders/mark":
+                    with db(lock="reminders") as conn:
+                        return make_response(self, 200, reminders.mark_manual(conn, user, payload))
+            except reminders.ReminderError as exc:
+                return make_response(self, 409, {"error": str(exc)})
+            return make_response(self, 404, {"error": "Ruta no encontrada"})
         if path == "/api/pharmacy":
             from medicg.pharmacy import operation as pharmacy_operation, PharmacyError
             try:
@@ -2973,6 +3023,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                             item[field] = previous.get(field)
                     if item["estado"] != "Cancelada" and item["estado"] != "Atendida":
                         item["med"] = find_available_doctor(appointments, medicos, item["esp"], item["med"], item["fecha"], item["hora"], appointment_id)
+                        clash = next((c for c in appointments if int(c.get("id") or 0) != appointment_id and int(c.get("pac") or 0) == item["pac"]
+                                      and str(c.get("fecha")) == str(item["fecha"]) and str(c.get("hora")) == str(item["hora"]) and appointment_blocks_slot(c)), None)
+                        if clash:
+                            raise AppointmentError(f"El paciente ya tiene una cita a esa hora (cita #{clash.get('id')}, {clash.get('esp') or ''}).")
                     if item["estado"] == "Pospuesta" and previous and (item["fecha"], item["hora"]) == (previous.get("fecha"), previous.get("hora")):
                         raise AppointmentError("Selecciona una nueva fecha u hora para posponer la cita.")
                     ids = get_json_key(conn, "nextIds", {}) or {}

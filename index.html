@@ -110,7 +110,7 @@
 
 
 
-<script>window.APP_BUILD="20261027-pro1";</script>
+<script>window.APP_BUILD="20261027-rem1";</script>
 
 
 
@@ -130,7 +130,7 @@
 <link rel="stylesheet" href="assets/css/telehealth.css?v=20260912-native2">
 <link rel="stylesheet" href="assets/css/clinical.css?v=20260920-1">
 <link rel="stylesheet" href="assets/css/pharmacy.css?v=20261027-farm1">
-<link rel="stylesheet" href="assets/css/pro.css?v=20261027-pro1">
+<link rel="stylesheet" href="assets/css/pro.css?v=20261027-rem1">
 </head>
 
 
@@ -1958,6 +1958,7 @@
 
 
 
+          <button class="btn-s btn-sm flex gap6" onclick="remOpenPanel()"><i class="ti ti-bell-ringing"></i>Recordatorios</button>
           <button class="btn-p btn-sm flex gap6" onclick="openCitaModal()"><i class="ti ti-plus"></i>Nueva cita</button>
 
 
@@ -3350,7 +3351,7 @@
 
       <div class="form-row"><div class="field"><label class="field-lbl">Fecha <span class="req">*</span></label><input type="date" id="c-fecha" onchange="renderCitaHours()"/></div><div class="field"><label class="field-lbl">Hora disponible <span class="req">*</span></label><select id="c-hora"></select><div id="c-slot-msg" class="text-xs text-muted mt4"></div></div></div>
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Estado</label><select id="c-estado"><option>Solicitada online</option><option>Pendiente</option><option>Confirmada</option><option>Pospuesta</option><option>Cancelada</option><option>Atendida</option></select></div><div class="field"><label class="field-lbl">Recordatorio</label><select id="c-notif"><option>WhatsApp + Correo (24h antes)</option><option>Solo WhatsApp (2h antes)</option><option>Solo correo</option><option>Sin recordatorio</option></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl">Estado</label><select id="c-estado"><option>Solicitada online</option><option>Pendiente</option><option>Confirmada</option><option>Pospuesta</option><option>Cancelada</option><option>Atendida</option></select></div><div class="field"><label class="field-lbl">Recordatorio</label><select id="c-notif" onchange="remContactHint()"><option>WhatsApp + Correo (24h antes)</option><option>WhatsApp + Correo (24h y 2h antes)</option><option>Solo WhatsApp (24h antes)</option><option>Solo WhatsApp (2h antes)</option><option>Solo correo (24h antes)</option><option>Sin recordatorio</option></select></div></div>
 
       <div class="field"><label class="field-lbl">Motivo</label><textarea id="c-motivo" rows="2" placeholder="Describe el motivo..."></textarea></div>
 
@@ -3374,11 +3375,11 @@
 
       <button class="btn-s" onclick="closeM('m-cita')">Cerrar</button>
 
-      <button class="btn-g" onclick="setCitaEstadoFromModal('Confirmada')"><i class="ti ti-calendar-check"></i> Confirmar</button>
+      <label class="rem-confirm" id="c-confirm-wrap"><input type="checkbox" id="c-confirm-send" checked> Enviar confirmación al paciente</label><button class="btn-s cita-edit-only" onclick="remSendFromModal()"><i class="ti ti-send"></i> Enviar recordatorio</button><button class="btn-g cita-edit-only" onclick="setCitaEstadoFromModal('Confirmada')"><i class="ti ti-calendar-check"></i> Confirmar</button>
 
-      <button class="btn-s" onclick="setCitaEstadoFromModal('Pospuesta')"><i class="ti ti-calendar-time"></i> Posponer</button>
+      <button class="btn-s cita-edit-only" onclick="setCitaEstadoFromModal('Pospuesta')"><i class="ti ti-calendar-time"></i> Posponer</button>
 
-      <button class="btn-d" onclick="setCitaEstadoFromModal('Cancelada')"><i class="ti ti-calendar-x"></i> Cancelar cita</button>
+      <button class="btn-d cita-edit-only" onclick="setCitaEstadoFromModal('Cancelada')"><i class="ti ti-calendar-x"></i> Cancelar cita</button>
 
       <button class="btn-p" onclick="saveCita()"><i class="ti ti-device-floppy"></i> Guardar</button>
 
@@ -4934,15 +4935,16 @@
 
 
 
-<script src="assets/js/app.js?v=20261027-pro1"></script>
-<script src="assets/js/cash.js?v=20261027-pro1"></script>
+<script src="assets/js/app.js?v=20261027-rem1"></script>
+<script src="assets/js/cash.js?v=20261027-rem1"></script>
 <script src="assets/js/clinical.js?v=20260920-1"></script>
-<script src="assets/js/clinical-docs.js?v=20261027-pro1"></script>
+<script src="assets/js/clinical-docs.js?v=20261027-rem1"></script>
 <script src="assets/js/email.js?v=20260921-gmail1"></script>
 <script src="assets/js/walkin.js?v=20260918-care1"></script>
-<script src="assets/js/patient-picker.js?v=20261027-pro1"></script>
-<script src="assets/js/pharmacy.js?v=20261027-pro1"></script>
-<script src="assets/js/ui-pro.js?v=20261027-pro1"></script>
+<script src="assets/js/patient-picker.js?v=20261027-rem1"></script>
+<script src="assets/js/pharmacy.js?v=20261027-rem1"></script>
+<script src="assets/js/ui-pro.js?v=20261027-rem1"></script>
+<script src="assets/js/reminders.js?v=20261027-rem1"></script>
 <script src="assets/js/telehealth.js?v=20260912-native2"></script>
 
 
