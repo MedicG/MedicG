@@ -137,20 +137,38 @@ function cdOrdersPanel(pid){
   return `${cdCanIssue()?`<div class="mb12"><button class="btn-p btn-sm" onclick="cdOrderForm(${pid})"><i class="ti ti-test-pipe"></i> Nueva orden de laboratorio</button></div>`:''}
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Número</th><th>Fecha</th><th>Exámenes</th><th>Prioridad</th><th>Médico</th><th>Estado</th><th></th></tr></thead><tbody>${rows.map(o=>`<tr><td>${esc(o.numero)}</td><td>${fmtDate(o.fecha)}</td><td class="text-sm">${esc((o.examenes||[]).map(e=>e.nombre).join(', '))}</td><td>${o.prioridad==='Urgente'?'<span class="badge b-red">Urgente</span>':'Rutina'}</td><td class="text-sm">${esc(o.medico?.nombre||'')}</td><td><span class="badge ${cdOrderBadge(o.estado)}">${esc(o.estado)}</span></td><td><button class="btn-s btn-xs" onclick="cdOrderPrint(${pid},'${esc(o.id)}')"><i class="ti ti-printer"></i> Imprimir</button>${o.estado!=='Anulada'?` <select class="btn-xs" aria-label="Cambiar estado" onchange="cdOrderStatus(${pid},'${esc(o.id)}',this.value)"><option value="">Cambiar estado…</option>${CD_ORDER_STATES.filter(s=>s!==o.estado).map(s=>`<option>${s}</option>`).join('')}${cdCanIssue()?'<option>Anulada</option>':''}</select>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="text-muted">Sin órdenes de laboratorio.</td></tr>'}</tbody></table></div>`;
 }
+function cdTitle(v){const s=String(v||'').trim();return s&&s===s.toUpperCase()&&s.length>3?s.charAt(0)+s.slice(1).toLowerCase():s;}
 function cdOrderForm(pid){
   if(!cdCanIssue()){toast('Solo médicos o el administrador crean órdenes','err');return;}
-  const exams=(DB.get('examenes')||[]).slice().sort((a,b)=>String(a.categoria||'').localeCompare(String(b.categoria||''))||String(a.nombre).localeCompare(String(b.nombre)));
-  const groups={};exams.forEach(e=>{(groups[e.categoria||'Otros']=groups[e.categoria||'Otros']||[]).push(e);});
+  const groups={};
+  (DB.get('examenes')||[]).forEach(e=>{const g=cdTitle(e.categoria)||'Otros';(groups[g]=groups[g]||[]).push(e);});
+  const ordered=Object.entries(groups).sort((a,b)=>a[0].localeCompare(b[0],'es')).map(([g,l])=>[g,l.sort((x,y)=>String(x.nombre).localeCompare(String(y.nombre),'es'))]);
   const lastDx=((DB.get('notas')||{})[pid]||[])[0];
-  cdModal('m-cd-order','Nueva orden de laboratorio',`<p class="text-sm"><strong>${esc(getPacName(pid))}</strong></p>${cdDoctorField()}
-  <label class="field">Buscar examen<input id="cd-o-q" placeholder="Hemograma, glucosa, TSH..." oninput="cdOrderFilter(this.value)"></label>
-  <div id="cd-o-list" style="max-height:260px;overflow:auto;border:1px solid var(--border,#ddd);border-radius:8px;padding:8px">${Object.entries(groups).map(([g,list])=>`<div class="cd-o-group"><div class="fw6 text-sm mt8">${esc(g)}</div>${list.map(e=>`<label class="cd-o-item" style="display:flex;gap:8px;align-items:center;padding:3px 0" data-name="${esc(String(e.nombre).toLowerCase())}"><input type="checkbox" class="cd-o-check" value="${esc(String(e.id))}"> ${esc(e.nombre)}</label>`).join('')}</div>`).join('')||'<p class="text-muted">No hay exámenes en el catálogo. Escríbelos abajo.</p>'}</div>
-  <label class="field mt8">Otros exámenes (uno por línea)<textarea id="cd-o-otros" rows="2" maxlength="2000"></textarea></label>
+  cdModal('m-cd-order','Nueva orden de laboratorio',`<div class="cd-o-patient"><i class="ti ti-user"></i> <strong>${esc(getPacName(pid))}</strong></div>${cdDoctorField()}
+  <div class="cd-o-toolbar"><div class="si" style="flex:1"><i class="ti ti-search"></i><input id="cd-o-q" placeholder="Buscar examen: hemograma, glucosa, TSH…" oninput="cdOrderFilter(this.value)" autocomplete="off"></div><span class="cd-o-count" id="cd-o-count">0 seleccionados</span></div>
+  <div id="cd-o-selected" class="cd-o-selected"></div>
+  <div id="cd-o-list" class="cd-o-list">${ordered.map(([g,list],gi)=>`<section class="cd-o-group" data-group="${gi}"><header><span>${esc(g)} <em>${list.length}</em></span><button type="button" class="btn-s btn-xs" onclick="cdOrderToggleGroup(${gi})">Seleccionar todo</button></header><div class="cd-o-grid">${list.map(e=>`<label class="cd-o-item" data-name="${esc(proNormSafe(e.nombre+' '+g))}"><input type="checkbox" class="cd-o-check" value="${esc(String(e.id))}" data-label="${esc(e.nombre)}" onchange="cdOrderCount()"><span>${esc(e.nombre)}</span></label>`).join('')}</div></section>`).join('')||'<p class="text-muted">No hay exámenes en el catálogo. Escríbelos abajo.</p>'}</div>
+  <label class="field mt12">Otros exámenes no listados (uno por línea)<textarea id="cd-o-otros" rows="2" maxlength="2000"></textarea></label>
   <div class="form-row"><label class="field" style="flex:2">Diagnóstico presuntivo<input id="cd-o-dx" maxlength="300" value="${esc(lastDx?.cie10Desc||'')}"></label><label class="field">CIE-10<input id="cd-o-cie" list="cd-cie-list2" maxlength="12" value="${esc(lastDx?.cie10Code||'')}"><datalist id="cd-cie-list2">${cdCieOptions()}</datalist></label><label class="field">Prioridad<select id="cd-o-prio"><option>Rutina</option><option>Urgente</option></select></label></div>
   <label class="field">Indicaciones para el paciente<textarea id="cd-o-ind" rows="2" maxlength="1000" placeholder="Ej: Ayuno de 8 a 12 horas"></textarea></label>
-  <button class="btn-p mt8" onclick="cdOrderSave(${pid})"><i class="ti ti-test-pipe"></i> Crear e imprimir orden</button>`);
+  <div class="cd-o-actions"><button class="btn-s" onclick="closeM('m-cd-order')">Cancelar</button><button class="btn-p" onclick="cdOrderSave(${pid})"><i class="ti ti-test-pipe"></i> Crear e imprimir orden</button></div>`);
+  setTimeout(()=>document.getElementById('cd-o-q')?.focus(),50);
 }
-function cdOrderFilter(q){q=String(q||'').toLowerCase().trim();document.querySelectorAll('#cd-o-list .cd-o-item').forEach(el=>{el.style.display=!q||el.dataset.name.includes(q)?'flex':'none';});}
+function proNormSafe(v){return String(v??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+function cdOrderFilter(q){
+  q=proNormSafe(q).trim();
+  document.querySelectorAll('#cd-o-list .cd-o-group').forEach(g=>{let visible=0;g.querySelectorAll('.cd-o-item').forEach(el=>{const show=!q||el.dataset.name.includes(q);el.style.display=show?'':'none';if(show)visible++;});g.style.display=visible?'':'none';});
+}
+function cdOrderToggleGroup(i){
+  const boxes=[...document.querySelectorAll(`#cd-o-list .cd-o-group[data-group="${i}"] .cd-o-item`)].filter(el=>el.style.display!=='none').map(el=>el.querySelector('input'));
+  const all=boxes.every(b=>b.checked);boxes.forEach(b=>{b.checked=!all;});cdOrderCount();
+}
+function cdOrderCount(){
+  const checked=[...document.querySelectorAll('.cd-o-check:checked')];
+  const c=document.getElementById('cd-o-count');if(c)c.textContent=`${checked.length} seleccionado${checked.length===1?'':'s'}`;
+  const sel=document.getElementById('cd-o-selected');
+  if(sel)sel.innerHTML=checked.map(b=>`<button type="button" class="cd-o-chip" onclick="document.querySelector('.cd-o-check[value=&quot;${esc(b.value)}&quot;]').checked=false;cdOrderCount()">${esc(b.dataset.label)} <i class="ti ti-x"></i></button>`).join('');
+}
 async function cdOrderSave(pid){
   const examenes=[...document.querySelectorAll('.cd-o-check:checked')].map(c=>({id:c.value}));
   document.getElementById('cd-o-otros').value.split('\n').map(x=>x.trim()).filter(Boolean).forEach(nombre=>examenes.push({nombre}));
