@@ -21,6 +21,7 @@ function ctOpen(opts={}){
   <p class="text-sm text-muted mb12">Emite el certificado que el médico solicitó. Se imprime con los datos y la firma del médico seleccionado y queda registrado quién lo elaboró.</p>
   <div class="form-row"><div class="field" style="flex:1.4"><label class="field-lbl">Paciente <span class="req">*</span></label><select id="ct-pac"><option value="">Seleccionar…</option>${pats.map(p=>`<option value="${p.id}">${esc(ppLabel(p))}</option>`).join('')}</select></div>
   <div class="field"><label class="field-lbl">Médico que solicita y firma <span class="req">*</span></label><select id="ct-med"><option value="">Seleccionar médico…</option>${meds.map(m=>`<option value="${m.id}">${esc(m.nombre)} · ${esc(m.esp||'')}</option>`).join('')}</select></div></div>
+  ${cdCertWorkFields(opts.patientId)}
   <div class="form-row"><label class="field">Tipo<select id="cd-c-tipo" onchange="cdCertToggle()">${CD_CERT_TYPES.map(t=>`<option ${t===(opts.tipo||'Asistencia a consulta')?'selected':''}>${t}</option>`).join('')}</select></label><label class="field">Fecha de atención<input id="cd-c-fecha" type="date" value="${esc(opts.fecha&&opts.fecha<=today()?opts.fecha:today())}" max="${today()}"></label></div>
   <div class="form-row"><label class="field" style="flex:2">Diagnóstico (lo indica el médico)<input id="cd-c-dx" maxlength="300"></label><label class="field">CIE-10<input id="cd-c-cie" list="cd-cie-list" maxlength="12"><datalist id="cd-cie-list">${cdCieOptions()}</datalist></label></div>
   <div class="form-row" id="cd-c-reposo"><label class="field">Días de reposo<input id="cd-c-dias" type="number" min="1" max="365" value="1"></label><label class="field">Desde<input id="cd-c-desde" type="date" value="${today()}"></label></div>
@@ -42,7 +43,7 @@ async function ctLoadList(){
   const pid=document.getElementById('ct-pac')?.value;const box=document.getElementById('ct-list');if(!box)return;
   if(!pid){box.textContent='Selecciona un paciente para ver sus certificados.';return;}
   box.textContent='Cargando…';
-  try{const res=await ctCall({action:'certificate_list',patientId:pid});ctRenderList(pid,res.records);}
+  try{const res=await ctCall({action:'certificate_list',patientId:pid});ctRenderList(pid,res.records);cdCertFillWork(pid);}
   catch(e){box.textContent=e.message;}
 }
 function ctCanVoid(c){return c.estado!=='Anulado'&&(currentUser?.rol==='admin'||String(c.emitidoPorId)===String(currentUser?.id));}
@@ -58,7 +59,7 @@ async function ctSave(){
   if(!pid){toast('Selecciona el paciente','err');return;}
   if(!doctorId){toast('Selecciona el médico que solicitó el certificado','err');return;}
   const tipo=document.getElementById('cd-c-tipo').value;
-  const payload={action:'certificate_create',patientId:pid,doctorId,tipo,fechaAtencion:document.getElementById('cd-c-fecha').value,diagnostico:document.getElementById('cd-c-dx').value,cie10:document.getElementById('cd-c-cie').value,contenido:document.getElementById('cd-c-texto').value,recomendaciones:document.getElementById('cd-c-rec').value};
+  const payload={action:'certificate_create',patientId:pid,doctorId,tipo,fechaAtencion:document.getElementById('cd-c-fecha').value,diagnostico:document.getElementById('cd-c-dx').value,cie10:document.getElementById('cd-c-cie').value,contenido:document.getElementById('cd-c-texto').value,recomendaciones:document.getElementById('cd-c-rec').value,...cdCertWorkPayload()};
   if(tipo==='Reposo médico'){payload.diasReposo=document.getElementById('cd-c-dias').value;payload.desde=document.getElementById('cd-c-desde').value;}
   ctBusy=true;const btn=document.getElementById('ct-save');if(btn)btn.disabled=true;
   try{

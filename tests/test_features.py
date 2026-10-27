@@ -128,10 +128,11 @@ def main():
     assert code == 200 and next(c for c in body['records'] if c['id'] == cert['id'])['estado'] == 'Anulado'
 
     # ---- reception issues certificates requested by a doctor (no access to the clinical record)
-    code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_create', 'patientId': 2, 'doctorId': 2, 'tipo': 'Reposo médico', 'diagnostico': 'Lumbalgia', 'diasReposo': 2})
+    code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_create', 'patientId': 2, 'doctorId': 2, 'tipo': 'Reposo médico', 'diagnostico': 'Lumbalgia', 'diasReposo': 2, 'domicilio': 'Cdla. Martha de Roldós Mz 215', 'empresa': 'Comercial XYZ S.A.', 'cargo': 'Bodeguero'})
     assert code == 200, body
     rcert = body['records'][0]
     assert rcert['medico']['id'] == 2 and rcert['emitidoPorRol'] == 'recepcion' and rcert['reposo']['dias'] == 2, rcert
+    assert (rcert['domicilio'], rcert['empresa'], rcert['cargo']) == ('Cdla. Martha de Roldós Mz 215', 'Comercial XYZ S.A.', 'Bodeguero'), rcert
     code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_list', 'patientId': 2})
     assert code == 200 and body['records'][0]['id'] == rcert['id'], body
     for action in ('vitals_save', 'lab_order_create', 'note_vitals'):

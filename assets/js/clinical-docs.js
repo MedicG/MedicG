@@ -89,11 +89,25 @@ function cdCertPanel(pid){
   <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Número</th><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Médico</th><th>Estado</th><th></th></tr></thead><tbody>${rows.map(c=>`<tr><td>${esc(c.numero)}</td><td>${fmtDate(c.fechaEmision)}</td><td>${esc(c.tipo)}</td><td class="text-sm">${c.reposo?`${c.reposo.dias} día(s): ${fmtDate(c.reposo.desde)} al ${fmtDate(c.reposo.hasta)}`:esc((c.diagnostico||c.contenido||'').slice(0,80))}</td><td class="text-sm">${esc(c.medico?.nombre||'')}</td><td><span class="badge ${c.estado==='Anulado'?'b-red':'b-green'}">${esc(c.estado)}</span></td><td><button class="btn-s btn-xs" onclick="cdCertPrint(${pid},'${esc(c.id)}')"><i class="ti ti-printer"></i> Imprimir</button>${c.estado!=='Anulado'&&(currentUser?.rol==='admin'||String(c.medico?.id)===String(currentUser?.medicoId))?` <button class="btn-d btn-xs" onclick="cdCertVoid(${pid},'${esc(c.id)}')">Anular</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="text-muted">Sin certificados emitidos.</td></tr>'}</tbody></table></div>`;
 }
 function cdCieOptions(){return (typeof cie10Catalog==='function'?cie10Catalog():[]).slice(0,4000).map(c=>`<option value="${esc(c.code)}">${esc(c.desc)}</option>`).join('');}
+function cdDaysWords(n){n=Math.floor(Number(n)||0);let w=typeof phNumberWords==='function'?phNumberWords(n):String(n);w=w.replace(/uno$/,'un').replace(/veintiuno$/,'veintiún');return `${w.toUpperCase()} (${n}) ${n===1?'día':'días'}`;}
+function cdLastCert(pid){return cdRecords('certificados',pid).find(c=>c.empresa||c.cargo||c.domicilio)||{};}
+function cdCertWorkFields(pid){
+  const p=(DB.get('pacientes')||[]).find(x=>String(x.id)===String(pid))||{};const last=cdLastCert(pid);
+  return `<div class="form-row"><label class="field" style="flex:2">Dirección de domicilio<input id="cd-c-dom" maxlength="300" value="${esc(p.dir||last.domicilio||'')}" placeholder="Calle, número, ciudad"></label></div>
+  <div class="form-row"><label class="field">Empresa donde labora<input id="cd-c-emp" maxlength="200" value="${esc(last.empresa||'')}" placeholder="Opcional"></label><label class="field">Cargo / puesto que desempeña<input id="cd-c-cargo" maxlength="150" value="${esc(last.cargo||'')}" placeholder="Opcional"></label></div>`;
+}
+function cdCertFillWork(pid){
+  const p=(DB.get('pacientes')||[]).find(x=>String(x.id)===String(pid))||{};const last=cdLastCert(pid);
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  set('cd-c-dom',p.dir||last.domicilio);set('cd-c-emp',last.empresa);set('cd-c-cargo',last.cargo);
+}
+function cdCertWorkPayload(){const v=id=>document.getElementById(id)?.value||'';return {domicilio:v('cd-c-dom'),empresa:v('cd-c-emp'),cargo:v('cd-c-cargo')};}
 function cdCertForm(pid){
   if(!cdCanIssue()){toast('Solo médicos o el administrador emiten certificados','err');return;}
   const lastDx=((DB.get('notas')||{})[pid]||[])[0];
   cdModal('m-cd-cert','Nuevo certificado médico',`<p class="text-sm"><strong>${esc(getPacName(pid))}</strong></p>
   ${cdDoctorField()}
+  ${cdCertWorkFields(pid)}
   <div class="form-row"><label class="field">Tipo<select id="cd-c-tipo" onchange="cdCertToggle()">${CD_CERT_TYPES.map(t=>`<option>${t}</option>`).join('')}</select></label><label class="field">Fecha de atención<input id="cd-c-fecha" type="date" value="${today()}" max="${today()}"></label></div>
   <div class="form-row"><label class="field" style="flex:2">Diagnóstico<input id="cd-c-dx" maxlength="300" value="${esc(lastDx?.cie10Desc||'')}"></label><label class="field">CIE-10<input id="cd-c-cie" list="cd-cie-list" maxlength="12" value="${esc(lastDx?.cie10Code||'')}"><datalist id="cd-cie-list">${cdCieOptions()}</datalist></label></div>
   <div class="form-row" id="cd-c-reposo"><label class="field">Días de reposo<input id="cd-c-dias" type="number" min="1" max="365" value="1"></label><label class="field">Desde<input id="cd-c-desde" type="date" value="${today()}"></label></div>
@@ -105,7 +119,7 @@ function cdCertForm(pid){
 function cdCertToggle(){const rest=document.getElementById('cd-c-tipo')?.value==='Reposo médico';const el=document.getElementById('cd-c-reposo');if(el)el.style.display=rest?'':'none';}
 async function cdCertSave(pid){
   const tipo=document.getElementById('cd-c-tipo').value;
-  const payload={action:'certificate_create',patientId:pid,tipo,fechaAtencion:document.getElementById('cd-c-fecha').value,diagnostico:document.getElementById('cd-c-dx').value,cie10:document.getElementById('cd-c-cie').value,contenido:document.getElementById('cd-c-texto').value,recomendaciones:document.getElementById('cd-c-rec').value,doctorId:document.getElementById('cd-doctor')?.value};
+  const payload={action:'certificate_create',patientId:pid,tipo,fechaAtencion:document.getElementById('cd-c-fecha').value,diagnostico:document.getElementById('cd-c-dx').value,cie10:document.getElementById('cd-c-cie').value,contenido:document.getElementById('cd-c-texto').value,recomendaciones:document.getElementById('cd-c-rec').value,doctorId:document.getElementById('cd-doctor')?.value,...cdCertWorkPayload()};
   if(tipo==='Reposo médico'){payload.diasReposo=document.getElementById('cd-c-dias').value;payload.desde=document.getElementById('cd-c-desde').value;}
   const res=await cdSend(payload,'t-certs');
   if(res){closeM('m-cd-cert');toast('Certificado emitido','ok');cdCertPrint(pid,res.records[0].id);}
@@ -119,9 +133,11 @@ function cdCertPrint(pid,id){
   const p=(DB.get('pacientes')||[]).find(x=>String(x.id)===String(pid))||{};
   const age=typeof patientAge==='function'?patientAge(p):'';
   let body;
-  if(c.tipo==='Reposo médico')body=`Certifico que el/la paciente <b>${esc(c.paciente?.nombre)}</b>, con documento de identidad <b>${esc(c.paciente?.cedula||'—')}</b>${age&&age!=='—'?`, de ${esc(age)} años de edad`:''}, fue atendido/a en esta casa de salud el <b>${fmtDate(c.fechaAtencion)}</b>${c.diagnostico?` con diagnóstico de <b>${esc(c.diagnostico)}</b>${c.cie10?` (CIE-10 ${esc(c.cie10)})`:''}`:''}, por lo que requiere <b>${c.reposo.dias} día(s) de reposo</b> desde el <b>${fmtDate(c.reposo.desde)}</b> hasta el <b>${fmtDate(c.reposo.hasta)}</b> inclusive.`;
-  else if(c.tipo==='Asistencia a consulta')body=`Certifico que el/la paciente <b>${esc(c.paciente?.nombre)}</b>, con documento de identidad <b>${esc(c.paciente?.cedula||'—')}</b>, acudió a consulta médica en esta casa de salud el <b>${fmtDate(c.fechaAtencion)}</b>${c.diagnostico?` con diagnóstico de <b>${esc(c.diagnostico)}</b>${c.cie10?` (CIE-10 ${esc(c.cie10)})`:''}`:''}.`;
-  else body=`Paciente: <b>${esc(c.paciente?.nombre)}</b> · Documento: <b>${esc(c.paciente?.cedula||'—')}</b> · Fecha de atención: <b>${fmtDate(c.fechaAtencion)}</b>${c.diagnostico?`<br>Diagnóstico: <b>${esc(c.diagnostico)}</b>${c.cie10?` (CIE-10 ${esc(c.cie10)})`:''}`:''}`;
+  const who=`el/la paciente <b>${esc(c.paciente?.nombre)}</b>, con documento de identidad <b>${esc(c.paciente?.cedula||'—')}</b>${age&&age!=='—'?`, de ${esc(age)} años de edad`:''}${c.domicilio?`, con domicilio en <b>${esc(c.domicilio)}</b>`:''}${c.empresa?`, quien labora en <b>${esc(c.empresa)}</b>${c.cargo?` desempeñando el cargo de <b>${esc(c.cargo)}</b>`:''}`:(c.cargo?`, quien desempeña el cargo de <b>${esc(c.cargo)}</b>`:'')}`;
+  const dx=c.diagnostico?` con diagnóstico de <b>${esc(c.diagnostico)}</b>${c.cie10?` (CIE-10 ${esc(c.cie10)})`:''}`:'';
+  if(c.tipo==='Reposo médico')body=`Certifico que ${who}, fue atendido/a en esta casa de salud el <b>${fmtDate(c.fechaAtencion)}</b>${dx}, por lo que requiere <b>${cdDaysWords(c.reposo.dias)} de reposo</b> desde el <b>${fmtDate(c.reposo.desde)}</b> hasta el <b>${fmtDate(c.reposo.hasta)}</b> inclusive.`;
+  else if(c.tipo==='Asistencia a consulta')body=`Certifico que ${who}, acudió a consulta médica en esta casa de salud el <b>${fmtDate(c.fechaAtencion)}</b>${dx}.`;
+  else body=`Paciente: <b>${esc(c.paciente?.nombre)}</b> · Documento: <b>${esc(c.paciente?.cedula||'—')}</b> · Fecha de atención: <b>${fmtDate(c.fechaAtencion)}</b>${c.domicilio?`<br>Domicilio: <b>${esc(c.domicilio)}</b>`:''}${c.empresa?`<br>Empresa: <b>${esc(c.empresa)}</b>`:''}${c.cargo?` · Cargo: <b>${esc(c.cargo)}</b>`:''}${c.diagnostico?`<br>Diagnóstico: <b>${esc(c.diagnostico)}</b>${c.cie10?` (CIE-10 ${esc(c.cie10)})`:''}`:''}`;
   printDoc('Certificado '+c.numero,`${cdPrintHeader('CERTIFICADO MÉDICO')}${c.estado==='Anulado'?'<div class="box" style="color:#b00;font-weight:bold;text-align:center">DOCUMENTO ANULADO</div>':''}
   <div class="row"><div><div class="label">Número</div>${esc(c.numero)}</div><div><div class="label">Tipo</div>${esc(c.tipo)}</div><div><div class="label">Fecha de emisión</div>${fmtDate(c.fechaEmision)}</div></div>
   <p style="line-height:1.7;margin-top:18px;text-align:justify">${body}</p>
