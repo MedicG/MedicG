@@ -814,7 +814,7 @@ def sri_config(config):
         "razonSocial": os.environ.get("SRI_RAZON_SOCIAL") or cfg.get("sriRazonSocial") or cfg.get("nombre") or "Centro Medico",
         "nombreComercial": os.environ.get("SRI_NOMBRE_COMERCIAL") or cfg.get("sriNombreComercial") or cfg.get("nombre") or "Medic G",
         "dirMatriz": os.environ.get("SRI_DIR_MATRIZ") or cfg.get("sriDirMatriz") or cfg.get("dir") or "",
-        "dirEstablecimiento": os.environ.get("SRI_DIR_ESTABLECIMIENTO") or cfg.get("sriDirEstablecimiento") or cfg.get("dir") or "",
+        "dirEstablecimiento": os.environ.get("SRI_DIR_ESTABLECIMIENTO") or cfg.get("sriDirEstablecimiento") or cfg.get("dir") or os.environ.get("SRI_DIR_MATRIZ") or cfg.get("sriDirMatriz") or "",
         "estab": (os.environ.get("SRI_ESTAB") or cfg.get("sriEstab") or "001").zfill(3)[:3],
         "ptoEmi": (os.environ.get("SRI_PTO_EMI") or cfg.get("sriPtoEmi") or "001").zfill(3)[:3],
         "obligadoContabilidad": (os.environ.get("SRI_OBLIGADO_CONTABILIDAD") or cfg.get("sriObligadoContabilidad") or "NO").upper(),
@@ -869,10 +869,10 @@ def id_type_for_patient(patient):
 
 
 def payment_code(payment):
-    value = str(payment or "").lower()
-    if "debito" in value or "debito" in value:
+    value = unicodedata.normalize("NFKD", str(payment or "")).encode("ascii", "ignore").decode().lower()
+    if "debito" in value:
         return "16"
-    if "credito" in value or "credito" in value or "tarjeta" in value:
+    if "credito" in value or "tarjeta" in value:
         return "19"
     if "transfer" in value or "seguro" in value or "iess" in value:
         return "20"
@@ -946,7 +946,8 @@ def build_invoice_xml(invoice, patient, config):
 
     info_fact = ET.SubElement(root, "infoFactura")
     add_text(info_fact, "fechaEmision", fecha.strftime("%d/%m/%Y"))
-    add_text(info_fact, "dirEstablecimiento", sri["dirEstablecimiento"][:300])
+    if str(sri.get("dirEstablecimiento") or "").strip():
+        add_text(info_fact, "dirEstablecimiento", sri["dirEstablecimiento"][:300])
     if sri.get("contribuyenteEspecial"):
         add_text(info_fact, "contribuyenteEspecial", sri["contribuyenteEspecial"])
     add_text(info_fact, "obligadoContabilidad", sri["obligadoContabilidad"] if sri["obligadoContabilidad"] in ("SI", "NO") else "NO")
@@ -968,11 +969,22 @@ def build_invoice_xml(invoice, patient, config):
     add_text(info_fact, "importeTotal", money_text(total))
     add_text(info_fact, "moneda", "DOLAR")
     pagos = ET.SubElement(info_fact, "pagos")
-    pago = ET.SubElement(pagos, "pago")
-    add_text(pago, "formaPago", payment_code(invoice.get("pago")))
-    add_text(pago, "total", money_text(total))
-    add_text(pago, "plazo", "0")
-    add_text(pago, "unidadTiempo", "dias")
+    by_code = {}
+    for p in invoice.get("pagos") or []:
+        code = payment_code(p.get("metodo"))
+        by_code[code] = by_code.get(code, Decimal(0)) + money_decimal(p.get("monto"))
+    paid = money_decimal(sum(by_code.values(), Decimal(0)))
+    if not by_code or paid > total:
+        by_code = {payment_code(invoice.get("pago")): total}
+    elif paid < total:
+        # Balance still pending: report it as "sin utilizacion del sistema financiero" so the payments add up to the total.
+        by_code["01"] = by_code.get("01", Decimal(0)) + (total - paid)
+    for code, amount_ in by_code.items():
+        pago = ET.SubElement(pagos, "pago")
+        add_text(pago, "formaPago", code)
+        add_text(pago, "total", money_text(amount_))
+        add_text(pago, "plazo", "0")
+        add_text(pago, "unidadTiempo", "dias")
 
     detalles = ET.SubElement(root, "detalles")
     for idx, item, qty, unit, line_base, line_rate, line_tax in lines:
@@ -1018,7 +1030,26 @@ def saved_sri_certificate_status(cert):
         "updatedAt": "" if has_env_cert else cert.get("updatedAt", ""),
         "hasPassword": bool(SRI_CERT_PASSWORD or cert.get("password")),
         "envLocked": has_env_cert,
+        "titular": "" if has_env_cert else cert.get("titular", ""),
+        "vence": "" if has_env_cert else cert.get("vence", ""),
     }
+
+
+def describe_p12(raw, password):
+    """Open a .p12 with its password and return holder and expiry, or a clear error."""
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.x509.oid import NameOID
+    try:
+        key, cert, _extra = pkcs12.load_key_and_certificates(raw, password.encode("utf-8") if password else None)
+    except ValueError as exc:
+        raise SRIIntegrationError("La clave de la firma electrónica no es correcta o el archivo no es un .p12 válido.") from exc
+    if not key or not cert:
+        raise SRIIntegrationError("El archivo no contiene la clave privada de la firma electrónica.")
+    names = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    not_after = getattr(cert, "not_valid_after_utc", None) or cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+    if not_after < dt.datetime.now(dt.timezone.utc):
+        raise SRIIntegrationError(f"Esta firma electrónica caducó el {not_after.date().isoformat()}.")
+    return {"titular": names[0].value if names else cert.subject.rfc4514_string(), "vence": not_after.date().isoformat()}
 
 
 def get_sri_certificate(conn):
@@ -1062,39 +1093,33 @@ def load_sri_certificate_bytes(cert_info=None):
 
 
 def sign_invoice_xml(unsigned_xml, cert_info=None):
+    """XAdES-BES 1.3.2 / RSA-SHA1 enveloped signature, as required by the SRI technical sheet."""
     try:
-        from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, pkcs12
-        from signxml import methods
-        from signxml.xades import XAdESDataObjectFormat, XAdESSigner
-        from lxml import etree
+        from cryptography.hazmat.primitives.serialization import pkcs12
+        from medicg import xades
     except Exception as exc:
         raise SRIIntegrationError("Faltan dependencias para firma XAdES. Reinstala requirements.txt en Vercel.") from exc
+    cert_info = cert_info or {}
+    cert_password = cert_info.get("password") or SRI_CERT_PASSWORD
     try:
-        cert_info = cert_info or {}
-        cert_password = cert_info.get("password") or SRI_CERT_PASSWORD
         key, cert, _extra = pkcs12.load_key_and_certificates(
             load_sri_certificate_bytes(cert_info),
             cert_password.encode("utf-8") if cert_password else None,
         )
-        if not key or not cert:
-            raise SRIIntegrationError("El certificado P12 no contiene clave privada o certificado valido")
-        key_pem = key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
-        cert_pem = cert.public_bytes(Encoding.PEM)
-        root = etree.fromstring(unsigned_xml.encode("utf-8"))
-        signer = XAdESSigner(
-            method=methods.enveloped,
-            signature_algorithm="rsa-sha256",
-            digest_algorithm="sha256",
-            c14n_algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-            data_object_format=XAdESDataObjectFormat(Description="Factura electronica SRI", MimeType="text/xml"),
-        )
-        signer.use_deprecated_legacy_signing_certificate = True
-        signed = signer.sign(root, key=key_pem, cert=cert_pem, reference_uri="#comprobante")
-        return etree.tostring(signed, encoding="utf-8", xml_declaration=True).decode("utf-8")
     except SRIIntegrationError:
         raise
+    except ValueError as exc:
+        raise SRIIntegrationError("No se pudo abrir la firma electrónica: revisa la clave del archivo .p12.") from exc
+    if not key or not cert:
+        raise SRIIntegrationError("El archivo .p12 no contiene la clave privada y el certificado de la firma.")
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    not_after = getattr(cert, "not_valid_after_utc", None) or cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+    if not_after < now_utc:
+        raise SRIIntegrationError(f"La firma electrónica caducó el {not_after.date().isoformat()}. Renueva la firma y súbela otra vez.")
+    try:
+        return xades.sign(unsigned_xml, key, cert)
     except Exception as exc:
-        raise SRIIntegrationError(f"No se pudo firmar el XML con el certificado digital: {exc}") from exc
+        raise SRIIntegrationError(f"No se pudo firmar el XML con la firma electrónica: {exc}") from exc
 
 
 def xml_local_name(tag):
@@ -1184,27 +1209,110 @@ def sri_autorizacion(clave, ambiente):
     }
 
 
+CODE128_PATTERNS = [
+    "212222", "222122", "222221", "121223", "121322", "131222", "122213", "122312", "132212", "221213", "221312", "231212", "112232", "122132", "122231", "113222", "123122", "123221", "223211", "221132", "221231", "213212", "223112", "312131", "311222", "321122", "321221", "312212", "322112", "322211", "212123", "212321", "232121", "111323", "131123", "131321", "112313", "132113", "132311", "211313", "231113", "231311", "112133", "112331", "132131", "113123", "113321", "133121", "313121", "211331", "231131", "213113", "213311", "213131", "311123", "311321", "331121", "312113", "312311", "332111", "314111", "221411", "431111", "111224", "111422", "121124", "121421", "141122", "141221", "112214", "112412", "122114", "122411", "142112", "142211", "241211", "221114", "413111", "241112", "134111", "111242", "121142", "121241", "114212", "124112", "124211", "411212", "421112", "421211", "212141", "214121", "412121", "111143", "111341", "131141", "114113", "114311", "411113", "411311", "113141", "114131", "311141", "411131", "211412", "211214", "211232", "2331112"]
+
+
+def code128_svg(digits, height=46):
+    """Code 128 (set C, with set B for an odd last digit) as inline SVG for the access key."""
+    digits = clean_digits(digits)
+    if not digits:
+        return ""
+    codes = [105]
+    even = digits[: len(digits) - len(digits) % 2]
+    codes += [int(even[i:i + 2]) for i in range(0, len(even), 2)]
+    if len(digits) % 2:
+        codes += [100, ord(digits[-1]) - 32]
+    checksum = (codes[0] + sum(i * c for i, c in enumerate(codes[1:], start=1))) % 103
+    codes += [checksum, 106]
+    x, bars = 10, []
+    for code in codes:
+        for i, w in enumerate(CODE128_PATTERNS[code]):
+            w = int(w)
+            if i % 2 == 0:
+                bars.append(f"<rect x='{x}' y='0' width='{w}' height='{height}'/>")
+            x += w
+    width = x + 10
+    return f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {width} {height}' width='100%' height='{height}' preserveAspectRatio='none' style='max-width:520px'>{''.join(bars)}</svg>"
+
+
 def ride_html(invoice, patient, config, ticket=False):
     cfg = config or {}
-    rows = "".join(
-        f"<tr><td>{html_escape(str(i.get('desc','')))}</td><td>{html_escape(str(i.get('cant',1)))}</td><td>{money_text(i.get('unit'))}</td><td>{money_text(i.get('total'))}</td></tr>"
-        for i in (invoice.get("items") or [])
-    )
-    patient_name = f"{patient.get('nombres','')} {patient.get('apellidos','')}".strip()
-    width = "width:80mm;font-size:11px;" if ticket else "max-width:760px;"
-    return f"""<!doctype html><html lang='es'><meta charset='utf-8'><title>RIDE {html_escape(invoice.get('id',''))}</title>
-<body style='font-family:Arial,sans-serif;color:#111;margin:0;padding:18px;{width}'>
-  <div style='display:flex;gap:12px;align-items:center;border-bottom:2px solid #0f766e;padding-bottom:10px;margin-bottom:12px;'>
-    <img src='{html_escape(cfg.get('logo') or 'assets/medicg-logo.jpg')}' style='width:72px;height:72px;object-fit:contain;'>
-    <div><h2 style='margin:0;'>{html_escape(cfg.get('nombre') or 'Centro Medico')}</h2><div>RUC: {html_escape((invoice.get('sri') or {}).get('ruc') or cfg.get('ruc') or '')}</div><div>{html_escape(cfg.get('dir') or '')}</div></div>
+    sri = invoice.get("sri") or sri_config(cfg)
+    esc_ = lambda v: html_escape(str(v if v is not None else ""))
+    patient_name = f"{patient.get('nombres','')} {patient.get('apellidos','')}".strip() or "CONSUMIDOR FINAL"
+    tipo_id, ident = id_type_for_patient(patient)
+    groups = {}
+    rows = []
+    for idx, item in enumerate(invoice.get("items") or [], start=1):
+        base = money_decimal(item.get("total"))
+        rate = money_decimal(item.get("ivaRate") if item.get("ivaRate") is not None else (invoice.get("ivaRate") if invoice.get("ivaRate") is not None else sri.get("ivaRate") or 0))
+        groups[rate] = groups.get(rate, Decimal(0)) + base
+        rows.append(f"<tr><td>{esc_(item.get('codigo') or f'MED{idx:03d}')}</td><td style='text-align:right'>{money_text(item.get('cant') or 1)}</td><td>{esc_(item.get('desc') or item.get('nombre') or '')}</td><td style='text-align:right'>{money_text(item.get('unit'))}</td><td style='text-align:right'>0.00</td><td style='text-align:right'>{money_text(base)}</td></tr>")
+    taxed = {r: b for r, b in groups.items() if r > 0}
+    totals = "".join(f"<tr><td>SUBTOTAL {r.normalize():f}%</td><td>{money_text(b)}</td></tr>" for r, b in sorted(taxed.items()))
+    totals += f"<tr><td>SUBTOTAL 0%</td><td>{money_text(groups.get(Decimal('0.00'), Decimal(0)))}</td></tr>"
+    totals += f"<tr><td>SUBTOTAL SIN IMPUESTOS</td><td>{money_text(invoice.get('sub'))}</td></tr><tr><td>TOTAL DESCUENTO</td><td>0.00</td></tr>"
+    totals += "".join(f"<tr><td>IVA {r.normalize():f}%</td><td>{money_text(b * r / Decimal(100))}</td></tr>" for r, b in sorted(taxed.items())) or "<tr><td>IVA</td><td>0.00</td></tr>"
+    totals += f"<tr><td><b>VALOR TOTAL</b></td><td><b>{money_text(invoice.get('total'))}</b></td></tr>"
+    pagos = invoice.get("pagos") or [{"metodo": invoice.get("pago") or "Efectivo", "monto": invoice.get("total")}]
+    pay_rows = "".join(f"<tr><td>{esc_(p.get('metodo'))}</td><td style='text-align:right'>{money_text(p.get('monto'))}</td></tr>" for p in pagos)
+    ambiente = "PRODUCCIÓN" if str(sri.get("ambiente")) == "2" else "PRUEBAS"
+    authorized = invoice.get("sriEstado") == "AUTORIZADO"
+    clave = invoice.get("claveAcceso") or ""
+    width = "width:80mm;font-size:10px;" if ticket else "max-width:800px;font-size:12px;"
+    box = "border:1px solid #333;border-radius:8px;padding:10px"
+    extra = ""
+    if patient.get("email"):
+        extra += f"<div><b>Email:</b> {esc_(patient.get('email'))}</div>"
+    if patient.get("tel"):
+        extra += f"<div><b>Teléfono:</b> {esc_(patient.get('tel'))}</div>"
+    extra += f"<div><b>Paciente:</b> {esc_(patient_name)}</div>"
+    return f"""<!doctype html><html lang='es'><meta charset='utf-8'><title>RIDE {esc_(invoice.get('id',''))}</title>
+<body style='font-family:Arial,sans-serif;color:#111;margin:0 auto;padding:16px;{width}'>
+{'' if authorized else "<div style='border:2px solid #b00;color:#b00;text-align:center;font-weight:bold;padding:6px;margin-bottom:8px'>DOCUMENTO SIN AUTORIZACIÓN DEL SRI · " + esc_(invoice.get('sriEstado') or invoice.get('estado') or 'PENDIENTE') + "</div>"}
+<div style='display:flex;gap:12px;flex-wrap:wrap'>
+ <div style='flex:1;min-width:240px'>
+  <div style='text-align:center;margin-bottom:8px'><img src='{esc_(cfg.get('logo') or 'https://medicg.vercel.app/assets/medicg-logo.jpg')}' style='max-width:150px;max-height:90px;object-fit:contain'></div>
+  <div style='{box}'>
+   <div style='font-weight:bold;font-size:14px'>{esc_(sri.get('razonSocial'))}</div>
+   {f"<div>{esc_(sri.get('nombreComercial'))}</div>" if sri.get('nombreComercial') and sri.get('nombreComercial') != sri.get('razonSocial') else ''}
+   <div><b>Dirección matriz:</b> {esc_(sri.get('dirMatriz'))}</div>
+   <div><b>Dirección sucursal:</b> {esc_(sri.get('dirEstablecimiento') or sri.get('dirMatriz'))}</div>
+   {f"<div><b>Contribuyente especial Nro:</b> {esc_(sri.get('contribuyenteEspecial'))}</div>" if sri.get('contribuyenteEspecial') else ''}
+   <div><b>Obligado a llevar contabilidad:</b> {esc_(sri.get('obligadoContabilidad') or 'NO')}</div>
   </div>
-  <h3>RIDE - Factura electronica</h3>
-  <p><b>No.:</b> {html_escape(invoice.get('id',''))}<br><b>Fecha:</b> {html_escape(invoice.get('fecha',''))}<br><b>Estado SRI:</b> {html_escape(invoice.get('sriEstado') or invoice.get('estado',''))}</p>
-  <p><b>Cliente:</b> {html_escape(patient_name)}<br><b>Identificacion:</b> {html_escape(patient.get('cedula') or '9999999999999')}<br><b>Email:</b> {html_escape(patient.get('email') or '')}</p>
-  <table width='100%' border='1' cellspacing='0' cellpadding='6'><thead><tr><th>Detalle</th><th>Cant.</th><th>P.Unit.</th><th>Total</th></tr></thead><tbody>{rows}</tbody></table>
-  <div style='text-align:right;margin-top:12px;'><div>Subtotal: ${money_text(invoice.get('sub'))}</div><div>IVA: ${money_text(invoice.get('iva'))}</div><h3>Total: ${money_text(invoice.get('total'))}</h3></div>
-  <p style='word-break:break-all;'><b>Clave de acceso:</b><br>{html_escape(invoice.get('claveAcceso') or '')}</p>
-  <p style='word-break:break-all;'><b>Autorizacion:</b><br>{html_escape(invoice.get('autorizacion') or '')}</p>
+ </div>
+ <div style='flex:1.2;min-width:280px;{box}'>
+  <div><b>R.U.C.:</b> {esc_(sri.get('ruc'))}</div>
+  <div style='font-size:16px;font-weight:bold;margin:4px 0'>FACTURA</div>
+  <div><b>No.</b> {esc_(invoice.get('id'))}</div>
+  <div style='margin-top:6px'><b>NÚMERO DE AUTORIZACIÓN</b><br><span style='word-break:break-all'>{esc_(invoice.get('autorizacion') if authorized else '—')}</span></div>
+  <div style='margin-top:6px'><b>FECHA Y HORA DE AUTORIZACIÓN:</b> {esc_(invoice.get('fechaAutorizacion') if authorized else '—')}</div>
+  <div><b>AMBIENTE:</b> {ambiente}</div>
+  <div><b>EMISIÓN:</b> NORMAL</div>
+  <div style='margin-top:6px'><b>CLAVE DE ACCESO</b></div>
+  {code128_svg(clave)}
+  <div style='font-size:10px;word-break:break-all;text-align:center'>{esc_(clave)}</div>
+ </div>
+</div>
+<div style='{box};margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:4px'>
+ <div><b>Razón social / Nombres y apellidos:</b> {esc_(patient_name)}</div>
+ <div><b>Identificación:</b> {esc_(ident)}</div>
+ <div><b>Fecha de emisión:</b> {esc_(parse_invoice_date(invoice.get('fecha')).strftime('%d/%m/%Y'))}</div>
+ <div><b>Dirección:</b> {esc_(patient.get('dir') or '')}</div>
+</div>
+<table width='100%' cellspacing='0' cellpadding='5' border='1' style='border-collapse:collapse;margin-top:10px'>
+ <thead style='background:#f1f5f9'><tr><th>Cód. principal</th><th>Cant.</th><th>Descripción</th><th>Precio unitario</th><th>Descuento</th><th>Precio total</th></tr></thead>
+ <tbody>{''.join(rows)}</tbody>
+</table>
+<div style='display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:flex-start'>
+ <div style='flex:1;min-width:240px'>
+  <div style='{box}'><b>Información adicional</b>{extra}</div>
+  <table width='100%' cellspacing='0' cellpadding='5' border='1' style='border-collapse:collapse;margin-top:8px'><thead style='background:#f1f5f9'><tr><th>Forma de pago</th><th>Valor</th></tr></thead><tbody>{pay_rows}</tbody></table>
+ </div>
+ <table cellspacing='0' cellpadding='5' border='1' style='border-collapse:collapse;min-width:260px'><tbody>{totals.replace("<td>", "<td>", 1)}</tbody></table>
+</div>
 </body></html>"""
 
 
@@ -1250,23 +1358,33 @@ def prepare_invoice_from_payload(conn, user, payload):
     if not patient:
         raise SRIIntegrationError("Selecciona un paciente registrado para emitir factura")
     items = []
+    config_for_rate = get_json_key(conn, "config", {}) or {}
+    default_rate = money_decimal(sri_config(config_for_rate).get("ivaRate") or 15)
     for raw in payload.get("items") or []:
         desc = str(raw.get("desc") or raw.get("descripcion") or "").strip()
         qty = money_decimal(raw.get("cant") or raw.get("cantidad") or 1)
         unit = money_decimal(raw.get("unit") or raw.get("precio") or 0)
+        rate = money_decimal(raw.get("ivaRate")) if raw.get("ivaRate") not in (None, "") else default_rate
+        if rate not in SRI_IVA_CODES:
+            raise SRIIntegrationError("Tarifa de IVA no válida en una línea de la factura")
         if desc and qty > 0 and unit >= 0:
-            items.append({"desc": desc, "cant": float(qty), "unit": float(unit), "total": float(money_decimal(qty * unit))})
+            base = money_decimal(qty * unit)
+            items.append({"desc": desc, "cant": float(qty), "unit": float(unit), "total": float(base),
+                          "ivaRate": float(rate), "iva": float(money_decimal(base * rate / Decimal("100")))})
     if not items:
         raise SRIIntegrationError("Agrega al menos un servicio o examen facturable")
     config = get_json_key(conn, "config", {}) or {}
     sri = sri_config(config)
     next_ids = get_json_key(conn, "nextIds", {}) or {}
-    seq_int = next_id(next_ids, "fac", 1)
+    existing = get_json_key(conn, "facturas", []) or []
+    used = max((int(str(f.get("id", "")).split("-")[-1]) for f in existing if re.fullmatch(r"\d{3}-\d{3}-\d{9}", str(f.get("id", "")))), default=0)
+    seq_int = max(int(next_ids.get("fac") or 1), used + 1)
+    next_ids["fac"] = seq_int + 1
     secuencial = str(seq_int).zfill(9)[-9:]
     fecha = parse_invoice_date(payload.get("fecha"))
     subtotal = sum(money_decimal(i["total"]) for i in items)
     iva_rate = money_decimal(sri.get("ivaRate") or 15)
-    iva = money_decimal(subtotal * iva_rate / Decimal("100"))
+    iva = money_decimal(sum(money_decimal(i["iva"]) for i in items))
     total = money_decimal(subtotal + iva)
     clave = build_access_key(fecha, sri, secuencial)
     invoice = {
@@ -1283,6 +1401,7 @@ def prepare_invoice_from_payload(conn, user, payload):
         "iva": float(iva),
         "total": float(total),
         "pago": payload.get("pago") or "Efectivo",
+        "ivaRate": None,
         "estado": "Pendiente SRI",
         "sriEstado": "GENERADO",
         "sriMensaje": "XML generado pendiente de envio",
@@ -1297,14 +1416,83 @@ def prepare_invoice_from_payload(conn, user, payload):
     return invoice, patient, config
 
 
+SRI_SENT_STATES = ("RECIBIDA", "EN_PROCESO", "AUTORIZADO")
+
+
+def sri_prepare(invoice, patient, config):
+    """Fill SRI data (environment, access key, XML) from the current configuration.
+
+    Invoices already received by the SRI keep their access key; the others are rebuilt so a
+    change of environment (pruebas -> produccion), RUC or patient data is always applied."""
+    current = sri_config(config)
+    parts = str(invoice.get("id") or "").split("-")
+    if len(parts) == 3 and all(p.isdigit() for p in parts):
+        current["estab"], current["ptoEmi"] = parts[0].zfill(3)[-3:], parts[1].zfill(3)[-3:]
+        secuencial = parts[2].zfill(9)[-9:]
+    else:
+        secuencial = str(invoice.get("secuencial") or clean_digits(invoice.get("id"))[-9:]).zfill(9)[-9:]
+    if invoice.get("sriEstado") in SRI_SENT_STATES and invoice.get("claveAcceso") and invoice.get("sri"):
+        if not invoice.get("xml"):
+            invoice["xml"] = build_invoice_xml(invoice, patient, config)
+        return invoice
+    problems = []
+    if len(clean_digits(current.get("ruc"))) != 13:
+        problems.append("RUC de 13 dígitos")
+    if not str(current.get("razonSocial") or "").strip():
+        problems.append("razón social")
+    if not str(current.get("dirMatriz") or "").strip():
+        problems.append("dirección matriz")
+    if problems:
+        raise SRIIntegrationError("Completa en Configuración > Facturación electrónica SRI: " + ", ".join(problems) + ".")
+    if money_decimal(invoice.get("total")) <= 0:
+        raise SRIIntegrationError("La factura no tiene valor a facturar.")
+    tipo_id, _doc = id_type_for_patient(patient)
+    if tipo_id == "07" and money_decimal(invoice.get("total")) > Decimal("50.00"):
+        raise SRIIntegrationError("Las facturas a consumidor final no pueden superar $50. Registra la cédula o RUC del paciente.")
+    if tipo_id == "05" and not valid_cedula(clean_digits(patient.get("cedula"))):
+        raise SRIIntegrationError("La cédula del paciente no es válida. Corrígela en su ficha antes de enviar al SRI.")
+    previous = invoice.get("sri") or {}
+    same = invoice.get("claveAcceso") and all(str(previous.get(k)) == str(current.get(k)) for k in ("ambiente", "ruc", "estab", "ptoEmi"))
+    rate = previous.get("ivaRate") if previous.get("ivaRate") is not None else float(current.get("ivaRate") or 15)
+    invoice["sri"] = {**current, "ivaRate": float(rate)}
+    invoice["secuencial"] = secuencial
+    if not same or str(invoice["claveAcceso"])[:8] != parse_invoice_date(invoice.get("fecha")).strftime("%d%m%Y"):
+        invoice["claveAcceso"] = build_access_key(parse_invoice_date(invoice.get("fecha")), current, secuencial)
+    invoice["xml"] = build_invoice_xml(invoice, patient, config)
+    return invoice
+
+
+def valid_cedula(doc):
+    if len(doc) != 10 or not doc.isdigit():
+        return False
+    province, third = int(doc[:2]), int(doc[2])
+    if not (1 <= province <= 24 or province == 30) or third >= 6:
+        return False
+    total = 0
+    for i, ch in enumerate(doc[:9]):
+        n = int(ch) * (2 if i % 2 == 0 else 1)
+        total += n - 9 if n > 9 else n
+    return (10 - total % 10) % 10 == int(doc[9])
+
+
+def sri_already_registered(reception):
+    text = " ".join(f"{m.get('identificador','')} {m.get('mensaje','')}" for m in reception.get("mensajes", [])).upper()
+    return "CLAVE ACCESO REGISTRADA" in text or "EN PROCESAMIENTO" in text or any(m.get("identificador") in ("43", "70") for m in reception.get("mensajes", []))
+
+
 def send_invoice_to_sri(invoice, cert_info=None):
-    invoice["signedXml"] = sign_invoice_xml(invoice["xml"], cert_info)
-    reception = sri_recepcion(invoice["signedXml"], invoice["sri"]["ambiente"])
+    if invoice.get("sriEstado") in ("RECIBIDA", "EN_PROCESO") and invoice.get("signedXml"):
+        reception = {"estado": "RECIBIDA", "mensajes": [], "previo": True}
+    else:
+        invoice["signedXml"] = sign_invoice_xml(invoice["xml"], cert_info)
+        reception = sri_recepcion(invoice["signedXml"], invoice["sri"]["ambiente"])
+        if reception.get("estado") != "RECIBIDA" and sri_already_registered(reception):
+            reception = {**reception, "estado": "RECIBIDA"}
     invoice["sriRecepcion"] = reception
     if reception.get("estado") != "RECIBIDA":
         invoice["estado"] = "Devuelta SRI"
         invoice["sriEstado"] = reception.get("estado") or "DEVUELTA"
-        invoice["sriMensaje"] = "; ".join(m.get("mensaje", "") for m in reception.get("mensajes", [])) or "Comprobante devuelto por el SRI"
+        invoice["sriMensaje"] = "; ".join(" ".join(x for x in (m.get("identificador", ""), m.get("mensaje", ""), m.get("informacionAdicional", "")) if x) for m in reception.get("mensajes", [])) or "Comprobante devuelto por el SRI"
         return invoice
     invoice["estado"] = "Recibida SRI"
     invoice["sriEstado"] = "RECIBIDA"
@@ -1327,7 +1515,7 @@ def send_invoice_to_sri(invoice, cert_info=None):
     elif last_auth and last_auth.get("estado") == "NO AUTORIZADO":
         invoice["estado"] = "No autorizado SRI"
         invoice["sriEstado"] = "NO AUTORIZADO"
-        invoice["sriMensaje"] = "; ".join(m.get("mensaje", "") for m in last_auth.get("mensajes", [])) or "No autorizado por el SRI"
+        invoice["sriMensaje"] = "; ".join(" ".join(x for x in (m.get("identificador", ""), m.get("mensaje", ""), m.get("informacionAdicional", "")) if x) for m in last_auth.get("mensajes", [])) or "No autorizado por el SRI"
     else:
         invoice["estado"] = "En proceso SRI"
         invoice["sriEstado"] = "EN_PROCESO"
@@ -1355,7 +1543,7 @@ def invoice_context(conn, invoice_id):
         invoice["sri"] = sri_config(config)
     if not invoice.get("secuencial"):
         invoice["secuencial"] = clean_digits(invoice.get("id"))[-9:].zfill(9)
-    if not invoice.get("xml"):
+    if not invoice.get("xml") and invoice.get("claveAcceso"):
         invoice["xml"] = build_invoice_xml(invoice, patient, config)
     return invoice, patient, config
 
@@ -2182,7 +2370,7 @@ def clinical_file_allowed(conn, user, patient_id):
 
 INVOICE_SRI_FIELDS = (
     "signedXml", "sriRecepcion", "estado", "sriEstado", "sriMensaje", "sriAutorizacion",
-    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial",
+    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial", "claveAcceso",
 )
 CLAIM_SECONDS = 180
 
@@ -2753,13 +2941,19 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 if not password:
                     return make_response(self, 400, {"error": "Ingresa la clave del certificado digital"})
                 try:
-                    base64.b64decode(cert_b64, validate=True)
+                    raw_p12 = base64.b64decode(cert_b64, validate=True)
                 except Exception:
                     return make_response(self, 400, {"error": "No se pudo leer el certificado. Sube un archivo .p12/.pfx valido."})
+                try:
+                    holder = describe_p12(raw_p12, password)
+                except SRIIntegrationError as exc:
+                    return make_response(self, 400, {"error": str(exc)})
                 set_json_key(conn, "sriCertificate", {
                     "p12Base64": cert_b64,
                     "password": password,
                     "filename": filename,
+                    "titular": holder["titular"],
+                    "vence": holder["vence"],
                     "updatedAt": now_iso(),
                     "uploadedBy": user.get("email", ""),
                 })
@@ -2791,11 +2985,19 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not invoice_id:
                 return make_response(self, 400, {"error": "Falta el numero de factura"})
             try:
+                from medicg.mailer import settings as mail_settings_of
                 with db(read_only=True) as conn:
                     invoice, patient, config = invoice_context(conn, invoice_id)
                     cert_info = get_sri_certificate(conn)
+                    mail_config = mail_settings_of(conn)
                 if invoice.get("sriEstado") == "AUTORIZADO" or invoice.get("estado") == "Autorizado SRI":
                     return make_response(self, 200, {"ok": True, "invoice": invoice, "alreadyAuthorized": True})
+                if not (cert_info or {}).get("p12Base64") and not SRI_CERT_P12_BASE64 and not SRI_CERT_P12_PATH:
+                    return make_response(self, 400, {"error": "Sube la firma electrónica (.p12) en Configuración > Facturación electrónica SRI."})
+                try:
+                    sri_prepare(invoice, patient, config)
+                except SRIIntegrationError as exc:
+                    return make_response(self, 400, {"error": str(exc)})
                 if invoice.get("estado") == "Anulado":
                     return make_response(self, 409, {"error": "No se puede enviar una factura anulada."})
                 if not claim_invoice(invoice_id, "sriSendingAt"):
@@ -2815,8 +3017,24 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 updates = {k: invoice[k] for k in INVOICE_SRI_FIELDS if k in invoice}
                 saved = release_invoice(invoice_id, "sriSendingAt", updates, user, "sri_invoice_retry",
                                         {"invoiceId": invoice.get("id"), "estado": invoice.get("estado"), "emailSent": False})
+                email_sent, email_error = False, ""
+                current = saved or invoice
+                if current.get("sriEstado") == "AUTORIZADO" and not current.get("emailEnviado") and payload.get("sendEmail", True):
+                    if not (patient.get("email") or "").strip():
+                        email_error = "El paciente no tiene correo registrado."
+                    elif claim_invoice(invoice_id, "emailSendingAt"):
+                        try:
+                            email_sent, email_error = send_invoice_email({**invoice, **current}, patient, config, mail_config, None)
+                        except Exception:
+                            log.exception("invoice email after SRI failed")
+                            email_sent, email_error = False, "No se pudo enviar el correo."
+                        mail_updates = {"emailError": email_error}
+                        if email_sent:
+                            mail_updates.update(emailSentAt=now_iso(), emailSentBy=user.get("email", ""), emailTo=patient.get("email", ""), emailEnviado=True)
+                        current = release_invoice(invoice_id, "emailSendingAt", mail_updates, user, "sri_invoice_email",
+                                                  {"invoiceId": invoice.get("id"), "emailSent": email_sent, "error": email_error}) or current
                 from medicg.files import strip_invoice
-                return make_response(self, 200, {"ok": True, "invoice": strip_invoice(saved or invoice), "emailSent": False, "emailError": ""})
+                return make_response(self, 200, {"ok": True, "invoice": strip_invoice(current), "emailSent": email_sent, "emailError": email_error})
             except SRIIntegrationError as exc:
                 return make_response(self, 404, {"error": str(exc)})
             except Exception:

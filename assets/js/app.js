@@ -11268,7 +11268,7 @@ function openFacModal(){
 
 
 
-  document.getElementById('f-items').innerHTML=`<tr><td><input type="text" value="Consulta médica especialidad" style="min-width:160px;"/></td><td><input type="number" value="1" style="width:55px;" oninput="calcFac()"/></td><td><input type="number" value="85" style="width:70px;" oninput="calcFac()"/></td><td id="fs0">$85.00</td><td><button class="btn-ic" onclick="this.closest('tr').remove();calcFac()"><i class="ti ti-trash" style="color:var(--red);font-size:13px;"></i></button></td></tr>`;
+  document.getElementById('f-items').innerHTML=`<tr><td><input type="text" value="Consulta médica especialidad" style="min-width:160px;"/></td><td><input type="number" value="1" style="width:55px;" oninput="calcFac()"/></td><td><input type="number" value="85" style="width:70px;" oninput="calcFac()"/></td><td>${facIvaSelect(0)}</td><td id="fs0">$85.00</td><td><button class="btn-ic" onclick="this.closest('tr').remove();calcFac()"><i class="ti ti-trash" style="color:var(--red);font-size:13px;"></i></button></td></tr>`;
 
 
 
@@ -11324,7 +11324,7 @@ function addFItem(){
 
 
 
-  tr.innerHTML=`<td><input type="text" value="Servicio médico" style="min-width:160px;"/></td><td><input type="number" value="1" style="width:55px;" oninput="calcFac()"/></td><td><input type="number" value="50" style="width:70px;" oninput="calcFac()"/></td><td id="fs${idx}">$50.00</td><td><button class="btn-ic" onclick="this.closest('tr').remove();calcFac()"><i class="ti ti-trash" style="color:var(--red);font-size:13px;"></i></button></td>`;
+  tr.innerHTML=`<td><input type="text" value="Servicio médico" style="min-width:160px;"/></td><td><input type="number" value="1" style="width:55px;" oninput="calcFac()"/></td><td><input type="number" value="50" style="width:70px;" oninput="calcFac()"/></td><td>${facIvaSelect(0)}</td><td id="fs${idx}">$50.00</td><td><button class="btn-ic" onclick="this.closest('tr').remove();calcFac()"><i class="ti ti-trash" style="color:var(--red);font-size:13px;"></i></button></td>`;
 
 
 
@@ -11364,118 +11364,22 @@ function sriIvaRate(){const cfg=DB.get('config')||{};return +(cfg.sriIvaRate||15
 
 
 
+function facIvaSelect(rate){return `<select class="f-iva" style="width:78px" onchange="calcFac()">${[0,15,5].map(r=>`<option value="${r}" ${+rate===r?'selected':''}>${r}%</option>`).join('')}</select>`;}
+function facRowRate(tr){const sel=tr.querySelector('select.f-iva');return sel?+sel.value:sriIvaRate();}
 function calcFac(){
-
-
-
-
-
-
-
-  let sub=0;
-
-
-
-
-
-
-
+  let sub=0,iva=0;const byRate={};
   document.querySelectorAll('#f-items tr').forEach((tr)=>{
-
-
-
-
-
-
-
     const ins=tr.querySelectorAll('input[type=number]');
-
-
-
-
-
-
-
-    const v=(+ins[0]?.value||0)*(+ins[1]?.value||0);
-
-
-
-
-
-
-
-    sub+=v;
-
-
-
-
-
-
-
-    const td=tr.children[3];if(td) td.textContent=fmtMoney(v);
-
-
-
-
-
-
-
+    const v=Math.round((+ins[0]?.value||0)*(+ins[1]?.value||0)*100)/100;
+    const r=facRowRate(tr);
+    sub+=v;iva+=Math.round(v*r)/100;if(r>0)byRate[r]=(byRate[r]||0)+v;
+    const td=tr.children[4];if(td) td.textContent=fmtMoney(v);
   });
-
-
-
-
-
-
-
-  const rate=sriIvaRate();
-
-
-
-
-
-
-
-  const iva=sub*rate/100;
-
-
-
-
-
-
-
   document.getElementById('f-sub').textContent=fmtMoney(sub);
-
-
-
-
-
-
-
-  const lbl=document.getElementById('f-iva-lbl');if(lbl)lbl.textContent=`IVA ${rate}%:`;
-
-
-
-
-
-
-
+  const rates=Object.keys(byRate);
+  const lbl=document.getElementById('f-iva-lbl');if(lbl)lbl.textContent=rates.length?`IVA ${rates.join('% / ')}%:`:'IVA 0% (servicios de salud):';
   document.getElementById('f-iva').textContent=fmtMoney(iva);
-
-
-
-
-
-
-
   document.getElementById('f-total').textContent=fmtMoney(sub+iva);
-
-
-
-
-
-
-
 }
 
 
@@ -11572,7 +11476,8 @@ async function saveFactura(){
 
 
 
-    total:((+tr.children[1].querySelector('input').value||1)*(+tr.children[2].querySelector('input').value||0))
+    total:((+tr.children[1].querySelector('input').value||1)*(+tr.children[2].querySelector('input').value||0)),
+    ivaRate:facRowRate(tr)
 
 
 
@@ -20111,7 +20016,7 @@ function renderSriCertStatus(){
 
 
 
-    el.innerHTML=`<span class="badge b-green">Certificado configurado</span> ${esc(st.source||'Base de datos')}.${fileTxt}${dateTxt} ${st.hasPassword?'Clave guardada.':'Falta clave.'}`;
+    el.innerHTML=`<span class="badge b-green">Certificado configurado</span> ${esc(st.source||'Base de datos')}.${fileTxt}${dateTxt} ${st.hasPassword?'Clave guardada.':'Falta clave.'}${st.titular?` <br><b>Titular:</b> ${esc(st.titular)}`:''}${st.vence?` · <b>Vence:</b> ${esc(st.vence)}`:''}`;
 
 
 
