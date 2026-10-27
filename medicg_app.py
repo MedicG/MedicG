@@ -3064,6 +3064,26 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 log.exception("invoice emit failed")
                 return make_response(self, 500, {"error": "No se pudo emitir la factura. Intenta nuevamente o revisa la configuración SRI."})
 
+        if path == "/api/invoices/sri-check":
+            if not can_invoice_sri(user):
+                return make_response(self, 403, {"error": "No tienes permiso para consultar facturas en el SRI"})
+            try:
+                with db(read_only=True) as conn:
+                    invoice, _patient, _config = invoice_context(conn, payload.get("id") or payload.get("invoiceId"))
+            except SRIIntegrationError as exc:
+                return make_response(self, 404, {"error": str(exc)})
+            if not invoice.get("claveAcceso"):
+                return make_response(self, 409, {"error": "Esta factura aún no se ha enviado al SRI."})
+            ambiente = (invoice.get("sri") or {}).get("ambiente") or "2"
+            try:
+                found = sri_autorizacion(invoice["claveAcceso"], ambiente)
+            except SRIIntegrationError as exc:
+                return make_response(self, 502, {"error": str(exc)})
+            return make_response(self, 200, {"ok": True, "id": invoice.get("id"), "claveAcceso": invoice["claveAcceso"],
+                                             "consultadoEn": "PRODUCCIÓN" if ambiente == "2" else "PRUEBAS",
+                                             "estado": found.get("estado"), "ambiente": found.get("ambiente"),
+                                             "numeroAutorizacion": found.get("numeroAutorizacion"), "fechaAutorizacion": found.get("fechaAutorizacion"),
+                                             "mensajes": found.get("mensajes", [])})
         if path == "/api/invoices/sri-retry":
             if user.get("rol") not in ("admin", "recepcion", "secretaria") or not can_invoice_sri(user):
                 return make_response(self, 403, {"error": "No tienes permiso para reenviar facturas al SRI"})
