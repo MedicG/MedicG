@@ -2935,6 +2935,14 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not data_url:
                 return make_response(self, 404, {"error": "Archivo no encontrado."})
             return make_response(self, 200, {"ok": True, "dataUrl": data_url, "mime": mime or ""})
+        if path in ("/api/cash/expense", "/api/cash/expense-void"):
+            from medicg.cash import add_expense, void_expense, CashError
+            try:
+                with db() as conn:
+                    result = (add_expense if path.endswith("expense") else void_expense)(conn, user, payload)
+                return make_response(self, 200, result)
+            except CashError as exc:
+                return make_response(self, 409, {"error": str(exc)})
         if path in ("/api/cash/open", "/api/cash/close"):
             from medicg.cash import open_box, close_box, CashError
             try:
@@ -3482,6 +3490,11 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         return [m for c in boxes if isinstance(c, dict) for m in c.get("movimientos", []) if m.get("cobroVersion") == 1]
                     if ledger(current or []) != ledger(value):
                         return make_response(self, 409, {"error": "Los pagos registrados no se pueden modificar desde un guardado general."})
+                    def expenses(boxes):
+                        return {str(c.get("id")): c.get("egresos", []) for c in boxes if isinstance(c, dict)}
+                    old_exp, new_exp = expenses(current or []), expenses(value)
+                    if any(new_exp.get(k, []) != v for k, v in old_exp.items() if v) or any(v and old_exp.get(k, []) != v for k, v in new_exp.items()):
+                        return make_response(self, 409, {"error": "Los egresos de caja se registran y anulan solo desde Caja."})
                     closed = {str(c.get("id")): c for c in (current or []) if isinstance(c, dict) and c.get("cierre")}
                     incoming_boxes = {str(c.get("id")): c for c in value if isinstance(c, dict)}
                     if any(incoming_boxes.get(k) != v for k, v in closed.items()):

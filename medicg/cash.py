@@ -228,6 +228,85 @@ def open_box(conn, user, payload):
     return {"ok": True, "box": box}
 
 
+EXPENSE_CATEGORIES = ("Proveedores", "Insumos médicos", "Laboratorio externo", "Honorarios médicos", "Sueldos y anticipos",
+                      "Servicios básicos", "Movilización", "Alimentación", "Limpieza y mantenimiento", "Retiro del dueño", "Otros")
+EXPENSE_METHODS = ("Efectivo", "Transferencia", "Tarjeta débito", "Tarjeta crédito")
+
+
+def _text(payload, key, maxlen, label, required=False):
+    value = payload.get(key, "")
+    if value is None:
+        value = ""
+    if not isinstance(value, str) or len(value.strip()) > maxlen:
+        raise CashError(f"{label}: máximo {maxlen} caracteres.")
+    value = value.strip()
+    if required and len(value) < 3:
+        raise CashError(f"Indica {label.lower()}.")
+    return value
+
+
+def active_expenses(box):
+    return [e for e in box.get("egresos", []) if e.get("estado") != "Anulado"]
+
+
+def add_expense(conn, user, payload):
+    """Cash paid out of the open box (supplier, transport, advances...). Cash expenses lower the expected cash."""
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para registrar egresos de caja.")
+    boxes = get_json_key(conn, "cajas", []) or []
+    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    if not box:
+        raise CashError("No hay una caja abierta.")
+    if payload.get("boxId") is not None and str(payload.get("boxId")) != str(box.get("id")):
+        raise CashError("La caja cambió. Actualiza la pantalla.")
+    value = amount(payload.get("monto"))
+    if value <= 0 or value > Decimal("100000"):
+        raise CashError("Ingresa un monto mayor a cero.")
+    concept = _text(payload, "concepto", 200, "El concepto del pago", required=True)
+    category = payload.get("categoria") or "Otros"
+    if category not in EXPENSE_CATEGORIES:
+        raise CashError("Categoría de egreso inválida.")
+    method = payload.get("metodo") or "Efectivo"
+    if method not in EXPENSE_METHODS:
+        raise CashError("Forma de pago del egreso inválida.")
+    if method == "Efectivo":
+        available = amount(box_summary(box)["efectivoEsperado"])
+        if value > available:
+            raise CashError(f"No hay suficiente efectivo en caja: disponible {available:.2f}.")
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
+    expense = {"id": str(uuid.uuid4()), "fecha": stamp.date().isoformat(), "hora": stamp.strftime("%H:%M"),
+               "monto": float(value), "concepto": concept, "categoria": category, "metodo": method,
+               "beneficiario": _text(payload, "beneficiario", 120, "El beneficiario"),
+               "comprobante": _text(payload, "comprobante", 60, "El número de comprobante"),
+               "registradoPor": _staff_name(user), "registradoPorId": user.get("id"), "estado": "Vigente"}
+    box.setdefault("egresos", []).insert(0, expense)
+    set_json_key(conn, "cajas", boxes)
+    audit(conn, user, "cash_expense", "cajas", {"boxId": box["id"], "monto": expense["monto"], "concepto": concept, "metodo": method})
+    return {"ok": True, "box": box, "expense": expense}
+
+
+def void_expense(conn, user, payload):
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para anular egresos.")
+    boxes = get_json_key(conn, "cajas", []) or []
+    box = next((c for c in boxes if c.get("estado") == "abierta" and str(c.get("id")) == str(payload.get("boxId"))), None)
+    if not box:
+        raise CashError("Solo se anulan egresos de la caja abierta.")
+    expense = next((e for e in box.get("egresos", []) if e.get("id") == payload.get("id")), None)
+    if not expense or expense.get("estado") == "Anulado":
+        raise CashError("El egreso no existe o ya fue anulado.")
+    if user.get("rol") != "admin" and str(expense.get("registradoPorId")) != str(user.get("id")):
+        raise CashError("Solo quien registró el egreso o el administrador puede anularlo.")
+    reason = _text(payload, "motivo", 300, "El motivo de anulación", required=True)
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
+    expense.update(estado="Anulado", motivoAnulacion=reason, anuladoPor=_staff_name(user), anuladoEn=stamp.isoformat(timespec="seconds"))
+    set_json_key(conn, "cajas", boxes)
+    audit(conn, user, "cash_expense_void", "cajas", {"boxId": box["id"], "expense": expense["id"], "monto": expense["monto"], "motivo": reason})
+    return {"ok": True, "box": box}
+
+
 def box_summary(box):
     movements = [m for m in box.get("movimientos", []) if m.get("pago") != "Pendiente"]
     def total(rule):
@@ -240,8 +319,14 @@ def box_summary(box):
         "Otros": total(lambda p: p not in ("Efectivo", "Tarjeta débito", "Tarjeta crédito", "Tarjeta", "Transferencia")),
     }
     received = float(sum((amount(v) for v in totals.values()), Decimal(0)))
-    expected_cash = float(amount(box.get("montoApertura") or 0) + amount(totals["Efectivo"]))
-    return {"totales": totals, "totalRecibido": received, "efectivoEsperado": expected_cash, "movimientos": len(movements)}
+    expenses = active_expenses(box)
+    cash_out = sum((amount(e.get("monto")) for e in expenses if e.get("metodo", "Efectivo") == "Efectivo"), Decimal(0))
+    other_out = sum((amount(e.get("monto")) for e in expenses if e.get("metodo", "Efectivo") != "Efectivo"), Decimal(0))
+    expected_cash = float(amount(box.get("montoApertura") or 0) + amount(totals["Efectivo"]) - cash_out)
+    return {"totales": totals, "totalRecibido": received, "efectivoEsperado": expected_cash, "movimientos": len(movements),
+            "egresosEfectivo": float(cash_out), "egresosOtros": float(other_out), "totalEgresos": float(cash_out + other_out),
+            "egresos": [{k: e.get(k) for k in ("hora", "monto", "concepto", "categoria", "metodo", "beneficiario", "comprobante", "registradoPor")} for e in expenses],
+            "netoDelDia": float(amount(received) - cash_out - other_out)}
 
 
 def close_box(conn, user, payload):
@@ -258,6 +343,8 @@ def close_box(conn, user, payload):
     summary = box_summary(box)
     if amount(payload.get("expectedTotal")) != amount(summary["totalRecibido"]):
         raise CashError("Se registraron nuevos pagos. Revisa el resumen actualizado antes de cerrar.")
+    if payload.get("expectedCash") is not None and amount(payload.get("expectedCash")) != amount(summary["efectivoEsperado"]):
+        raise CashError("Se registraron o anularon egresos. Revisa el resumen actualizado antes de cerrar.")
     counted = amount(payload.get("efectivoContado"))
     notes = payload.get("observaciones", "")
     if not isinstance(notes, str) or len(notes) > 1000:
