@@ -878,6 +878,7 @@ const MODULE_PERMS = [
 
   {id:'caja',label:'Caja / cobranza'},
   {id:'farmacia',label:'Farmacia e inventario'},
+  {id:'certificados',label:'Certificados médicos (sin historia clínica)'},
 
 
 
@@ -926,7 +927,7 @@ const ROLE_DEFAULT_PERMS={
 
 
 
-  recepcion:['dashboard','agenda','caja','servicios','examenes'],
+  recepcion:['dashboard','agenda','caja','servicios','examenes','certificados'],
 
 
 
@@ -934,7 +935,7 @@ const ROLE_DEFAULT_PERMS={
 
 
 
-  secretaria:['dashboard','agenda','caja','servicios','examenes'],
+  secretaria:['dashboard','agenda','caja','servicios','examenes','certificados'],
 
 
 
@@ -1233,7 +1234,7 @@ function cleanPermissions(perms,role){
 
 
 
-  const catalogPerms=['recepcion','secretaria'].includes(role)?['servicios','examenes']:[];
+  const catalogPerms=['recepcion','secretaria'].includes(role)?['servicios','examenes','certificados']:[];
 
   return [...new Set([...base,...catalogPerms].filter(p=>allowed.includes(p)))];
 
@@ -1269,7 +1270,7 @@ function hasPerm(moduleId,user=currentUser){if(user?.rol==='medico'&&!['dashboar
 
 function canEditCatalog(moduleId){return ['admin','recepcion','secretaria'].includes(currentUser?.rol)&&hasPerm(moduleId);}
 
-function firstAllowedModule(){return MODULE_PERMS.find(p=>hasPerm(p.id))?.id||null;}
+function firstAllowedModule(){return MODULE_PERMS.find(p=>p.id!=='certificados'&&hasPerm(p.id))?.id||null;}
 
 
 
