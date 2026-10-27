@@ -33,3 +33,17 @@
 .cd-o-item:hover{border-color:#0d7a6b88}
 .cd-o-item:has(input:checked){border-color:var(--primary,#0d7a6b);background:#0d7a6b10;font-weight:600}
 .cd-o-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+/* appointment form and reminders */
+.rem-contact{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;color:var(--text2,#374151)}
+.rem-warn{color:#b45309;font-weight:600}
+.rem-confirm{display:flex;align-items:center;gap:6px;font-size:13px;margin-right:auto}
+.rem-confirm input{width:auto!important}
+.rem-preview{white-space:pre-wrap;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-family:inherit;font-size:14px;line-height:1.5}
+.rem-status{display:flex;flex-wrap:wrap;gap:8px}
+#m-cita .modal-footer{flex-wrap:wrap}
+a.btn-g,a.btn-p,a.btn-s{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+#m-rem-wa a.btn-g{color:#fff;padding:9px 16px;border-radius:8px;font-weight:600}
+label.flex input[type=checkbox],label.rem-confirm input[type=checkbox]{width:auto!important;margin:0;flex-shrink:0}
+label.flex{justify-content:flex-start;text-align:left}
+.flex > .pp-wrap{flex:1;min-width:0}
+#m-cita .flex.gap8{align-items:flex-start}

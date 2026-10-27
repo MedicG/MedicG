@@ -21,7 +21,10 @@ function patientPicker(selectId,opts={}){
   sel.insertAdjacentElement('afterend',wrap);
   const input=wrap.querySelector('.pp-input'),list=wrap.querySelector('.pp-list'),info=wrap.querySelector('.pp-selected');
   let items=[],active=-1;
-  const showInfo=()=>{const p=ppPatients().find(x=>String(x.id)===String(sel.value));info.textContent=p?`Seleccionado: ${ppLabel(p)}${p.cedula?' · C.I. '+p.cedula:''}`:'';if(p&&document.activeElement!==input)input.value=ppLabel(p);};
+  const showInfo=()=>{const p=ppPatients().find(x=>String(x.id)===String(sel.value));info.textContent=p?`Seleccionado: ${ppLabel(p)}${p.cedula?' · C.I. '+p.cedula:''}`:'';if(document.activeElement!==input)input.value=p?ppLabel(p):'';sel.dispatchEvent(new Event('ppsync'));};
+  // Keep the search box in sync when other code sets the select's value programmatically.
+  const desc=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(sel,'value',{configurable:true,get(){return desc.get.call(this);},set(v){desc.set.call(this,v);setTimeout(showInfo,0);}});
   const close=()=>{list.hidden=true;input.setAttribute('aria-expanded','false');active=-1;};
   const choose=p=>{sel.value=String(p.id);if(sel.value!==String(p.id)){const o=document.createElement('option');o.value=p.id;o.textContent=ppLabel(p);sel.appendChild(o);sel.value=String(p.id);}input.value=ppLabel(p);close();showInfo();sel.dispatchEvent(new Event('change',{bubbles:true}));opts.onSelect?.(p);};
   const render=()=>{
