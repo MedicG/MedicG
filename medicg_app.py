@@ -1542,6 +1542,45 @@ def schema_is_current():
         return False
 
 
+def migrate_clinical_files(conn):
+    """Move embedded documents into clinical_files keeping a single copy in memory."""
+    from medicg.files import file_key
+    row = conn.execute("select value from app_data where key = ?", ("archivosClinicos",)).fetchone()
+    if not row:
+        set_json_key(conn, "archivosClinicos", {})
+        return
+    text = row["value"]
+    row = None
+    if '"dataUrl"' not in text:
+        return
+    files = json.loads(text)
+    text = None
+    moved = 0
+    now = time.time()
+    for pid, entries in (files.items() if isinstance(files, dict) else []):
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict) or "dataUrl" not in entry:
+                continue
+            data_url = entry.pop("dataUrl")
+            if isinstance(data_url, str) and data_url.startswith("data:"):
+                conn.execute(
+                    "insert into clinical_files(file_key,patient_id,file_id,mime,size,data_url,created_at) values(?,?,?,?,?,?,?) "
+                    "on conflict(file_key) do update set data_url=excluded.data_url",
+                    (file_key(pid, entry.get("id")), str(pid), str(entry.get("id")), str(entry.get("mime") or ""), int(entry.get("size") or 0), data_url, now),
+                )
+                entry["hasFile"] = True
+                moved += 1
+            data_url = None
+    conn.execute(
+        "update app_data set value = ?, updated_at = ? where key = ?",
+        (json.dumps(files, ensure_ascii=False), now_iso(), "archivosClinicos"),
+    )
+    conn.json_cache.pop("archivosClinicos", None)
+    audit(conn, None, "migrate_clinical_files", "archivosClinicos", {"files": moved})
+
+
 def init_db():
     """Create/upgrade the schema. Cold starts on an up-to-date database only run
     one read-only query instead of rewriting every stored collection."""
@@ -1559,7 +1598,7 @@ def init_db():
         )
         conn.execute("create table if not exists telehealth_native(appointment_id text primary key, state text not null, expires_at integer not null)")
         conn.execute("create table if not exists cash_requests(request_id text primary key, payload_hash text not null, invoice_id text not null, created_at text not null)")
-        from medicg.files import table_sql as clinical_files_table, extract_contents
+        from medicg.files import table_sql as clinical_files_table
         conn.execute(clinical_files_table())
         conn.execute("create index if not exists clinical_files_patient_idx on clinical_files(patient_id)")
         conn.execute("create table if not exists login_attempts(attempt_key text primary key, failures integer not null, first_at double precision not null, locked_until double precision not null)")
@@ -1611,11 +1650,21 @@ def init_db():
                 changed = True
             if changed:
                 set_json_key(conn, "users", users)
-        for row in conn.execute("select key,value from app_data").fetchall():
+        # One collection at a time so large databases never sit in memory all at once.
+        stored_keys = [r["key"] for r in conn.execute("select key from app_data").fetchall()]
+        for stored_key in stored_keys:
+            if stored_key == "archivosClinicos" or stored_key.startswith("backup_"):
+                continue
+            row = conn.execute("select value from app_data where key = ?", (stored_key,)).fetchone()
+            if not row:
+                continue
             value = json.loads(row["value"])
+            row = None
             fixed_value = fix_text(value)
             if fixed_value != value:
-                set_json_key(conn, row["key"], fixed_value)
+                set_json_key(conn, stored_key, fixed_value)
+            value = fixed_value = None
+            conn.json_cache.clear()
         next_ids = get_json_key(conn, "nextIds")
         if not next_ids:
             set_json_key(conn, "nextIds", {"pac": 6, "med": 5, "cita": 6, "fac": 1845, "esp": 7, "seg": 5, "user": 2, "qx": 3, "eq": 3, "st": 3, "caja": 1, "serv": 6, "exam": 6, "cot": 1})
@@ -1627,13 +1676,7 @@ def init_db():
                     changed_ids = True
             if changed_ids:
                 set_json_key(conn, "nextIds", next_ids)
-        stored_files = get_json_key(conn, "archivosClinicos")
-        if stored_files is None:
-            set_json_key(conn, "archivosClinicos", {})
-        elif "dataUrl" in json.dumps(stored_files):
-            # One-time move of embedded documents into clinical_files (same transaction).
-            set_json_key(conn, "archivosClinicos", extract_contents(conn, stored_files))
-            audit(conn, None, "migrate_clinical_files", "archivosClinicos")
+        migrate_clinical_files(conn)
         if get_json_key(conn, "notificaciones") is None:
             set_json_key(conn, "notificaciones", [])
         if get_json_key(conn, "sriCertificate") is None:
