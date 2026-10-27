@@ -127,6 +127,23 @@ def main():
     code, body = call(medgen, '/api/clinical/docs', {'action': 'certificate_void', 'patientId': 1, 'id': cert['id'], 'motivo': 'Fecha errónea'})
     assert code == 200 and next(c for c in body['records'] if c['id'] == cert['id'])['estado'] == 'Anulado'
 
+    # ---- reception issues certificates requested by a doctor (no access to the clinical record)
+    code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_create', 'patientId': 2, 'doctorId': 2, 'tipo': 'Reposo médico', 'diagnostico': 'Lumbalgia', 'diasReposo': 2})
+    assert code == 200, body
+    rcert = body['records'][0]
+    assert rcert['medico']['id'] == 2 and rcert['emitidoPorRol'] == 'recepcion' and rcert['reposo']['dias'] == 2, rcert
+    code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_list', 'patientId': 2})
+    assert code == 200 and body['records'][0]['id'] == rcert['id'], body
+    for action in ('vitals_save', 'lab_order_create', 'note_vitals'):
+        assert call(recep, '/api/clinical/docs', {'action': action, 'patientId': 2, 'examenes': [{'id': 10}]})[0] == 409, action
+    other = call(admin, '/api/clinical/docs', {'action': 'certificate_create', 'patientId': 2, 'tipo': 'Asistencia a consulta', 'doctorId': 2})[1]['records'][0]
+    assert call(recep, '/api/clinical/docs', {'action': 'certificate_void', 'patientId': 2, 'id': other['id'], 'motivo': 'x'})[0] == 409
+    code, body = call(recep, '/api/clinical/docs', {'action': 'certificate_void', 'patientId': 2, 'id': rcert['id'], 'motivo': 'Días errados'})
+    assert code == 200 and next(c for c in body['records'] if c['id'] == rcert['id'])['estado'] == 'Anulado'
+    code, data = call(recep, '/api/data')
+    assert code == 200 and not data.get('certificados') and not data.get('notas'), 'reception must not receive clinical data'
+    assert 'certificados' in app.clean_permissions(['agenda'], 'recepcion')
+
     # ---- lab orders
     code, body = call(medgen, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 1, 'examenes': [{'id': 10}, {'id': 11}, {'nombre': 'Perfil tiroideo'}, {'id': 10}],
                                                       'diagnostico': 'Control', 'prioridad': 'Urgente', 'indicaciones': 'Ayuno 8 horas'})

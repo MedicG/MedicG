@@ -70,11 +70,24 @@ def can_read(user):
     return user.get("rol") == "admin" or can_save_key(user, "notas") or "hce" in set(user.get("permissions") or [])
 
 
-def check_access(conn, user, patient_id, write=True):
-    from medicg_app import get_json_key, clean_permissions
+CERT_ACTIONS = ("certificate_create", "certificate_void", "certificate_list")
+
+
+def perms_of(user):
+    from medicg_app import clean_permissions
+    return set(clean_permissions(user.get("permissions"), user.get("rol", "recepcion")))
+
+
+def is_cert_staff(user):
+    """Reception/secretary users who issue certificates on a doctor's request (no access to the medical record)."""
+    return user.get("rol") in ("recepcion", "secretaria") and "certificados" in perms_of(user)
+
+
+def check_access(conn, user, patient_id, write=True, action=None):
+    from medicg_app import get_json_key
     from medicg.doctor_scope import check_patient
-    perms = set(clean_permissions(user.get("permissions"), user.get("rol", "recepcion")))
-    if user.get("rol") != "admin" and "hce" not in perms:
+    perms = perms_of(user)
+    if user.get("rol") != "admin" and "hce" not in perms and not (action in CERT_ACTIONS and is_cert_staff(user)):
         raise DocsError("No tienes permiso para la historia clínica.")
     patient = next((p for p in get_json_key(conn, "pacientes", []) or [] if str(p.get("id")) == str(patient_id) and not p.get("deletedAt")), None)
     if not patient:
@@ -215,8 +228,10 @@ def edit_note_vitals(conn, user, payload, patient_id):
 # ---------------------------------------------------------- medical certificates
 def create_certificate(conn, user, payload, patient, patient_id):
     from medicg_app import set_json_key, audit
-    if not is_doctor(user) and user.get("rol") != "admin":
-        raise DocsError("Solo médicos o el administrador emiten certificados.")
+    if not is_doctor(user) and user.get("rol") != "admin" and not is_cert_staff(user):
+        raise DocsError("No tienes permiso para emitir certificados.")
+    if is_cert_staff(user) and not payload.get("doctorId"):
+        raise DocsError("Selecciona el médico que solicitó el certificado.")
     doctor = resolve_doctor(conn, user, payload)
     kind = text(payload, "tipo", 40, True, "el tipo de certificado")
     if kind not in CERT_TYPES:
@@ -247,6 +262,7 @@ def create_certificate(conn, user, payload, patient, patient_id):
         "recomendaciones": recommendations, "medico": doctor_snapshot(doctor),
         "paciente": {"nombre": (patient.get("nombres", "") + " " + patient.get("apellidos", "")).strip(), "cedula": patient.get("cedula", "")},
         "estado": "Vigente", "emitidoPor": user_name(user), "emitidoPorId": user.get("id"),
+        "emitidoPorRol": user.get("rol"),
         "emitidoEn": now().isoformat(timespec="seconds"),
     }
     records.insert(0, record)
@@ -263,8 +279,10 @@ def void_certificate(conn, user, payload, patient_id):
     record = next((r for r in records if r.get("id") == payload.get("id")), None)
     if not record:
         raise DocsError("Certificado no encontrado.")
-    if user.get("rol") != "admin" and str((record.get("medico") or {}).get("id")) != str(user.get("medicoId")):
-        raise DocsError("Solo el médico que lo emitió o el administrador puede anularlo.")
+    own_doctor = user.get("medicoId") and str((record.get("medico") or {}).get("id")) == str(user.get("medicoId"))
+    own_staff = is_cert_staff(user) and str(record.get("emitidoPorId")) == str(user.get("id"))
+    if user.get("rol") != "admin" and not own_doctor and not own_staff:
+        raise DocsError("Solo quien lo emitió, el médico firmante o el administrador puede anularlo.")
     if record.get("estado") == "Anulado":
         return "certificados", records
     record.update(estado="Anulado", anuladoPor=user_name(user), anuladoEn=now().isoformat(timespec="seconds"),
@@ -353,8 +371,12 @@ def operation(conn, user, payload):
     patient_id = str(payload.get("patientId") or "")
     if not patient_id:
         raise DocsError("Selecciona un paciente.")
-    patient = check_access(conn, user, patient_id)
-    if action == "vitals_save":
+    patient = check_access(conn, user, patient_id, action=action)
+    if user.get("rol") in ("recepcion", "secretaria") and "hce" not in perms_of(user) and action not in CERT_ACTIONS:
+        raise DocsError("No tienes permiso para la historia clínica.")
+    if action == "certificate_list":
+        key, records = "certificados", store(conn, "certificados").get(str(patient_id), [])
+    elif action == "vitals_save":
         key, records = save_vitals(conn, user, payload, patient_id)
     elif action == "note_vitals":
         key, records = edit_note_vitals(conn, user, payload, patient_id)
