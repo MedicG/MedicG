@@ -20,7 +20,9 @@ import uuid
 
 TZ = dt.timezone(dt.timedelta(hours=-5))
 ACTIVE_STATES = {"pendiente", "confirmada", "solicitada online", "pospuesta"}
-MAX_PER_RUN = 12
+MAX_PER_RUN = 6
+TIME_BUDGET_SECONDS = 7  # stay well inside the serverless function time limit
+WINDOW_24H = 36  # hours: the 07:00 daily run covers every appointment of the next day
 RUN_INTERVAL_SECONDS = 240
 DAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
@@ -153,7 +155,12 @@ def message(cita, patient, doctor, cfg, kind):
     online = cita.get("modalidad") == "online"
     when = f"{long_date(cita.get('fecha'))} a las {cita.get('hora')}"
     doctor_name = doctor.get("nombre") or "su médico"
-    intro = {"confirmacion": "su cita quedó agendada", "manual": "le recordamos su cita", "24h": "le recordamos su cita de mañana", "2h": "le recordamos su cita de hoy"}.get(kind, "le recordamos su cita")
+    try:
+        delta = (dt.date.fromisoformat(str(cita.get("fecha"))) - now().date()).days
+    except ValueError:
+        delta = None
+    relative = {0: "de hoy", 1: "de mañana"}.get(delta, "")
+    intro = "su cita quedó agendada" if kind == "confirmacion" else ("le recordamos su cita " + relative).strip()
     lines = [f"Hola {name}, {intro} en {center}:", f"📅 {when}", f"👩‍⚕️ {doctor_name} · {cita.get('esp') or ''}".strip(" ·")]
     if online:
         lines.append("💻 Consulta en línea: ingrese al portal del paciente 30 minutos antes.")
@@ -195,43 +202,59 @@ def send_whatsapp_cloud(cfg, phone, params):
         return False, "No se pudo conectar con WhatsApp Business."
 
 
+HANDLED = ("sent", "manual", "sending")
+
+
 def already_sent(conn, cita_id, channel, kind, slot):
-    row = conn.execute("select id from reminder_log where cita_id = ? and channel = ? and kind = ? and slot = ? and status in ('sent','manual')",
-                       (str(cita_id), channel, kind, slot)).fetchone()
+    """True when the message was sent, sent by hand, or reserved by a run that may have sent it."""
+    marks = ",".join("?" for _ in HANDLED)
+    row = conn.execute(f"select id from reminder_log where cita_id = ? and channel = ? and kind = ? and slot = ? and status in ({marks})",
+                       (str(cita_id), channel, kind, slot, *HANDLED)).fetchone()
     return bool(row)
 
 
-def log(conn, cita_id, channel, kind, slot, status, detail="", user_name="Sistema"):
+def log(conn, cita_id, channel, kind, slot, status, detail="", user_name="Sistema", entry_id=None):
+    entry_id = entry_id or str(uuid.uuid4())
     conn.execute("insert into reminder_log(id,cita_id,channel,kind,slot,status,detail,ts,user_name) values(?,?,?,?,?,?,?,?,?)",
-                 (str(uuid.uuid4()), str(cita_id), channel, kind, slot, status, str(detail)[:500], now().isoformat(timespec="seconds"), user_name))
+                 (entry_id, str(cita_id), channel, kind, slot, status, str(detail)[:500], now().isoformat(timespec="seconds"), user_name))
+    return entry_id
 
 
-def deliver(conn, cita, channel, kind, user_name="Sistema", mail_cfg=None, rem_cfg=None):
-    """Send one message. Returns dict with status sent/manual/skipped/error and optional waLink."""
-    from medicg.mailer import send as send_mail, settings as mail_settings
+def finish(entry_id, status, detail):
+    from medicg_app import db
+    with db(lock=None) as conn:
+        conn.execute("update reminder_log set status = ?, detail = ?, ts = ? where id = ?",
+                     (status, str(detail)[:500], now().isoformat(timespec="seconds"), entry_id))
+
+
+def prepare(conn, cita, channel, kind):
+    """Build the message (inside a transaction). Network sending happens later, outside it."""
     patient, doctor, cfg = context(conn, cita)
-    slot = f"{cita.get('fecha')} {cita.get('hora')}"
     text, params = message(cita, patient, doctor, cfg, kind)
-    rem_cfg = rem_cfg or settings(conn)
+    job = {"cita_id": cita["id"], "channel": channel, "kind": kind, "slot": f"{cita.get('fecha')} {cita.get('hora')}", "text": text, "params": params}
     if channel == "email":
-        address = (patient.get("email") or "").strip()
-        if not address:
-            log(conn, cita["id"], channel, kind, slot, "skipped", "El paciente no tiene correo.", user_name)
-            return {"status": "skipped", "detail": "El paciente no tiene correo registrado."}
-        subject = ("Cita agendada" if kind == "confirmacion" else "Recordatorio de cita") + f" · {long_date(cita.get('fecha'))} {cita.get('hora')}"
-        ok, error = send_mail(address, subject, text, email_html(text, cfg), config=mail_cfg or mail_settings(conn), conn=None)
-        log(conn, cita["id"], channel, kind, slot, "sent" if ok else "error", error or address, user_name)
-        return {"status": "sent" if ok else "error", "detail": error or f"Enviado a {address}"}
-    phone = phone_e164(patient.get("tel"))
-    if not phone:
-        log(conn, cita["id"], channel, kind, slot, "skipped", "Teléfono inválido o vacío.", user_name)
-        return {"status": "skipped", "detail": "El paciente no tiene un celular válido."}
-    link = "https://wa.me/" + phone + "?text=" + urllib.parse.quote(text)
-    if whatsapp_ready(rem_cfg):
-        ok, detail = send_whatsapp_cloud(rem_cfg, phone, params)
-        log(conn, cita["id"], channel, kind, slot, "sent" if ok else "error", detail, user_name)
-        return {"status": "sent" if ok else "error", "detail": detail if not ok else "Enviado por WhatsApp Business", "waLink": None if ok else link}
-    return {"status": "pending_manual", "detail": "Abre WhatsApp para enviar el mensaje preparado.", "waLink": link}
+        job["address"] = (patient.get("email") or "").strip()
+        job["subject"] = ("Cita agendada" if kind == "confirmacion" else "Recordatorio de cita") + f" · {long_date(cita.get('fecha'))} {cita.get('hora')}"
+        job["html"] = email_html(text, cfg)
+        if not job["address"]:
+            job["skip"] = "El paciente no tiene correo registrado."
+    else:
+        job["phone"] = phone_e164(patient.get("tel"))
+        if not job["phone"]:
+            job["skip"] = "El paciente no tiene un celular válido."
+        else:
+            job["link"] = "https://wa.me/" + job["phone"] + "?text=" + urllib.parse.quote(text)
+    return job
+
+
+def execute(job, mail_cfg, rem_cfg):
+    """Send one prepared message. Returns (status, detail). No database access."""
+    from medicg.mailer import send as send_mail
+    if job["channel"] == "email":
+        ok, error = send_mail(job["address"], job["subject"], job["text"], job["html"], config=mail_cfg, conn=None)
+        return ("sent", f"Enviado a {job['address']}") if ok else ("error", error or "No se pudo enviar el correo.")
+    ok, detail = send_whatsapp_cloud(rem_cfg, job["phone"], job["params"])
+    return ("sent", "Enviado por WhatsApp Business") if ok else ("error", detail)
 
 
 def due(cita, current):
@@ -248,64 +271,109 @@ def due(cita, current):
     channels, leads = plan(cita.get("notif"))
     result = []
     for lead in leads:
-        window = 26 if lead == 24 else 2.5
+        window = WINDOW_24H if lead == 24 else 2.5
         if hours <= window and (lead == 2 or hours > 2.5 or 2 not in leads):
             for channel in channels:
                 result.append((channel, f"{lead}h"))
     return result
 
 
-def run(conn, force=False):
-    """Send due automatic reminders (e-mail always; WhatsApp only with Business API)."""
-    from medicg_app import get_json_key, set_json_key
+def run(conn=None, force=False):
+    """Send due automatic reminders (e-mail always; WhatsApp only with Business API).
+
+    1) a short transaction reserves the due messages ("sending"), 2) messages are sent
+    outside any transaction within a time budget, 3) each result is recorded at once.
+    A message reserved by a run that was interrupted is never sent twice.
+    """
+    from medicg_app import db, get_json_key, set_json_key
     from medicg.mailer import settings as mail_settings
-    cfg = settings(conn)
-    if not cfg["enabled"]:
-        return {"ok": True, "sent": 0, "disabled": True}
-    if not force and time.time() - float(cfg.get("lastRun") or 0) < RUN_INTERVAL_SECONDS:
-        return {"ok": True, "sent": 0, "throttled": True}
-    raw = get_json_key(conn, "remindersPrivate", {}) or {}
-    raw["lastRun"] = time.time()
-    set_json_key(conn, "remindersPrivate", raw)
-    current = now()
-    mail_cfg = mail_settings(conn)
-    sent, errors, attempts = 0, [], 0
-    for cita in get_json_key(conn, "citas", []) or []:
-        for channel, kind in due(cita, current):
-            if channel == "whatsapp" and not whatsapp_ready(cfg):
-                continue
-            slot = f"{cita.get('fecha')} {cita.get('hora')}"
-            if already_sent(conn, cita["id"], channel, kind, slot):
-                continue
-            recent_error = conn.execute("select ts from reminder_log where cita_id = ? and channel = ? and kind = ? and slot = ? and status = 'error' order by ts desc limit 1",
-                                        (str(cita["id"]), channel, kind, slot)).fetchone()
-            if recent_error and (current - dt.datetime.fromisoformat(recent_error["ts"])).total_seconds() < 1800:
-                continue
-            if attempts >= MAX_PER_RUN:
-                return {"ok": True, "sent": sent, "errors": errors, "more": True}
-            attempts += 1
-            result = deliver(conn, cita, channel, kind, mail_cfg=mail_cfg, rem_cfg=cfg)
-            if result["status"] == "sent":
-                sent += 1
-            elif result["status"] == "error":
-                errors.append({"cita": cita["id"], "channel": channel, "detail": result["detail"]})
-    return {"ok": True, "sent": sent, "errors": errors}
+    started = time.time()
+    with db(lock="reminders") as tx:
+        cfg = settings(tx)
+        if not cfg["enabled"]:
+            return {"ok": True, "sent": 0, "disabled": True}
+        if not force and time.time() - float(cfg.get("lastRun") or 0) < RUN_INTERVAL_SECONDS:
+            return {"ok": True, "sent": 0, "throttled": True}
+        raw = get_json_key(tx, "remindersPrivate", {}) or {}
+        raw["lastRun"] = time.time()
+        set_json_key(tx, "remindersPrivate", raw)
+        current = now()
+        mail_cfg = mail_settings(tx)
+        jobs, more = [], False
+        for cita in get_json_key(tx, "citas", []) or []:
+            for channel, kind in due(cita, current):
+                if channel == "whatsapp" and not whatsapp_ready(cfg):
+                    continue
+                slot = f"{cita.get('fecha')} {cita.get('hora')}"
+                if already_sent(tx, cita["id"], channel, kind, slot):
+                    continue
+                recent_error = tx.execute("select ts from reminder_log where cita_id = ? and channel = ? and kind = ? and slot = ? and status in ('error','skipped') order by ts desc limit 1",
+                                          (str(cita["id"]), channel, kind, slot)).fetchone()
+                if recent_error and (current - dt.datetime.fromisoformat(recent_error["ts"])).total_seconds() < 1800:
+                    continue
+                if len(jobs) >= MAX_PER_RUN:
+                    more = True
+                    continue
+                job = prepare(tx, cita, channel, kind)
+                if job.get("skip"):
+                    log(tx, cita["id"], channel, kind, slot, "skipped", job["skip"])
+                    continue
+                job["entry"] = log(tx, cita["id"], channel, kind, slot, "sending", "Reservado para envío")
+                jobs.append(job)
+    sent, errors = 0, []
+    for index, job in enumerate(jobs):
+        if time.time() - started > TIME_BUDGET_SECONDS:
+            # Release what was not attempted so the next run picks it up.
+            with db(lock=None) as tx:
+                for pending in jobs[index:]:
+                    tx.execute("delete from reminder_log where id = ? and status = 'sending'", (pending["entry"],))
+            more = True
+            break
+        try:
+            status_, detail = execute(job, mail_cfg, cfg)
+        except Exception:
+            status_, detail = "error", "Error inesperado al enviar."
+        finish(job["entry"], status_, detail)
+        if status_ == "sent":
+            sent += 1
+        else:
+            errors.append({"cita": job["cita_id"], "channel": job["channel"], "detail": detail})
+    result = {"ok": True, "sent": sent, "errors": errors}
+    if more:
+        result["more"] = True
+    return result
 
 
 def send_now(conn, user, payload):
-    from medicg_app import get_json_key, can_save_key, user_display_name
+    """Manual send from the agenda. ``conn`` is ignored; short transactions are used internally."""
+    from medicg_app import db, get_json_key, can_save_key, user_display_name
+    from medicg.mailer import settings as mail_settings
     if not can_save_key(user, "citas"):
         raise ReminderError("No tienes permiso para enviar recordatorios.")
-    cita = next((c for c in get_json_key(conn, "citas", []) or [] if str(c.get("id")) == str(payload.get("citaId"))), None)
-    if not cita:
-        raise ReminderError("Cita no encontrada.")
     channels = payload.get("channels") or [payload.get("channel")]
+    if any(channel not in ("email", "whatsapp") for channel in channels):
+        raise ReminderError("Canal inválido.")
     kind = payload.get("kind") if payload.get("kind") in ("confirmacion", "manual") else "manual"
+    name = user_display_name(user)
+    with db(read_only=True) as tx:
+        cita = next((c for c in get_json_key(tx, "citas", []) or [] if str(c.get("id")) == str(payload.get("citaId"))), None)
+        if not cita:
+            raise ReminderError("Cita no encontrada.")
+        rem_cfg, mail_cfg = settings(tx), mail_settings(tx)
+        jobs = [prepare(tx, cita, channel, kind) for channel in channels]
     results = {}
-    for channel in channels:
-        if channel not in ("email", "whatsapp"):
-            raise ReminderError("Canal inválido.")
-        results[channel] = deliver(conn, cita, channel, kind, user_display_name(user))
+    for job in jobs:
+        if job.get("skip"):
+            outcome = {"status": "skipped", "detail": job["skip"]}
+        elif job["channel"] == "whatsapp" and not whatsapp_ready(rem_cfg):
+            results["whatsapp"] = {"status": "pending_manual", "detail": "Abre WhatsApp para enviar el mensaje preparado.", "waLink": job["link"]}
+            continue
+        else:
+            status_, detail = execute(job, mail_cfg, rem_cfg)
+            outcome = {"status": status_, "detail": detail, "waLink": job.get("link") if status_ == "error" else None}
+        with db(lock=None) as tx:
+            log(tx, job["cita_id"], job["channel"], kind, job["slot"], outcome["status"], outcome["detail"], name)
+        results[job["channel"]] = outcome
     return {"ok": True, "results": results}
 
 

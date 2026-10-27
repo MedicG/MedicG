@@ -2347,8 +2347,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if secret and self.headers.get("Authorization", "") != "Bearer " + secret:
                 return make_response(self, 401, {"error": "No autorizado"})
             from medicg.reminders import run as run_reminders
-            with db(lock="reminders") as conn:
-                return make_response(self, 200, run_reminders(conn, force=bool(secret)))
+            return make_response(self, 200, run_reminders(None, force=bool(secret)))
         if path in ("/api/reminders/settings", "/api/reminders/status"):
             user = auth_user(self)
             if not user:
@@ -2691,11 +2690,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 if path == "/api/reminders/run":
                     if not can_save_key(user, "citas"):
                         return make_response(self, 403, {"error": "Sin permiso de agenda."})
-                    with db(lock="reminders") as conn:
-                        return make_response(self, 200, reminders.run(conn, force=bool(payload.get("force")) and user.get("rol") == "admin"))
+                    return make_response(self, 200, reminders.run(None, force=bool(payload.get("force")) and user.get("rol") == "admin"))
                 if path == "/api/reminders/send":
-                    with db(lock="reminders") as conn:
-                        return make_response(self, 200, reminders.send_now(conn, user, payload))
+                    return make_response(self, 200, reminders.send_now(None, user, payload))
                 if path == "/api/reminders/mark":
                     with db(lock="reminders") as conn:
                         return make_response(self, 200, reminders.mark_manual(conn, user, payload))

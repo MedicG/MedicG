@@ -45,3 +45,5 @@ a.btn-g,a.btn-p,a.btn-s{display:inline-flex;align-items:center;gap:6px;text-deco
 #m-rem-wa a.btn-g{color:#fff;padding:9px 16px;border-radius:8px;font-weight:600}
 label.flex input[type=checkbox],label.rem-confirm input[type=checkbox]{width:auto!important;margin:0;flex-shrink:0}
 label.flex{justify-content:flex-start;text-align:left}
+.flex > .pp-wrap{flex:1;min-width:0}
+#m-cita .flex.gap8{align-items:flex-start}

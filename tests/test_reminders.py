@@ -29,6 +29,18 @@ def main():
     assert reminders.plan('Sin recordatorio') == (set(), [])
     assert reminders.phone_e164('099 123 4567') == '593991234567' and reminders.phone_e164('+593 99 123 4567') == '593991234567' and reminders.phone_e164('12') == ''
 
+    # 24h window: the 07:00 daily run must cover an appointment at 15:00 next day (32 h ahead)
+    now_ = datetime.datetime(2026, 11, 2, 7, 0, tzinfo=reminders.TZ)
+    assert reminders.due({'estado': 'Confirmada', 'fecha': '2026-11-03', 'hora': '15:00', 'notif': 'Solo correo (24h antes)'}, now_) == [('email', '24h')]
+    assert reminders.due({'estado': 'Confirmada', 'fecha': '2026-11-04', 'hora': '15:00', 'notif': 'Solo correo (24h antes)'}, now_) == []
+    assert reminders.due({'estado': 'Cancelada', 'fecha': '2026-11-03', 'hora': '15:00', 'notif': 'Solo correo (24h antes)'}, now_) == []
+    # relative day wording
+    today_ = datetime.datetime.now(reminders.TZ).date()
+    txt = reminders.message({'fecha': today_.isoformat(), 'hora': '18:00'}, {'nombres': 'ana'}, {}, {}, '24h')[0]
+    assert 'cita de hoy' in txt and 'mañana' not in txt.split('\n')[0], txt
+    txt = reminders.message({'fecha': (today_ + datetime.timedelta(days=1)).isoformat(), 'hora': '09:00'}, {'nombres': 'ana'}, {}, {}, '24h')[0]
+    assert 'cita de mañana' in txt
+
     temporary = tempfile.TemporaryDirectory()
     app.DB_DRIVER = 'sqlite'
     app.DB_PATH = Path(temporary.name) / 'reminders.sqlite3'
@@ -108,6 +120,30 @@ def main():
     assert len(SENT_WA) == 2
     # daily cron endpoint works without a session (rate limited, idempotent)
     assert call('', '/api/reminders/cron')[0] == 200
+
+    # a run interrupted after reserving a message never sends it twice
+    with app.db() as conn:
+        citas = app.get_json_key(conn, 'citas')
+        citas.append({'id': 9, 'pac': 1, 'med': 1, 'esp': 'Medicina General', 'fecha': soon.date().isoformat(), 'hora': soon.strftime('%H:%M'), 'estado': 'Confirmada', 'notif': 'Solo correo (24h antes)'})
+        app.set_json_key(conn, 'citas', citas)
+        reminders.log(conn, 9, 'email', '24h', f"{soon.date().isoformat()} {soon.strftime('%H:%M')}", 'sending', 'Reservado para envío')
+    before = len(SENT_MAIL)
+    call(admin, '/api/reminders/run', {'force': True})
+    assert len(SENT_MAIL) == before, 'reserved message must not be resent'
+    # time budget: unattempted reservations are released for the next run
+    original_budget, original_execute = reminders.TIME_BUDGET_SECONDS, reminders.execute
+    reminders.TIME_BUDGET_SECONDS = -1
+    with app.db() as conn:
+        citas = app.get_json_key(conn, 'citas')
+        citas.append({'id': 10, 'pac': 1, 'med': 1, 'esp': 'Medicina General', 'fecha': (soon + datetime.timedelta(minutes=5)).date().isoformat(), 'hora': (soon + datetime.timedelta(minutes=5)).strftime('%H:%M'), 'estado': 'Confirmada', 'notif': 'Solo correo (24h antes)'})
+        app.set_json_key(conn, 'citas', citas)
+    body = call(admin, '/api/reminders/run', {'force': True})[1]
+    assert body.get('more') and body['sent'] == 0, body
+    with app.db(read_only=True) as conn:
+        assert conn.execute("select count(*) as n from reminder_log where cita_id = '10'").fetchone()['n'] == 0
+    reminders.TIME_BUDGET_SECONDS = original_budget
+    body = call(admin, '/api/reminders/run', {'force': True})[1]
+    assert body['sent'] >= 1 and any(m[0] == 'ana@localhost.test' for m in SENT_MAIL[before:]), body
 
     # patient double booking is rejected
     day = datetime.date.today() + datetime.timedelta(days=7)
