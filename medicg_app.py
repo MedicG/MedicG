@@ -1035,6 +1035,79 @@ def saved_sri_certificate_status(cert):
     }
 
 
+def certificate_identity(cert):
+    """Holder name, ID digits found in the certificate (cédula/RUC) and expiry."""
+    from cryptography.x509.oid import NameOID
+    names = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    text = cert.subject.rfc4514_string()
+    try:
+        for ext in cert.extensions:
+            value = getattr(ext.value, "value", b"")
+            if isinstance(value, bytes):
+                text += " " + value.decode("latin-1", "ignore")
+    except Exception:
+        pass
+    ids = sorted(set(re.findall(r"(?<!\d)(\d{13}|\d{10})(?!\d)", text)))
+    not_after = getattr(cert, "not_valid_after_utc", None) or cert.not_valid_after.replace(tzinfo=dt.timezone.utc)
+    return {"titular": names[0].value if names else text, "identificaciones": ids, "vence": not_after.date().isoformat(),
+            "emisor": cert.issuer.rfc4514_string()[:200]}
+
+
+def sri_connection_test(config, cert_info, mail_config, send_email=True):
+    """Sign and send a $1.00 invoice to the SRI PRUEBAS environment. Nothing is stored."""
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    import random as _random
+    result = {"ok": False, "ambiente": "PRUEBAS"}
+    try:
+        _key, cert, _extra = pkcs12.load_key_and_certificates(load_sri_certificate_bytes(cert_info),
+                                                              (cert_info.get("password") or SRI_CERT_PASSWORD or "").encode("utf-8") or None)
+        result["firma"] = certificate_identity(cert)
+    except SRIIntegrationError as exc:
+        result["error"] = str(exc)
+        return result
+    except Exception:
+        result["error"] = "No se pudo abrir la firma electrónica: revisa la clave del .p12."
+        return result
+    sri = sri_config(config)
+    sri["ambiente"] = "1"
+    result["ruc"] = sri.get("ruc")
+    cedulas = [i[:10] for i in result["firma"]["identificaciones"]]
+    if cedulas and clean_digits(sri.get("ruc"))[:10] not in cedulas:
+        result["advertencia"] = f"El RUC configurado ({sri.get('ruc')}) no corresponde a la firma ({', '.join(result['firma']['identificaciones'])})."
+    today_ec = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5))).date()
+    secuencial = str(_random.randint(900000000, 999999999))
+    invoice = {"id": f"{sri['estab']}-{sri['ptoEmi']}-{secuencial}", "secuencial": secuencial, "fecha": today_ec.isoformat(),
+               "items": [{"desc": "PRUEBA DE CONEXION SRI - SIN VALOR TRIBUTARIO", "cant": 1, "unit": 1, "total": 1, "ivaRate": 0, "iva": 0, "codigo": "PRUEBA"}],
+               "sub": 1.0, "iva": 0.0, "total": 1.0, "ivaRate": 0.0, "pago": "Efectivo", "pagos": [],
+               "sri": {**sri, "ivaRate": 0.0}}
+    patient = {"id": 0, "nombres": "CONSUMIDOR", "apellidos": "FINAL", "cedula": "", "email": (config.get("email") or "").strip()}
+    try:
+        invoice["claveAcceso"] = build_access_key(today_ec, sri, secuencial)
+        invoice["xml"] = build_invoice_xml(invoice, patient, config)
+        send_invoice_to_sri(invoice, cert_info)
+    except SRIIntegrationError as exc:
+        result["error"] = str(exc)
+        return result
+    except Exception as exc:
+        log.exception("SRI test failed")
+        result["error"] = f"No se pudo completar la prueba: {exc}"
+        return result
+    result.update(estado=invoice.get("sriEstado"), mensaje=invoice.get("sriMensaje"), claveAcceso=invoice.get("claveAcceso"),
+                  numero=invoice["id"], recepcion=[m for m in (invoice.get("sriRecepcion") or {}).get("mensajes", [])],
+                  autorizacion=[m for m in (invoice.get("sriAutorizacion") or {}).get("mensajes", [])])
+    result["ok"] = invoice.get("sriEstado") == "AUTORIZADO"
+    if result["ok"] and send_email:
+        if patient["email"]:
+            try:
+                sent, error = send_invoice_email(invoice, patient, config, mail_config, None)
+            except Exception:
+                sent, error = False, "No se pudo enviar el correo."
+            result["correo"] = {"enviado": sent, "a": patient["email"], "error": error}
+        else:
+            result["correo"] = {"enviado": False, "error": "La clínica no tiene correo en Configuración."}
+    return result
+
+
 def describe_p12(raw, password):
     """Open a .p12 with its password and return holder and expiry, or a clear error."""
     from cryptography.hazmat.primitives.serialization import pkcs12
@@ -2920,6 +2993,18 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 200, result)
             except VideoError as exc:
                 return make_response(self, 409, {"error": str(exc)})
+        if path == "/api/sri/test":
+            if user.get("rol") != "admin":
+                return make_response(self, 403, {"error": "Solo el administrador puede probar la conexión con el SRI"})
+            from medicg.mailer import settings as mail_settings_of
+            with db(read_only=True) as conn:
+                config = get_json_key(conn, "config", {}) or {}
+                cert_info = get_sri_certificate(conn)
+                mail_config = mail_settings_of(conn)
+            result = sri_connection_test(config, cert_info, mail_config, payload.get("sendEmail", True) is not False)
+            with db(lock=None) as conn:
+                audit(conn, user, "sri_connection_test", "config", {"estado": result.get("estado"), "error": result.get("error", "")[:200]})
+            return make_response(self, 200, result)
         if path == "/api/sri/certificate":
             if user.get("rol") != "admin":
                 return make_response(self, 403, {"error": "Solo el dueno/administrador puede configurar el certificado SRI"})
