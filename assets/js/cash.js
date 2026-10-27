@@ -55,11 +55,11 @@ function cashAccountHtml(patientId){
 function renderCaja(){
  if(!hasPerm('caja'))return;
  const boxes=DB.get('cajas')||[],box=boxes.find(c=>c.estado==='abierta');
- if(!box){renderCajaLegacy();return;}
+ if(!box){renderCajaClosed();return;}
  const movs=(box.movimientos||[]).filter(m=>m.pago!=='Pendiente');
  const sum=filter=>movs.filter(filter).reduce((s,m)=>s+Number(m.monto||0),0);
  const totals=[['Total recibido en esta caja',sum(()=>true)],['Efectivo',sum(m=>m.pago==='Efectivo')],['Tarjeta',sum(m=>String(m.pago).startsWith('Tarjeta'))],['Transferencia',sum(m=>m.pago==='Transferencia')],['Seguros (registros anteriores)',sum(m=>m.pago==='IESS'||m.pago==='Seguro privado')]];
- document.getElementById('caja-content').innerHTML=`<div class="caja-status-bar caja-open"><strong>Caja abierta</strong> · ${esc(box.fecha)} · ${esc(box.cajero||'')}</div>
+ document.getElementById('caja-content').innerHTML=`<div class="caja-status-bar caja-open"><strong>Caja abierta</strong> · ${esc(box.fecha)} ${esc(box.horaApertura||'')} · ${esc(box.cajero||'')}${box.montoApertura?` · Fondo inicial ${fmtMoney(box.montoApertura)}`:''}</div>${box.fecha&&box.fecha<today()?`<div class="alert alert-w"><i class="ti ti-alert-triangle"></i><span>Esta caja es del ${fmtDate(box.fecha)} y sigue abierta. Haz el cierre de ese día antes de seguir cobrando.</span></div>`:''}
  ${cashPending()?'<div class="alert alert-w">Hay una operación pendiente de confirmar. <button class="btn-p" onclick="cashRetry()">Reintentar la misma operación</button></div>':''}
  <div class="stats-row">${totals.map(([name,total])=>`<div class="stat-box"><div class="stat-lbl">${name}</div><div class="stat-val">${fmtMoney(total)}</div></div>`).join('')}</div>
  <div class="cash-layout"><section class="card"><div class="card-hdr"><h3 class="card-title">Cobrar servicios y exámenes</h3></div><div class="card-body">
@@ -69,7 +69,7 @@ function renderCaja(){
  <div id="cash-summary" class="cash-summary" aria-live="polite"></div><button class="btn-g w100 cash-submit" onclick="cashCharge()">Guardar cobro y saldo</button></div></section>
  <section class="card"><div class="card-hdr"><h3 class="card-title">Cuenta del paciente</h3><button class="btn-s btn-sm" onclick="cashRefresh()">Actualizar</button></div><div class="card-body" id="cash-patient-account">${cashAccountHtml(cashDraft.patientId)}</div></section></div>
  <section class="card mt16"><div class="card-hdr"><h3 class="card-title">Movimientos recibidos</h3><span class="text-muted">Los saldos pendientes no se suman como ingresos</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha / hora</th><th>Paciente</th><th>Concepto</th><th>Recibido</th><th>Forma</th><th>Referencia</th>${currentUser?.rol==='admin'?'<th>Acciones</th>':''}</tr></thead><tbody>${movs.map(m=>`<tr><td>${esc(m.fecha||box.fecha)} ${esc(m.hora||'')}</td><td>${esc(m.pac||'')}</td><td>${esc(m.concepto||'')}</td><td>${fmtMoney(m.monto)}</td><td>${esc(m.pago||'')}</td><td>${esc(m.referencia||'—')}</td>${currentUser?.rol==='admin'?`<td><button class="btn-d btn-sm" onclick="cashDeleteDialog(${boxes.indexOf(box)},${box.movimientos.indexOf(m)})">Eliminar</button></td>`:''}</tr>`).join('')||'<tr><td colspan="6">Sin pagos recibidos</td></tr>'}</tbody></table></div></section>
- ${currentUser?.rol==='admin'?'<div class="mt12 text-r"><button class="btn-d" onclick="cerrarCaja()">Cerrar caja</button></div>':''}`;
+ ${cashCanManageBox()?'<div class="mt12 text-r"><button class="btn-d" onclick="cerrarCaja()"><i class="ti ti-lock"></i> Cierre de caja del día</button></div>':''}`;
  cashRenderItems();cashRenderPayments('charge');
 }
 function cashModal(id,title,body){
@@ -130,4 +130,68 @@ async function cashDeleteMovement(button){
  cashBusy=true;button.disabled=true;
  try{await DB.tail;if(DB.failures.size)throw new Error('Resuelve los cambios sin guardar antes de eliminar.');await API.post('/api/cash/delete-movement',{...cashDeleteTarget,reason});closeM('m-cash-delete');cashDeleteTarget=null;await cashRefresh();toast('Movimiento eliminado; caja y saldo actualizados.','ok');}
  catch(e){toast(e.message,'err');}finally{cashBusy=false;button.disabled=false;}
+}
+
+/* Daily open/close of the cash box with cash count (arqueo). Reception, secretary and admin. */
+function cashCanManageBox(){return ['admin','recepcion','secretaria'].includes(currentUser?.rol)&&hasPerm('caja');}
+function cashBoxSummary(box){
+ const movs=(box.movimientos||[]).filter(m=>m.pago!=='Pendiente');
+ const cents=v=>Math.round(Number(v||0)*100);
+ const sum=rule=>movs.filter(m=>rule(String(m.pago||''))).reduce((s,m)=>s+cents(m.monto),0)/100;
+ const totales={'Efectivo':sum(p=>p==='Efectivo'),'Tarjeta débito':sum(p=>p==='Tarjeta débito'),'Tarjeta crédito':sum(p=>p==='Tarjeta crédito'||p==='Tarjeta'),'Transferencia':sum(p=>p==='Transferencia'),'Otros':sum(p=>!['Efectivo','Tarjeta débito','Tarjeta crédito','Tarjeta','Transferencia'].includes(p))};
+ const totalRecibido=Object.values(totales).reduce((s,v)=>s+cents(v),0)/100;
+ return {totales,totalRecibido,efectivoEsperado:(cents(box.montoApertura)+cents(totales['Efectivo']))/100,movimientos:movs.length};
+}
+function cashClosingsHtml(){
+ const closed=(DB.get('cajas')||[]).filter(c=>c.estado==='cerrada').slice().reverse().slice(0,30);
+ if(!closed.length)return '<p class="text-muted">Aún no hay cierres registrados.</p>';
+ return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Caja</th><th>Fecha</th><th>Abrió</th><th>Cerró</th><th>Total recibido</th><th>Efectivo esperado</th><th>Contado</th><th>Diferencia</th><th></th></tr></thead><tbody>${closed.map(c=>{const k=c.cierre||{};const total=k.totalRecibido??(c.movimientos||[]).filter(m=>m.pago!=='Pendiente').reduce((s,m)=>s+Number(m.monto||0),0);const diff=k.diferencia;return `<tr><td>#${esc(c.id)}</td><td>${fmtDate(c.fecha)}</td><td>${esc(c.cajero||'—')} ${esc(c.horaApertura||'')}</td><td>${esc(k.cerradoPor||c.cerradoPor||'—')} ${esc(k.hora||c.horaCierre||'')}</td><td>${fmtMoney(total)}</td><td>${k.efectivoEsperado!=null?fmtMoney(k.efectivoEsperado):'—'}</td><td>${k.efectivoContado!=null?fmtMoney(k.efectivoContado):'—'}</td><td>${diff==null?'<span class="text-muted">Sin arqueo</span>':`<span class="badge ${diff===0?'b-green':'b-red'}">${fmtMoney(diff)}</span>`}</td><td><button class="btn-s btn-sm" onclick="printCierreCaja('${esc(String(c.id))}')"><i class="ti ti-printer"></i> Imprimir</button></td></tr>`;}).join('')}</tbody></table></div>`;
+}
+function renderCajaClosed(){
+ const el=document.getElementById('caja-content');if(!el)return;
+ el.innerHTML=`<div class="caja-closed"><i class="ti ti-lock" style="font-size:56px;color:var(--text3);display:block;margin-bottom:12px;"></i><div class="fw7 text-md mb8">Caja cerrada</div>
+ ${cashCanManageBox()?`<div class="text-sm text-muted mb12">Abre la caja del día para registrar cobros. Al terminar la jornada haz el cierre con el arqueo de efectivo.</div><div class="flex gap8" style="justify-content:center;align-items:flex-end;flex-wrap:wrap"><label class="field" style="max-width:220px;text-align:left">Fondo inicial en efectivo ($)<input id="cash-open-amount" type="number" min="0" step="0.01" value="0"></label><button class="btn-g" onclick="abrirCaja()"><i class="ti ti-lock-open"></i> Abrir caja del día</button></div>`:'<div class="alert alert-w" style="max-width:420px;margin:0 auto;"><i class="ti ti-alert-circle"></i><span>Recepción, secretaría o el administrador abren la caja.</span></div>'}</div>
+ <section class="card mt16"><div class="card-hdr"><h3 class="card-title">Cierres de caja</h3><button class="btn-s btn-sm" onclick="cashRefresh()">Actualizar</button></div><div class="card-body">${cashClosingsHtml()}</div></section>`;
+}
+async function abrirCaja(){
+ if(!cashCanManageBox()){toast('No tienes permiso para abrir caja','err');return;}
+ if(cashBusy)return;cashBusy=true;
+ try{
+  await DB.tail;if(DB.failures.size)throw new Error('Resuelve los cambios sin guardar antes de abrir caja.');
+  const amount=document.getElementById('cash-open-amount')?.value||0;
+  await API.post('/api/cash/open',{montoApertura:amount});
+  await cashRefresh();toast('Caja del día abierta','ok');
+ }catch(e){toast(e.message,'err');}finally{cashBusy=false;}
+}
+function cerrarCaja(){
+ if(!cashCanManageBox()){toast('No tienes permiso para cerrar caja','err');return;}
+ const box=(DB.get('cajas')||[]).find(c=>c.estado==='abierta');if(!box){toast('No hay una caja abierta','inf');return;}
+ const s=cashBoxSummary(box);
+ cashModal('m-cash-close','Cierre de caja del día',`<p class="text-sm text-muted">Caja #${esc(box.id)} · abierta el ${fmtDate(box.fecha)} ${esc(box.horaApertura||'')} por ${esc(box.cajero||'—')} · ${s.movimientos} pagos recibidos.</p>
+ <div class="tbl-wrap"><table class="tbl"><tbody>${Object.entries(s.totales).filter(([k,v])=>v||k!=='Otros').map(([k,v])=>`<tr><td>${esc(k)}</td><td class="text-r">${fmtMoney(v)}</td></tr>`).join('')}<tr><td><strong>Total recibido</strong></td><td class="text-r"><strong>${fmtMoney(s.totalRecibido)}</strong></td></tr><tr><td>Fondo inicial</td><td class="text-r">${fmtMoney(box.montoApertura||0)}</td></tr><tr><td><strong>Efectivo que debe haber en caja</strong></td><td class="text-r"><strong>${fmtMoney(s.efectivoEsperado)}</strong></td></tr></tbody></table></div>
+ <div class="form-row mt12"><label class="field">Efectivo contado ($)<input id="cash-close-counted" type="number" min="0" step="0.01" value="${s.efectivoEsperado.toFixed(2)}" oninput="cashCloseDiff(${s.efectivoEsperado})"></label><div class="field"><span class="field-lbl">Diferencia</span><div id="cash-close-diff" class="fw7">${fmtMoney(0)}</div></div></div>
+ <label class="field">Observaciones (obligatorio si hay diferencia)<textarea id="cash-close-notes" rows="3" maxlength="1000"></textarea></label>
+ <p class="text-sm text-muted">El cierre queda registrado con tu nombre y no se puede modificar.</p>
+ <button class="btn-d mt8" onclick="cashCloseConfirm('${esc(String(box.id))}',${s.totalRecibido})"><i class="ti ti-lock"></i> Cerrar caja</button>`);
+}
+function cashCloseDiff(expected){const v=Number(document.getElementById('cash-close-counted').value||0);const d=Math.round((v-expected)*100)/100;const el=document.getElementById('cash-close-diff');el.textContent=fmtMoney(d);el.style.color=d===0?'var(--green)':'var(--red)';}
+async function cashCloseConfirm(boxId,expectedTotal){
+ if(cashBusy)return;cashBusy=true;
+ try{
+  await DB.tail;if(DB.failures.size)throw new Error('Resuelve los cambios sin guardar antes de cerrar.');
+  const res=await API.post('/api/cash/close',{boxId,expectedTotal,efectivoContado:document.getElementById('cash-close-counted').value,observaciones:document.getElementById('cash-close-notes').value});
+  closeM('m-cash-close');await cashRefresh();toast('Caja cerrada. Cierre del día registrado.','ok');printCierreCaja(String(res.box.id));
+ }catch(e){toast(e.message,'err');}finally{cashBusy=false;}
+}
+function printCierreCaja(boxId){
+ const c=(DB.get('cajas')||[]).find(x=>String(x.id)===String(boxId));if(!c)return;
+ const k=c.cierre||{...cashBoxSummary(c),cerradoPor:c.cerradoPor,hora:c.horaCierre};const cfg=DB.get('config')||{};
+ const movs=(c.movimientos||[]).filter(m=>m.pago!=='Pendiente');
+ printDoc('Cierre de caja #'+c.id,`<div class="hdr"><img class="logo" src="${esc(cfg.logo||DEFAULT_LOGO)}"><div><div class="big">${esc(cfg.nombre||'Centro Médico')}</div><div class="muted">${esc(cfg.dir||'')}</div></div></div>
+ <div class="rx-title">CIERRE DE CAJA #${esc(c.id)}</div>
+ <div class="row"><div><div class="label">Apertura</div>${fmtDate(c.fecha)} ${esc(c.horaApertura||'')} · ${esc(c.cajero||'')}</div><div><div class="label">Cierre</div>${fmtDate(k.fecha||c.fechaCierre||c.fecha)} ${esc(k.hora||c.horaCierre||'')} · ${esc(k.cerradoPor||c.cerradoPor||'')}</div></div>
+ <table width="100%" border="1" cellspacing="0" cellpadding="6">${Object.entries(k.totales||{}).map(([n,v])=>`<tr><td>${esc(n)}</td><td align="right">${fmtMoney(v)}</td></tr>`).join('')}<tr><td><b>Total recibido</b></td><td align="right"><b>${fmtMoney(k.totalRecibido)}</b></td></tr><tr><td>Fondo inicial</td><td align="right">${fmtMoney(c.montoApertura||0)}</td></tr><tr><td><b>Efectivo esperado</b></td><td align="right"><b>${fmtMoney(k.efectivoEsperado)}</b></td></tr>${k.efectivoContado!=null?`<tr><td>Efectivo contado</td><td align="right">${fmtMoney(k.efectivoContado)}</td></tr><tr><td><b>Diferencia</b></td><td align="right"><b>${fmtMoney(k.diferencia)}</b></td></tr>`:''}</table>
+ ${k.observaciones?`<div class="box"><div class="label">Observaciones</div><pre>${esc(k.observaciones)}</pre></div>`:''}
+ <div class="label" style="margin-top:14px">Detalle de pagos (${movs.length})</div><table width="100%" border="1" cellspacing="0" cellpadding="4"><tr><th>Hora</th><th>Paciente</th><th>Concepto</th><th>Forma</th><th>Monto</th></tr>${movs.map(m=>`<tr><td>${esc(m.hora||'')}</td><td>${esc(m.pac||'')}</td><td>${esc(m.concepto||'')}</td><td>${esc(m.pago||'')}</td><td align="right">${fmtMoney(m.monto)}</td></tr>`).join('')}</table>
+ <div class="row" style="margin-top:50px"><div style="border-top:1px solid #111;width:40%;text-align:center;padding-top:4px">Entregado por</div><div style="border-top:1px solid #111;width:40%;text-align:center;padding-top:4px">Recibido por</div></div>`);
 }

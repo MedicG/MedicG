@@ -190,3 +190,85 @@ def delete_movement(conn, user, payload):
     set_json_key(conn, 'cajas', boxes)
     audit(conn, user, 'cash_delete_movement', 'cajas', {'boxId':box['id'], 'movement':movement, 'reason':reason.strip(), 'invoiceId':invoice['id'] if invoice else None})
     return {'ok': True}
+
+
+CASH_STAFF = ("admin", "recepcion", "secretaria")
+
+
+def _staff_name(user):
+    return (str(user.get("name", "")) + " " + str(user.get("last", ""))).strip() or user.get("email", "")
+
+
+def can_manage_box(user):
+    from medicg_app import can_save_key
+    return user.get("rol") in CASH_STAFF and can_save_key(user, "cajas")
+
+
+def open_box(conn, user, payload):
+    """Open the daily cash box (reception, secretary or administrator)."""
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para abrir caja.")
+    boxes = get_json_key(conn, "cajas", []) or []
+    if any(c.get("estado") == "abierta" for c in boxes):
+        raise CashError("Ya hay una caja abierta. Ciérrala antes de abrir otra.")
+    opening = amount(payload.get("montoApertura") or 0)
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
+    ids = get_json_key(conn, "nextIds", {}) or {}
+    number = max(int(ids.get("caja") or 1), max((int(c.get("id") or 0) for c in boxes if str(c.get("id") or "").isdigit()), default=0) + 1)
+    ids["caja"] = number + 1
+    box = {"id": number, "fecha": stamp.date().isoformat(), "horaApertura": stamp.strftime("%H:%M"), "estado": "abierta",
+           "cajero": _staff_name(user), "cajeroId": user.get("id"), "montoApertura": float(opening), "movimientos": []}
+    boxes.append(box)
+    set_json_key(conn, "nextIds", ids)
+    set_json_key(conn, "cajas", boxes)
+    audit(conn, user, "cash_open", "cajas", {"boxId": number, "montoApertura": float(opening)})
+    return {"ok": True, "box": box}
+
+
+def box_summary(box):
+    movements = [m for m in box.get("movimientos", []) if m.get("pago") != "Pendiente"]
+    def total(rule):
+        return float(sum((amount(m.get("monto") or 0) for m in movements if rule(str(m.get("pago") or ""))), Decimal(0)))
+    totals = {
+        "Efectivo": total(lambda p: p == "Efectivo"),
+        "Tarjeta débito": total(lambda p: p == "Tarjeta débito"),
+        "Tarjeta crédito": total(lambda p: p == "Tarjeta crédito" or p == "Tarjeta"),
+        "Transferencia": total(lambda p: p == "Transferencia"),
+        "Otros": total(lambda p: p not in ("Efectivo", "Tarjeta débito", "Tarjeta crédito", "Tarjeta", "Transferencia")),
+    }
+    received = float(sum((amount(v) for v in totals.values()), Decimal(0)))
+    expected_cash = float(amount(box.get("montoApertura") or 0) + amount(totals["Efectivo"]))
+    return {"totales": totals, "totalRecibido": received, "efectivoEsperado": expected_cash, "movimientos": len(movements)}
+
+
+def close_box(conn, user, payload):
+    """Daily close with cash count (arqueo). The summary is stored and can't be edited later."""
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para cerrar caja.")
+    boxes = get_json_key(conn, "cajas", []) or []
+    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    if not box:
+        raise CashError("No hay una caja abierta.")
+    if str(payload.get("boxId")) != str(box.get("id")):
+        raise CashError("La caja cambió. Actualiza la pantalla antes de cerrar.")
+    summary = box_summary(box)
+    if amount(payload.get("expectedTotal")) != amount(summary["totalRecibido"]):
+        raise CashError("Se registraron nuevos pagos. Revisa el resumen actualizado antes de cerrar.")
+    counted = amount(payload.get("efectivoContado"))
+    notes = payload.get("observaciones", "")
+    if not isinstance(notes, str) or len(notes) > 1000:
+        raise CashError("Las observaciones admiten hasta 1000 caracteres.")
+    difference = counted - amount(summary["efectivoEsperado"])
+    if difference != 0 and len(notes.strip()) < 5:
+        raise CashError("Hay diferencia en el efectivo: explica el motivo en observaciones.")
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
+    box["cierre"] = {**summary, "montoApertura": float(amount(box.get("montoApertura") or 0)),
+                     "efectivoContado": float(counted), "diferencia": float(difference),
+                     "observaciones": notes.strip(), "fecha": stamp.date().isoformat(), "hora": stamp.strftime("%H:%M"),
+                     "cerradoPor": _staff_name(user), "cerradoPorId": user.get("id")}
+    box.update(estado="cerrada", horaCierre=stamp.strftime("%H:%M"), fechaCierre=stamp.date().isoformat(), cerradoPor=_staff_name(user))
+    set_json_key(conn, "cajas", boxes)
+    audit(conn, user, "cash_close", "cajas", {"boxId": box["id"], "totalRecibido": summary["totalRecibido"], "diferencia": float(difference)})
+    return {"ok": True, "box": box}

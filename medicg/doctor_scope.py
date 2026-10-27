@@ -23,7 +23,7 @@ def filter_data(data,user):
  ids,allowed=scope(data,user)
  result=dict(data)
  result['pacientes']=[p for p in data.get('pacientes',[]) if str(p.get('id')) in ids]
- for key in ('notas','recetas','archivosClinicos'):
+ for key in ('notas','recetas','archivosClinicos','signosVitales','certificados','ordenesLab'):
   result[key]={k:v for k,v in (data.get(key) or {}).items() if str(k) in ids}
  result['citas']=[c for c in data.get('citas',[]) if str(c.get('med'))==str(user.get('medicoId')) and str(c.get('pac')) in ids]
  for key in ('facturas','cotizaciones','cajas'):

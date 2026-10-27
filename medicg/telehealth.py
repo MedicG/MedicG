@@ -12,8 +12,12 @@ def window(a):
     except (KeyError, ValueError, TypeError):
         return 0, 0
 
+def is_doctor_of(user, a):
+    # Doctors, including administrators linked to a doctor profile (superadmin doctors).
+    return user.get('rol') in ('medico', 'admin') and bool(user.get('medicoId')) and str(user.get('medicoId')) == str(a.get('med'))
+
 def permitted(user, a):
-    return (user.get('rol') == 'medico' and str(user.get('medicoId')) == str(a.get('med'))) or (user.get('rol') == 'paciente' and str(user.get('patientId')) == str(a.get('pac')))
+    return is_doctor_of(user, a) or (user.get('rol') == 'paciente' and str(user.get('patientId')) == str(a.get('pac')))
 
 def appointments(conn, user):
     from medicg_app import get_json_key, can_save_key
@@ -66,7 +70,7 @@ def ice_servers(user):
 def operation(conn, user, payload):
     from medicg_app import audit
     a = authorize(conn, user, payload.get('appointmentId'))
-    role = 'doctor' if user['rol'] == 'medico' else 'patient'
+    role = 'doctor' if is_doctor_of(user, a) else 'patient'
     other = 'patient' if role == 'doctor' else 'doctor'
     action = payload.get('action')
     if action not in ('join','poll','description','leave'):

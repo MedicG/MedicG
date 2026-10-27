@@ -1399,6 +1399,7 @@ def public_user(user):
         "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
         "patientId": user.get("patientId"),
         "medicoId": user.get("medicoId"),
+        "superadminMedico": bool(user.get("superadminMedico")) and user.get("rol") == "admin",
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
         "emailVerified": user_email_verified(user),
@@ -2063,7 +2064,7 @@ def sanitize_app_data_for_user(data, user=None):
         data["config"].pop("wtoken", None)
         perms = set(clean_permissions((user or {}).get("permissions"), (user or {}).get("rol", "pendiente")))
         if "hce" not in perms:
-            for key in ("notas", "recetas", "archivosClinicos"):
+            for key in ("notas", "recetas", "archivosClinicos", "signosVitales", "certificados", "ordenesLab"):
                 data[key] = {}
             data["pacientes"] = [{k:v for k,v in p.items() if k not in ("alergias","antec","sangre","antecedentes")} for p in (data.get("pacientes") or [])]
     data["sriCertificateStatus"] = saved_sri_certificate_status(saved_cert)
@@ -2454,6 +2455,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "origen": "Registro web",
                 })
                 next_ids = get_json_key(conn, "nextIds", {})
+                next_ids["user"] = max(int(next_ids.get("user") or 1), max((int(u.get("id") or 0) for u in users), default=0) + 1)
                 new_id = next_id(next_ids, "user", len(users) + 1)
                 new_user = {
                     "id": new_id,
@@ -2590,6 +2592,22 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not data_url:
                 return make_response(self, 404, {"error": "Archivo no encontrado."})
             return make_response(self, 200, {"ok": True, "dataUrl": data_url, "mime": mime or ""})
+        if path in ("/api/cash/open", "/api/cash/close"):
+            from medicg.cash import open_box, close_box, CashError
+            try:
+                with db() as conn:
+                    result = (open_box if path.endswith("open") else close_box)(conn, user, payload)
+                return make_response(self, 200, result)
+            except CashError as exc:
+                return make_response(self, 409, {"error": str(exc)})
+        if path == "/api/clinical/docs":
+            from medicg.clinical_docs import operation as clinical_docs_operation, DocsError
+            try:
+                with db() as conn:
+                    result = clinical_docs_operation(conn, user, payload)
+                return make_response(self, 200, result)
+            except DocsError as exc:
+                return make_response(self, 409, {"error": str(exc)})
         if path == "/api/clinical/entries":
             from medicg.clinical import append_entry, ClinicalError
             try:
@@ -3023,6 +3041,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         return [m for c in boxes if isinstance(c, dict) for m in c.get("movimientos", []) if m.get("cobroVersion") == 1]
                     if ledger(current or []) != ledger(value):
                         return make_response(self, 409, {"error": "Los pagos registrados no se pueden modificar desde un guardado general."})
+                    closed = {str(c.get("id")): c for c in (current or []) if isinstance(c, dict) and c.get("cierre")}
+                    incoming_boxes = {str(c.get("id")): c for c in value if isinstance(c, dict)}
+                    if any(incoming_boxes.get(k) != v for k, v in closed.items()):
+                        return make_response(self, 409, {"error": "Los cierres de caja no se modifican ni eliminan."})
                 if key == "pacientes":
                     if any(not isinstance(p, dict) or not p.get("id") for p in value):
                         return make_response(self, 400, {"error": "Paciente inválido."})
@@ -3102,6 +3124,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     last = (payload.get("last") or "").strip()
                     email = (payload.get("email") or "").strip().lower()
                     rol = (payload.get("rol") or target.get("rol") or "recepcion").strip()
+                    superadmin_medico = rol == "medico_superadmin"
+                    if superadmin_medico:
+                        rol = "admin"
                     estado = (payload.get("estado") or target.get("estado") or "activo").strip()
                     password = payload.get("password") or ""
                     if not name or not last or not email:
@@ -3129,13 +3154,17 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                             "origen": "Vinculado por administrador",
                         })
                         target["patientId"] = patient.get("id")
-                    if rol == "medico":
+                    if rol == "medico" or superadmin_medico:
                         medico_id = resolve_medico_id(conn, payload, name, last, email)
                         if not medico_id:
                             return make_response(self, 400, {"error": "Selecciona el perfil medico vinculado para este usuario"})
                         target["medicoId"] = medico_id
                     else:
                         target.pop("medicoId", None)
+                    if superadmin_medico:
+                        target["superadminMedico"] = True
+                    else:
+                        target.pop("superadminMedico", None)
                     if rol != "paciente":
                         target.pop("patientId", None)
                     target.update({
@@ -3167,6 +3196,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             email = (payload.get("email") or "").strip().lower()
             password = payload.get("password") or ""
             rol = payload.get("rol") or "recepcion"
+            superadmin_medico = rol == "medico_superadmin"
+            if superadmin_medico:
+                rol = "admin"
             if not name or not last or not email or len(password) < 6:
                 return make_response(self, 400, {"error": "Completa nombre, apellido, correo y contraseña de mínimo 6 caracteres"})
             permissions = clean_permissions(payload.get("permissions"), rol)
@@ -3186,12 +3218,12 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         "origen": "Creado por administrador",
                     })
                     patient_id = patient.get("id")
-                if rol == "medico":
+                if rol == "medico" or superadmin_medico:
                     medico_id = resolve_medico_id(conn, payload, name, last, email)
                     if not medico_id:
                         return make_response(self, 400, {"error": "Selecciona el perfil medico vinculado para este usuario"})
                 next_ids = get_json_key(conn, "nextIds", {})
-                new_id = int(next_ids.get("user", len(users) + 1))
+                new_id = max(int(next_ids.get("user", len(users) + 1)), max((int(u.get("id") or 0) for u in users), default=0) + 1)
                 next_ids["user"] = new_id + 1
                 new_user = {
                     "id": new_id,
@@ -3207,6 +3239,8 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "medicoId": medico_id,
                     "createdAt": now_iso(),
                 }
+                if superadmin_medico:
+                    new_user["superadminMedico"] = True
                 users.append(new_user)
                 set_json_key(conn, "users", users)
                 set_json_key(conn, "nextIds", next_ids)

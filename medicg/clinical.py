@@ -42,7 +42,7 @@ def append_entry(conn,user,payload):
  notes=get_json_key(conn,'notas',{}) or {};entries=notes.get(pid,[])
  previous=next((n for n in entries if n.get('clinicalVersion') and n.get('requestId')==rid and n.get('authorId')==user['id']),None)
  if previous:return {'ok':True,'entry':previous,'replayed':True}
- doctor_id=user.get('medicoId') if user['rol']=='medico' else payload.get('doctorId')
+ doctor_id=user.get('medicoId') if user['rol']=='medico' else (payload.get('doctorId') or user.get('medicoId'))
  doctor=next((m for m in get_json_key(conn,'medicos',[]) if str(m.get('id'))==str(doctor_id) and m.get('estado')!='inactivo'),None)
  specialty=payload.get('specialty','')
  if not doctor or specialty not in specialties(doctor):raise ClinicalError('Selecciona un profesional y una de sus especialidades.')

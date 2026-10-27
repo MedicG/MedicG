@@ -900,7 +900,8 @@ const MODULE_PERMS = [
 
 
 
-const ROLE_LABELS={admin:'Dueño / Administrador',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico',paciente:'Paciente',pendiente:'Pendiente de permisos'};
+function userRoleKey(u){return u?.rol==='admin'&&u?.superadminMedico?'medico_superadmin':u?.rol;}
+const ROLE_LABELS={admin:'Dueño / Administrador',medico_superadmin:'Médico superadmin',recepcion:'Recepción',secretaria:'Secretaria',asistente:'Asistente clínico',medico:'Médico',paciente:'Paciente',pendiente:'Pendiente de permisos'};
 
 
 
@@ -3474,7 +3475,7 @@ function launchApp(){
 
 
 
-  document.getElementById('sb-urole').textContent=ROLE_LABELS[currentUser.rol]||currentUser.rol;
+  document.getElementById('sb-urole').textContent=ROLE_LABELS[userRoleKey(currentUser)]||currentUser.rol;
 
 
 
@@ -18075,7 +18076,7 @@ function renderUserRow(u){
 
 
 
-  const roleExtra=u.rol==='medico'?`<div class="text-xs text-muted mt4">${linkedMed?`Perfil: ${esc(linkedMed.nombre)} - ${esc(linkedMed.esp||'')}`:'Sin perfil medico vinculado'}</div>`:'';
+  const roleExtra=(u.rol==='medico'||u.superadminMedico)?`<div class="text-xs text-muted mt4">${linkedMed?`Perfil: ${esc(linkedMed.nombre)} - ${esc(linkedMed.esp||'')}`:'Sin perfil medico vinculado'}</div>`:'';
 
 
 
@@ -18107,7 +18108,7 @@ function renderUserRow(u){
 
 
 
-    <td><span class="badge b-blue">${ROLE_LABELS[u.rol]||esc(u.rol)}</span>${roleExtra}</td>
+    <td><span class="badge b-blue">${ROLE_LABELS[userRoleKey(u)]||esc(u.rol)}</span>${roleExtra}</td>
 
 
 
@@ -18331,7 +18332,7 @@ function renderUserEditRow(u){
 
 
 
-      <select id="edit-u-rol-${u.id}" ${isSelf?'disabled':''} onchange="toggleEditMedicoLink(${u.id})">${userRoleOptions(u.rol)}</select>
+      <select id="edit-u-rol-${u.id}" ${isSelf&&!u.superadminMedico?'disabled':''} onchange="toggleEditMedicoLink(${u.id})">${userRoleOptions(userRoleKey(u))}</select>
 
 
 
@@ -18355,7 +18356,7 @@ function renderUserEditRow(u){
 
 
 
-        <select id="edit-u-medico-${u.id}" ${u.rol==='medico'?'':'disabled'}>${renderMedicoLinkOptions(linkedId)}</select>
+        <select id="edit-u-medico-${u.id}" ${(u.rol==='medico'||u.superadminMedico)?'':'disabled'}>${renderMedicoLinkOptions(linkedId)}</select>
 
 
 
@@ -19395,7 +19396,7 @@ function renderCreatePerms(){
 
 
 
-  box.innerHTML=renderPermChecks('u-perm-',perms,role==='admin');
+  box.innerHTML=renderPermChecks('u-perm-',perms,role==='admin'||role==='medico_superadmin');
 
 
 
@@ -19483,7 +19484,7 @@ function renderCreateMedicoLink(){
 
 
 
-  sel.disabled=role!=='medico';
+  sel.disabled=role!=='medico'&&role!=='medico_superadmin';
 
 
 
@@ -19491,7 +19492,7 @@ function renderCreateMedicoLink(){
 
 
 
-  wrap.style.opacity=role==='medico'?'1':'.75';
+  wrap.style.opacity=(role==='medico'||role==='medico_superadmin')?'1':'.75';
 
 
 
@@ -19539,7 +19540,7 @@ function toggleEditMedicoLink(userId){
 
 
 
-  if(sel)sel.disabled=role!=='medico';
+  if(sel)sel.disabled=role!=='medico'&&role!=='medico_superadmin';
 
 
 
