@@ -241,6 +241,9 @@ def create_certificate(conn, user, payload, patient, patient_id):
     cie = text(payload, "cie10", 12).upper()
     content = text(payload, "contenido", 3000, kind in ("Certificado de salud", "Otro"), "el contenido del certificado")
     recommendations = text(payload, "recomendaciones", 1000)
+    home = text(payload, "domicilio", 300)
+    company = text(payload, "empresa", 200)
+    position = text(payload, "cargo", 150)
     rest = None
     if kind == "Reposo médico":
         try:
@@ -259,6 +262,7 @@ def create_certificate(conn, user, payload, patient, patient_id):
         "id": str(uuid.uuid4()), "numero": next_number(conn, "cert", "CERT"), "tipo": kind,
         "fechaEmision": now().date().isoformat(), "fechaAtencion": attention.isoformat(),
         "diagnostico": diagnosis, "cie10": cie, "reposo": rest, "contenido": content,
+        "domicilio": home, "empresa": company, "cargo": position,
         "recomendaciones": recommendations, "medico": doctor_snapshot(doctor),
         "paciente": {"nombre": (patient.get("nombres", "") + " " + patient.get("apellidos", "")).strip(), "cedula": patient.get("cedula", "")},
         "estado": "Vigente", "emitidoPor": user_name(user), "emitidoPorId": user.get("id"),
