@@ -145,11 +145,27 @@ def main():
     assert code == 200 and not data.get('certificados') and not data.get('notas'), 'reception must not receive clinical data'
     assert 'certificados' in app.clean_permissions(['agenda'], 'recepcion')
 
+    # ---- reception creates exam orders requested by a doctor
+    assert call(recep, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 2, 'examenes': [{'id': 10}]})[0] == 409  # doctor required
+    code, body = call(recep, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 2, 'doctorId': 2, 'examenes': [{'id': 10}, {'nombre': 'TSH'}], 'prioridad': 'Urgente'})
+    assert code == 200, body
+    rorder = body['records'][0]
+    assert rorder['medico']['id'] == 2 and rorder['creadoPorRol'] == 'recepcion' and len(rorder['examenes']) == 2, rorder
+    code, body = call(recep, '/api/clinical/docs', {'action': 'lab_order_list', 'patientId': 2})
+    assert code == 200 and body['records'][0]['id'] == rorder['id']
+    assert call(recep, '/api/clinical/docs', {'action': 'lab_order_status', 'patientId': 2, 'id': rorder['id'], 'estado': 'Muestra tomada'})[0] == 200
+    doc_order = call(cardio, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 2, 'examenes': [{'id': 11}]})[1]['records'][0]
+    assert call(recep, '/api/clinical/docs', {'action': 'lab_order_status', 'patientId': 2, 'id': doc_order['id'], 'estado': 'Anulada', 'motivo': 'x'})[0] == 409
+    assert call(recep, '/api/clinical/docs', {'action': 'lab_order_status', 'patientId': 2, 'id': rorder['id'], 'estado': 'Anulada', 'motivo': 'Duplicada'})[0] == 200
+    assert 'ordenes' in app.clean_permissions(['agenda'], 'recepcion')
+    code, data = call(recep, '/api/data')
+    assert not data.get('ordenesLab'), 'reception must not receive lab orders in bulk'
+
     # ---- lab orders
     code, body = call(medgen, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 1, 'examenes': [{'id': 10}, {'id': 11}, {'nombre': 'Perfil tiroideo'}, {'id': 10}],
                                                       'diagnostico': 'Control', 'prioridad': 'Urgente', 'indicaciones': 'Ayuno 8 horas'})
     order = body['records'][0]
-    assert code == 200 and order['numero'] == 'LAB-000001' and [e['nombre'] for e in order['examenes']] == ['Hemograma', 'Glucosa', 'Perfil tiroideo'], body
+    assert code == 200 and order['numero'].startswith('LAB-') and [e['nombre'] for e in order['examenes']] == ['Hemograma', 'Glucosa', 'Perfil tiroideo'], body
     assert call(medgen, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 1, 'examenes': [{'id': 99}]})[0] == 409
     assert call(medgen, '/api/clinical/docs', {'action': 'lab_order_create', 'patientId': 1, 'examenes': []})[0] == 409
     code, body = call(asis, '/api/clinical/docs', {'action': 'lab_order_status', 'patientId': 1, 'id': order['id'], 'estado': 'Muestra tomada'})
