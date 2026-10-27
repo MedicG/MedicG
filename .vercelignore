@@ -17,3 +17,12 @@ render.yaml
 INICIAR.bat
 local_server.py
 PASOS_GITHUB_RENDER.txt
+
+caja-verificada.png
+
+tests/
+
+.env*
+docs/
+frontend/
+scripts/
