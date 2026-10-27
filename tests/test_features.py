@@ -73,13 +73,32 @@ def main():
     code, body = call(recep, '/api/cash/charge', {'requestId': 'req-feature-0000001', 'patientId': 1, 'items': [{'kind': 'servicio', 'id': 1, 'quantity': 1}],
                                                   'expectedTotal': 20, 'payments': [{'method': 'Efectivo', 'amount': 15}, {'method': 'Transferencia', 'amount': 5}]})
     assert code == 200, body
-    assert call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 15, 'efectivoContado': 35})[0] == 409  # stale total
-    code, body = call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 20, 'efectivoContado': 30})
+    # ---- cash expenses (pagos realizados desde caja): cash ones lower the expected cash
+    assert call(medgen, '/api/cash/expense', {'monto': 5, 'concepto': 'Taxi'})[0] in (403, 409)
+    assert call(recep, '/api/cash/expense', {'monto': 50, 'concepto': 'Proveedor'})[0] == 409  # only 35 in cash
+    assert call(recep, '/api/cash/expense', {'monto': 5, 'concepto': ''})[0] == 409
+    code, body = call(recep, '/api/cash/expense', {'boxId': box_id, 'monto': 10, 'concepto': 'Reactivos laboratorio', 'categoria': 'Proveedores', 'beneficiario': 'LabSur', 'comprobante': '001-001-55'})
+    assert code == 200 and body['expense']['monto'] == 10 and body['expense']['metodo'] == 'Efectivo', body
+    exp_cash = body['expense']['id']
+    code, body = call(recep, '/api/cash/expense', {'monto': 4, 'concepto': 'Internet', 'categoria': 'Servicios básicos', 'metodo': 'Transferencia'})
+    assert code == 200, body
+    code, body = call(recep, '/api/cash/expense', {'monto': 3, 'concepto': 'Duplicado', 'categoria': 'Otros'})
+    dup = body['expense']['id']
+    assert call(admin, '/api/cash/expense-void', {'boxId': box_id, 'id': dup, 'motivo': 'x'})[0] == 409  # reason too short
+    assert call(recep, '/api/cash/expense-void', {'boxId': box_id, 'id': dup, 'motivo': 'Registrado dos veces'})[0] == 200
+    boxes = call(admin, '/api/data')[1]['data']['cajas']
+    tampered = json.loads(json.dumps(boxes)); tampered[0]['egresos'][0]['monto'] = 1
+    assert call(admin, '/api/data', {'key': 'cajas', 'value': tampered, 'baseValue': boxes})[0] == 409
+    assert call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 20, 'expectedCash': 35, 'efectivoContado': 25})[0] == 409  # stale expenses
+    assert call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 15, 'efectivoContado': 25})[0] == 409  # stale total
+    code, body = call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 20, 'expectedCash': 25, 'efectivoContado': 20})
     assert code == 409 and 'diferencia' in body['error'], body  # difference needs a reason
-    code, body = call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 20, 'efectivoContado': 30, 'observaciones': 'Faltan 5 dólares de vuelto'})
+    code, body = call(recep, '/api/cash/close', {'boxId': box_id, 'expectedTotal': 20, 'expectedCash': 25, 'efectivoContado': 20, 'observaciones': 'Faltan 5 dólares de vuelto'})
     assert code == 200, body
     closing = body['box']['cierre']
-    assert closing['efectivoEsperado'] == 35 and closing['diferencia'] == -5 and closing['totales']['Transferencia'] == 5, closing
+    assert closing['efectivoEsperado'] == 25 and closing['diferencia'] == -5 and closing['totales']['Transferencia'] == 5, closing
+    assert closing['egresosEfectivo'] == 10 and closing['egresosOtros'] == 4 and closing['totalEgresos'] == 14 and len(closing['egresos']) == 2, closing
+    assert call(recep, '/api/cash/expense-void', {'boxId': box_id, 'id': exp_cash, 'motivo': 'Después del cierre'})[0] == 409
     boxes = call(admin, '/api/data')[1]['data']['cajas']
     tampered = json.loads(json.dumps(boxes)); tampered[0]['cierre']['diferencia'] = 0
     assert call(admin, '/api/data', {'key': 'cajas', 'value': tampered, 'baseValue': boxes})[0] == 409

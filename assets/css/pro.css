@@ -50,3 +50,7 @@ label.flex{justify-content:flex-start;text-align:left}
 /* Agenda toolbar: keep button labels on one line and wrap the row on narrow screens */
 .flex.gap8.mb12:has(#week-lbl){flex-wrap:wrap;row-gap:8px}
 .flex.gap8.mb12:has(#week-lbl) .btn-sm{white-space:nowrap}
+/* Caja: cash expenses form */
+.cash-expense-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:6px}
+.cash-expense-form .field{flex:1;min-width:140px;margin:0}
+.cash-expense-form button{white-space:nowrap}
