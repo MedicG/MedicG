@@ -201,7 +201,16 @@ def main():
     mails = len(SENT_MAIL)
     code, body = call(admin, '/api/invoices/sri-retry', {'id': body['invoice']['id']})
     assert code == 200 and body['invoice']['sriEstado'] == 'DEVUELTA' and '35' in body['invoice']['sriMensaje'] and not body['emailSent'] and len(SENT_MAIL) == mails, body
-    print('PASS SRI: access key, per-line VAT, payment codes, XAdES signature, authorization, RIDE and e-mail to client, cash-desk accounts, validations, pruebas→producción, returned documents')
+    # Connection test: PRUEBAS environment, nothing stored, RIDE to the clinic e-mail
+    with app.db() as conn:
+        cfg = app.get_json_key(conn, 'config'); cfg['email'] = 'clinica@example.test'; app.set_json_key(conn, 'config', cfg)
+        before = len(app.get_json_key(conn, 'facturas'))
+    code, body = call(admin, '/api/sri/test', {})
+    assert code == 200 and body['ok'] and body['estado'] == 'AUTORIZADO' and SRI_CALLS[-1][1] == '1', body
+    assert body['firma']['titular'] == 'PRUEBA FIRMA MEDIC G' and body['correo']['a'] == 'clinica@example.test' and body['correo']['enviado'], body
+    with app.db() as conn:
+        assert len(app.get_json_key(conn, 'facturas')) == before
+    print('PASS SRI: connection test, access key, per-line VAT, payment codes, XAdES signature, authorization, RIDE and e-mail to client, cash-desk accounts, validations, pruebas→producción, returned documents')
 
 
 if __name__ == '__main__':
