@@ -90,7 +90,9 @@ def cash_operation(conn, user, payload, action):
         number = max(int(ids.get("fac") or 1), max((int(str(f.get("id", "")).split("-")[-1]) for f in invoices if re.fullmatch(r"\d{3}-\d{3}-\d{9}", str(f.get("id", "")))), default=0) + 1)
         if number > 999999999:
             raise CashError("Secuencia de facturas agotada.")
-        invoice = {"id": "001-001-" + str(number).zfill(9), "fecha": stamp[:10], "createdAt": stamp,
+        cfg = get_json_key(conn, "config", {}) or {}
+        prefix = str(cfg.get("sriEstab") or "001").zfill(3)[-3:] + "-" + str(cfg.get("sriPtoEmi") or "001").zfill(3)[-3:] + "-"
+        invoice = {"id": prefix + str(number).zfill(9), "fecha": stamp[:10], "createdAt": stamp,
                    "pac": patient["id"], "esp": "General", "serv": "; ".join(i["nombre"] for i in items),
                    "items": items, "sub": float(subtotal), "iva": float(tax), "ivaRate": float(rate), "total": float(total),
                    "cobroVersion": 1, "pagos": [], "abonado": 0, "saldo": float(total)}
@@ -328,7 +330,9 @@ def create_account(conn, user, patient, items, payments, concept, esp="Farmacia"
     number = max(int(ids.get("fac") or 1), max((int(str(f.get("id", "")).split("-")[-1]) for f in invoices if re.fullmatch(r"\d{3}-\d{3}-\d{9}", str(f.get("id", "")))), default=0) + 1)
     ids["fac"] = number + 1
     rates = {l["ivaRate"] for l in lines}
-    invoice = {"id": "001-001-" + str(number).zfill(9), "fecha": stamp[:10], "createdAt": stamp, "pac": patient["id"], "esp": esp,
+    cfg = get_json_key(conn, "config", {}) or {}
+    prefix = str(cfg.get("sriEstab") or "001").zfill(3)[-3:] + "-" + str(cfg.get("sriPtoEmi") or "001").zfill(3)[-3:] + "-"
+    invoice = {"id": prefix + str(number).zfill(9), "fecha": stamp[:10], "createdAt": stamp, "pac": patient["id"], "esp": esp,
                "serv": "; ".join(f"{l['cant']:g} × {l['nombre']}" for l in lines), "items": lines,
                "sub": float(amount(subtotal)), "iva": float(amount(tax)), "ivaRate": float(rates.pop()) if len(rates) == 1 else None,
                "total": float(total), "cobroVersion": 1, "pagos": clean, "abonado": float(paid), "saldo": float(total - paid)}
