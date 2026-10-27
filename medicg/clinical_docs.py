@@ -71,6 +71,8 @@ def can_read(user):
 
 
 CERT_ACTIONS = ("certificate_create", "certificate_void", "certificate_list")
+ORDER_ACTIONS = ("lab_order_create", "lab_order_status", "lab_order_list")
+STAFF_ACTIONS = {**{a: "certificados" for a in CERT_ACTIONS}, **{a: "ordenes" for a in ORDER_ACTIONS}}
 
 
 def perms_of(user):
@@ -78,16 +80,24 @@ def perms_of(user):
     return set(clean_permissions(user.get("permissions"), user.get("rol", "recepcion")))
 
 
+def is_staff(user, perm):
+    """Reception/secretary users who prepare documents on a doctor's request (no access to the medical record)."""
+    return user.get("rol") in ("recepcion", "secretaria") and perm in perms_of(user)
+
+
 def is_cert_staff(user):
-    """Reception/secretary users who issue certificates on a doctor's request (no access to the medical record)."""
-    return user.get("rol") in ("recepcion", "secretaria") and "certificados" in perms_of(user)
+    return is_staff(user, "certificados")
+
+
+def is_order_staff(user):
+    return is_staff(user, "ordenes")
 
 
 def check_access(conn, user, patient_id, write=True, action=None):
     from medicg_app import get_json_key
     from medicg.doctor_scope import check_patient
     perms = perms_of(user)
-    if user.get("rol") != "admin" and "hce" not in perms and not (action in CERT_ACTIONS and is_cert_staff(user)):
+    if user.get("rol") != "admin" and "hce" not in perms and not (action in STAFF_ACTIONS and is_staff(user, STAFF_ACTIONS[action])):
         raise DocsError("No tienes permiso para la historia clínica.")
     patient = next((p for p in get_json_key(conn, "pacientes", []) or [] if str(p.get("id")) == str(patient_id) and not p.get("deletedAt")), None)
     if not patient:
@@ -299,8 +309,10 @@ def void_certificate(conn, user, payload, patient_id):
 # ------------------------------------------------------------- laboratory orders
 def create_lab_order(conn, user, payload, patient, patient_id):
     from medicg_app import get_json_key, set_json_key, audit
-    if not is_doctor(user) and user.get("rol") != "admin":
-        raise DocsError("Solo médicos o el administrador crean órdenes de laboratorio.")
+    if not is_doctor(user) and user.get("rol") != "admin" and not is_order_staff(user):
+        raise DocsError("No tienes permiso para crear órdenes de exámenes.")
+    if is_order_staff(user) and not payload.get("doctorId"):
+        raise DocsError("Selecciona el médico que solicitó los exámenes.")
     doctor = resolve_doctor(conn, user, payload)
     catalog = {str(e.get("id")): e for e in get_json_key(conn, "examenes", []) or []}
     raw_items = payload.get("examenes")
@@ -337,7 +349,7 @@ def create_lab_order(conn, user, payload, patient, patient_id):
         "prioridad": priority, "medico": doctor_snapshot(doctor),
         "paciente": {"nombre": (patient.get("nombres", "") + " " + patient.get("apellidos", "")).strip(), "cedula": patient.get("cedula", "")},
         "estado": "Pendiente", "historialEstado": [{"estado": "Pendiente", "por": user_name(user), "en": stamp}],
-        "creadoPor": user_name(user), "creadoPorId": user.get("id"), "creadoEn": stamp,
+        "creadoPor": user_name(user), "creadoPorId": user.get("id"), "creadoPorRol": user.get("rol"), "creadoEn": stamp,
     }
     records.insert(0, record)
     data[str(patient_id)] = records
@@ -360,8 +372,9 @@ def update_lab_order(conn, user, payload, patient_id):
         raise DocsError("La orden está anulada.")
     entry = {"estado": state, "por": user_name(user), "en": now().isoformat(timespec="seconds")}
     if state == "Anulada":
-        if not is_doctor(user) and user.get("rol") != "admin":
-            raise DocsError("Solo médicos o el administrador anulan órdenes.")
+        own_staff = is_order_staff(user) and str(record.get("creadoPorId")) == str(user.get("id"))
+        if not is_doctor(user) and user.get("rol") != "admin" and not own_staff:
+            raise DocsError("Solo quien creó la orden, un médico o el administrador puede anularla.")
         entry["motivo"] = text(payload, "motivo", 500, True, "el motivo de anulación")
     record["estado"] = state
     record.setdefault("historialEstado", []).append(entry)
@@ -376,10 +389,12 @@ def operation(conn, user, payload):
     if not patient_id:
         raise DocsError("Selecciona un paciente.")
     patient = check_access(conn, user, patient_id, action=action)
-    if user.get("rol") in ("recepcion", "secretaria") and "hce" not in perms_of(user) and action not in CERT_ACTIONS:
+    if user.get("rol") in ("recepcion", "secretaria") and "hce" not in perms_of(user) and action not in STAFF_ACTIONS:
         raise DocsError("No tienes permiso para la historia clínica.")
     if action == "certificate_list":
         key, records = "certificados", store(conn, "certificados").get(str(patient_id), [])
+    elif action == "lab_order_list":
+        key, records = "ordenesLab", store(conn, "ordenesLab").get(str(patient_id), [])
     elif action == "vitals_save":
         key, records = save_vitals(conn, user, payload, patient_id)
     elif action == "note_vitals":

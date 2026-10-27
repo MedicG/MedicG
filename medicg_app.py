@@ -64,12 +64,12 @@ SESSIONS = {}
 ALLOWED_PERMISSIONS = {
     "dashboard", "agenda", "hce", "facturacion", "reportes", "pacientes",
     "medicos", "especialidades", "seguros", "quirofanos", "servicios",
-    "examenes", "caja", "config", "farmacia", "certificados",
+    "examenes", "caja", "config", "farmacia", "certificados", "ordenes",
 }
 ROLE_DEFAULT_PERMISSIONS = {
     "admin": sorted(ALLOWED_PERMISSIONS),
-    "recepcion": ["dashboard", "agenda", "caja", "servicios", "examenes", "certificados"],
-    "secretaria": ["dashboard", "agenda", "caja", "servicios", "examenes", "certificados"],
+    "recepcion": ["dashboard", "agenda", "caja", "servicios", "examenes", "certificados", "ordenes"],
+    "secretaria": ["dashboard", "agenda", "caja", "servicios", "examenes", "certificados", "ordenes"],
     "asistente": ["agenda", "caja"],
     "medico": ["dashboard", "agenda", "hce"],
     "paciente": [],
@@ -1452,7 +1452,7 @@ def clean_permissions(permissions, role):
     if not isinstance(permissions, list) or not permissions:
         permissions = ROLE_DEFAULT_PERMISSIONS.get(role, ROLE_DEFAULT_PERMISSIONS["recepcion"])
     if role in ("recepcion", "secretaria"):
-        permissions = list(dict.fromkeys([*permissions, "servicios", "examenes", "certificados"]))
+        permissions = list(dict.fromkeys([*permissions, "servicios", "examenes", "certificados", "ordenes"]))
     return [p for p in permissions if p in ALLOWED_PERMISSIONS and p != "config"]
 
 
