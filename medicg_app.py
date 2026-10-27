@@ -1243,9 +1243,10 @@ def sri_soap_request(url, action_body):
 
 def sri_recepcion(signed_xml, ambiente):
     payload = base64.b64encode(signed_xml.encode("utf-8")).decode("ascii")
-    body = f'''<validarComprobante xmlns="http://ec.gob.sri.ws.recepcion">
+    # The child elements are unqualified: only the operation element is in the SRI namespace.
+    body = f'''<ec:validarComprobante xmlns:ec="http://ec.gob.sri.ws.recepcion">
   <xml>{payload}</xml>
-</validarComprobante>'''
+</ec:validarComprobante>'''
     raw = sri_soap_request(SRI_RECEPTION_ENDPOINTS[ambiente], body)
     try:
         root = ET.fromstring(raw)
@@ -1255,9 +1256,9 @@ def sri_recepcion(signed_xml, ambiente):
 
 
 def sri_autorizacion(clave, ambiente):
-    body = f'''<autorizacionComprobante xmlns="http://ec.gob.sri.ws.autorizacion">
+    body = f'''<ec:autorizacionComprobante xmlns:ec="http://ec.gob.sri.ws.autorizacion">
   <claveAccesoComprobante>{html_escape(clave)}</claveAccesoComprobante>
-</autorizacionComprobante>'''
+</ec:autorizacionComprobante>'''
     raw = sri_soap_request(SRI_AUTH_ENDPOINTS[ambiente], body)
     try:
         root = ET.fromstring(raw)
