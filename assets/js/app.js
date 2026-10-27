@@ -877,6 +877,7 @@ const MODULE_PERMS = [
 
 
   {id:'caja',label:'Caja / cobranza'},
+  {id:'farmacia',label:'Farmacia e inventario'},
 
 
 

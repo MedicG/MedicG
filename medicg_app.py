@@ -64,7 +64,7 @@ SESSIONS = {}
 ALLOWED_PERMISSIONS = {
     "dashboard", "agenda", "hce", "facturacion", "reportes", "pacientes",
     "medicos", "especialidades", "seguros", "quirofanos", "servicios",
-    "examenes", "caja", "config",
+    "examenes", "caja", "config", "farmacia",
 }
 ROLE_DEFAULT_PERMISSIONS = {
     "admin": sorted(ALLOWED_PERMISSIONS),
@@ -592,7 +592,7 @@ MOJIBAKE_REPLACEMENTS = {
 from medicg.storage import DatabaseConnection, connect as connect_database
 
 
-SCHEMA_VERSION = "2026-10-scalability-v1"
+SCHEMA_VERSION = "2026-10-pharmacy-v1"
 LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "8"))
 LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))
 log = logging.getLogger("medicg")
@@ -885,6 +885,17 @@ def add_text(parent, name, text):
     return child
 
 
+SRI_IVA_CODES = {Decimal("0.00"): "0", Decimal("12.00"): "2", Decimal("14.00"): "3", Decimal("15.00"): "4", Decimal("5.00"): "5", Decimal("13.00"): "10"}
+
+
+def sri_iva_code(rate, sri):
+    """SRI table 17 (codigoPorcentaje) for the IVA rate of a line."""
+    rate = money_decimal(rate)
+    if rate in SRI_IVA_CODES:
+        return SRI_IVA_CODES[rate]
+    return str(sri.get("ivaCode") or "4")
+
+
 def build_invoice_xml(invoice, patient, config):
     sri = invoice["sri"]
     fecha = parse_invoice_date(invoice.get("fecha"))
@@ -893,6 +904,32 @@ def build_invoice_xml(invoice, patient, config):
     iva = money_decimal(invoice.get("iva"))
     total = money_decimal(invoice.get("total"))
     iva_rate = money_decimal(sri.get("ivaRate") or 15)
+    # Cash-desk and pharmacy accounts record their own VAT (0% medical services and
+    # medicines, 15% other goods). Use the rate of each line, not the global setting.
+    invoice_rate = invoice.get("ivaRate")
+    lines = []
+    for idx, item in enumerate(invoice.get("items") or [], start=1):
+        qty = money_decimal(item.get("cant") or 1)
+        unit = money_decimal(item.get("unit"))
+        line_base = money_decimal(item.get("total") or (qty * unit))
+        if item.get("ivaRate") is not None:
+            rate = money_decimal(item.get("ivaRate"))
+        elif invoice_rate is not None:
+            rate = money_decimal(invoice_rate)
+        else:
+            rate = iva_rate
+        if item.get("iva") is not None and item.get("ivaRate") is not None:
+            line_tax = money_decimal(item.get("iva"))
+        else:
+            line_tax = money_decimal(line_base * rate / Decimal("100"))
+        lines.append((idx, item, qty, unit, line_base, rate, line_tax))
+    groups = {}
+    for _idx, _item, _qty, _unit, base, rate, line_tax in lines:
+        group = groups.setdefault(rate, [Decimal(0), Decimal(0)])
+        group[0] += base
+        group[1] += line_tax
+    if lines:
+        iva = money_decimal(sum((g[1] for g in groups.values()), Decimal(0)))
     root = ET.Element("factura", {"id": "comprobante", "version": "1.1.0"})
     info_trib = ET.SubElement(root, "infoTributaria")
     add_text(info_trib, "ambiente", sri["ambiente"])
@@ -921,11 +958,12 @@ def build_invoice_xml(invoice, patient, config):
     add_text(info_fact, "totalSinImpuestos", money_text(subtotal))
     add_text(info_fact, "totalDescuento", "0.00")
     total_imp = ET.SubElement(info_fact, "totalConImpuestos")
-    imp = ET.SubElement(total_imp, "totalImpuesto")
-    add_text(imp, "codigo", "2")
-    add_text(imp, "codigoPorcentaje", sri["ivaCode"])
-    add_text(imp, "baseImponible", money_text(subtotal))
-    add_text(imp, "valor", money_text(iva))
+    for rate, (base, value) in (sorted(groups.items()) if groups else [(iva_rate, (subtotal, iva))]):
+        imp = ET.SubElement(total_imp, "totalImpuesto")
+        add_text(imp, "codigo", "2")
+        add_text(imp, "codigoPorcentaje", sri_iva_code(rate, sri))
+        add_text(imp, "baseImponible", money_text(base))
+        add_text(imp, "valor", money_text(value))
     add_text(info_fact, "propina", "0.00")
     add_text(info_fact, "importeTotal", money_text(total))
     add_text(info_fact, "moneda", "DOLAR")
@@ -937,11 +975,7 @@ def build_invoice_xml(invoice, patient, config):
     add_text(pago, "unidadTiempo", "dias")
 
     detalles = ET.SubElement(root, "detalles")
-    for idx, item in enumerate(invoice.get("items") or [], start=1):
-        qty = money_decimal(item.get("cant") or 1)
-        unit = money_decimal(item.get("unit"))
-        line_base = money_decimal(item.get("total") or (qty * unit))
-        line_tax = money_decimal(line_base * iva_rate / Decimal("100"))
+    for idx, item, qty, unit, line_base, line_rate, line_tax in lines:
         det = ET.SubElement(detalles, "detalle")
         add_text(det, "codigoPrincipal", str(item.get("codigo") or f"MED{idx:03d}"))
         add_text(det, "descripcion", str(item.get("desc") or "Servicio medico")[:300])
@@ -952,8 +986,8 @@ def build_invoice_xml(invoice, patient, config):
         impuestos = ET.SubElement(det, "impuestos")
         impuesto = ET.SubElement(impuestos, "impuesto")
         add_text(impuesto, "codigo", "2")
-        add_text(impuesto, "codigoPorcentaje", sri["ivaCode"])
-        add_text(impuesto, "tarifa", money_text(iva_rate))
+        add_text(impuesto, "codigoPorcentaje", sri_iva_code(line_rate, sri))
+        add_text(impuesto, "tarifa", money_text(line_rate))
         add_text(impuesto, "baseImponible", money_text(line_base))
         add_text(impuesto, "valor", money_text(line_tax))
 
@@ -1602,6 +1636,9 @@ def init_db():
         from medicg.files import table_sql as clinical_files_table
         conn.execute(clinical_files_table())
         conn.execute("create index if not exists clinical_files_patient_idx on clinical_files(patient_id)")
+        from medicg.pharmacy import table_sql as pharmacy_moves_table
+        conn.execute(pharmacy_moves_table())
+        conn.execute("create index if not exists pharmacy_moves_product_idx on pharmacy_moves(product_id, ts)")
         conn.execute("create table if not exists login_attempts(attempt_key text primary key, failures integer not null, first_at double precision not null, locked_until double precision not null)")
         conn.execute("create index if not exists sessions_expires_idx on sessions(expires_at)")
         conn.execute("create index if not exists sessions_user_idx on sessions(user_id)")
@@ -2296,6 +2333,21 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 403, {"error": "Acceso clínico restringido."})
             from medicg.clinical import PROFILES, VERSION, SOURCES
             return make_response(self, 200, {"profiles": PROFILES, "version": VERSION, "sources": SOURCES})
+        if path in ("/api/pharmacy/queue", "/api/pharmacy/kardex"):
+            user = auth_user(self)
+            if not user:
+                return make_response(self, 401, {"error": "Sesión no válida"})
+            from medicg.pharmacy import queue as pharmacy_queue, kardex as pharmacy_kardex, PharmacyError
+            params = parse_qs(parsed_url.query)
+            try:
+                with db(read_only=True) as conn:
+                    if path.endswith("queue"):
+                        result = pharmacy_queue(conn, user)
+                    else:
+                        result = pharmacy_kardex(conn, user, params.get("productId", [""])[0], params.get("limit", ["300"])[0])
+                return make_response(self, 200, result)
+            except (PharmacyError, ValueError) as exc:
+                return make_response(self, 403, {"error": str(exc)})
         if path == "/api/telehealth":
             user = auth_user(self)
             if not user:
@@ -2599,6 +2651,14 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     result = (open_box if path.endswith("open") else close_box)(conn, user, payload)
                 return make_response(self, 200, result)
             except CashError as exc:
+                return make_response(self, 409, {"error": str(exc)})
+        if path == "/api/pharmacy":
+            from medicg.pharmacy import operation as pharmacy_operation, PharmacyError
+            try:
+                with db() as conn:
+                    result = pharmacy_operation(conn, user, payload)
+                return make_response(self, 200, result)
+            except PharmacyError as exc:
                 return make_response(self, 409, {"error": str(exc)})
         if path == "/api/clinical/docs":
             from medicg.clinical_docs import operation as clinical_docs_operation, DocsError
@@ -3025,6 +3085,12 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         value = merge_write(conn, user, key, value)
                     except ValueError as exc:
                         return make_response(self, 403, {"error": str(exc)})
+                if key == "recetas":
+                    def electronic(data):
+                        return {(str(pid), str(r.get("id"))): r for pid, rows in (data or {}).items() if isinstance(rows, list)
+                                for r in rows if isinstance(r, dict) and r.get("rxVersion")}
+                    if electronic(current) != electronic(value):
+                        return make_response(self, 409, {"error": "Las recetas electrónicas no se editan ni eliminan desde aquí."})
                 if key == "notas":
                     from medicg.clinical import preserve_entries, ClinicalError
                     try:

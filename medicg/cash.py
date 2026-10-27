@@ -272,3 +272,78 @@ def close_box(conn, user, payload):
     set_json_key(conn, "cajas", boxes)
     audit(conn, user, "cash_close", "cajas", {"boxId": box["id"], "totalRecibido": summary["totalRecibido"], "diferencia": float(difference)})
     return {"ok": True, "box": box}
+
+
+def clean_payments(payments, user, box, stamp):
+    if not isinstance(payments, list) or len(payments) > 20:
+        raise CashError("Revisa las formas de pago.")
+    clean = []
+    for payment in payments:
+        if not isinstance(payment, dict) or payment.get("method") not in METHODS:
+            raise CashError("Selecciona efectivo, tarjeta o transferencia.")
+        value = amount(payment.get("amount"))
+        if value <= 0:
+            raise CashError("Cada pago debe ser mayor a cero.")
+        reference = payment.get("reference", "")
+        if not isinstance(reference, str) or len(reference) > 120:
+            raise CashError("La referencia admite hasta 120 caracteres.")
+        clean.append({"id": str(uuid.uuid4()), "fecha": stamp, "metodo": payment["method"], "monto": float(value),
+                      "referencia": reference.strip(), "cajaId": box["id"] if box else None, "userId": user["id"],
+                      "registradoPor": (str(user.get("name", "")) + " " + str(user.get("last", ""))).strip()})
+    return clean
+
+
+def create_account(conn, user, patient, items, payments, concept, esp="Farmacia"):
+    """Create a patient account (cobroVersion 1) with per-line VAT and optional payments.
+
+    ``items`` need nombre, cantidad, unit (net unit price), ivaRate and may carry kind/id/codigo.
+    Payments go to the open cash box; without payments the balance stays pending in Caja.
+    """
+    from medicg_app import get_json_key, set_json_key
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5))).isoformat(timespec="seconds")
+    invoices = get_json_key(conn, "facturas", []) or []
+    boxes = get_json_key(conn, "cajas", []) or []
+    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    lines, subtotal, tax = [], Decimal(0), Decimal(0)
+    for item in items:
+        quantity = Decimal(str(item["cantidad"]))
+        unit = amount(item["unit"])
+        base = amount(unit * quantity)
+        rate = Decimal(str(item.get("ivaRate") or 0))
+        line_tax = amount(base * rate / 100)
+        subtotal += base
+        tax += line_tax
+        lines.append({**item, "desc": item["nombre"], "cant": float(quantity), "unit": float(unit), "total": float(base),
+                      "ivaRate": float(rate), "iva": float(line_tax), "precioNeto": float(unit)})
+    total = amount(subtotal + tax)
+    if total <= 0:
+        raise CashError("El total debe ser mayor a cero.")
+    clean = clean_payments(payments or [], user, box, stamp)
+    if clean and not box:
+        raise CashError("Abre caja antes de registrar pagos. También puedes dejar la cuenta pendiente.")
+    paid = sum((amount(p["monto"]) for p in clean), Decimal(0))
+    if paid > total:
+        raise CashError("El pago supera el total. Registra solo el monto aplicado, sin incluir cambio.")
+    ids = get_json_key(conn, "nextIds", {}) or {}
+    number = max(int(ids.get("fac") or 1), max((int(str(f.get("id", "")).split("-")[-1]) for f in invoices if re.fullmatch(r"\d{3}-\d{3}-\d{9}", str(f.get("id", "")))), default=0) + 1)
+    ids["fac"] = number + 1
+    rates = {l["ivaRate"] for l in lines}
+    invoice = {"id": "001-001-" + str(number).zfill(9), "fecha": stamp[:10], "createdAt": stamp, "pac": patient["id"], "esp": esp,
+               "serv": "; ".join(f"{l['cant']:g} × {l['nombre']}" for l in lines), "items": lines,
+               "sub": float(amount(subtotal)), "iva": float(amount(tax)), "ivaRate": float(rates.pop()) if len(rates) == 1 else None,
+               "total": float(total), "cobroVersion": 1, "pagos": clean, "abonado": float(paid), "saldo": float(total - paid)}
+    invoice["estadoPago"] = "Pagado" if invoice["saldo"] == 0 else "Abono" if paid else "Pendiente"
+    invoice["estado"] = invoice["estadoPago"]
+    methods = list(dict.fromkeys(p["metodo"] for p in clean))
+    invoice["pago"] = methods[0] if len(methods) == 1 else "Mixto" if methods else "Pendiente"
+    invoices.insert(0, invoice)
+    name = (patient.get("nombres", "") + " " + patient.get("apellidos", "")).strip()
+    for payment in clean:
+        box.setdefault("movimientos", []).insert(0, {"id": payment["id"], "fecha": stamp[:10], "hora": stamp[11:16], "pacId": patient["id"],
+                                                     "pac": name, "concepto": concept + " · " + invoice["serv"], "monto": payment["monto"],
+                                                     "pago": payment["metodo"], "referencia": payment["referencia"], "factura": invoice["id"], "cobroVersion": 1})
+    set_json_key(conn, "nextIds", ids)
+    set_json_key(conn, "facturas", invoices)
+    if clean:
+        set_json_key(conn, "cajas", boxes)
+    return invoice

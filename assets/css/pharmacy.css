@@ -1,0 +1,23 @@
+/* Patient search, walk-in totals, pharmacy and e-prescription */
+.pp-wrap{position:relative}
+.pp-box{display:flex;align-items:center;gap:8px;border:1px solid var(--border,#d1d5db);border-radius:8px;padding:0 10px;background:var(--bg,#fff)}
+.pp-box:focus-within{border-color:var(--primary,#0d7a6b);box-shadow:0 0 0 3px #0d7a6b22}
+.pp-icon{color:var(--text3,#6b7280)}
+.pp-input{border:0!important;outline:0;box-shadow:none!important;flex:1;padding:10px 0!important;background:transparent;min-width:0}
+.pp-list{position:absolute;z-index:20000;left:0;right:0;top:100%;margin-top:4px;background:var(--bg,#fff);border:1px solid var(--border,#d1d5db);border-radius:8px;box-shadow:0 8px 24px #0002;max-height:300px;overflow:auto}
+.pp-item{display:flex;flex-direction:column;padding:8px 12px;cursor:pointer;border-bottom:1px solid #0000000d}
+.pp-item span{font-size:12px;color:var(--text3,#6b7280)}
+.pp-item:hover,.pp-item.active{background:#0d7a6b14}
+.pp-empty{padding:10px 12px;color:var(--text3,#6b7280);font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pp-selected{margin-top:4px;min-height:14px}
+.wi-summary{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:flex-end;padding:10px 12px;margin-top:8px;border-radius:8px;background:#0d7a6b10;border:1px solid #0d7a6b33}
+.wi-summary-total{font-size:16px}
+.wi-summary-total strong{font-size:18px;color:var(--primary,#0d7a6b)}
+.ph-stats .stat-box{min-width:150px}
+.ph-actions{white-space:nowrap}
+.ph-queue-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #0000000f}
+.box-soft{background:#0d7a6b0d;border:1px solid #0d7a6b26;border-radius:8px;padding:10px 12px;line-height:1.6}
+.rx-line{border:1px solid var(--border,#e5e7eb);border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.rx-line-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.rx-line-head input{padding:6px 8px;border:1px solid var(--border,#d1d5db);border-radius:6px}
+@media (max-width:700px){.wi-summary{justify-content:flex-start}.ph-actions{white-space:normal}}
