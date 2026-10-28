@@ -231,6 +231,41 @@ def open_box(conn, user, payload):
 EXPENSE_CATEGORIES = ("Proveedores", "Insumos médicos", "Laboratorio externo", "Honorarios médicos", "Sueldos y anticipos",
                       "Servicios básicos", "Movilización", "Alimentación", "Limpieza y mantenimiento", "Retiro del dueño", "Otros")
 EXPENSE_METHODS = ("Efectivo", "Transferencia", "Tarjeta débito", "Tarjeta crédito")
+CUSTOM_CATEGORIES_KEY = "cajaCategoriasEgreso"
+
+
+def expense_categories(conn):
+    from medicg_app import get_json_key
+    custom = [c for c in (get_json_key(conn, CUSTOM_CATEGORIES_KEY, []) or []) if isinstance(c, str)]
+    return list(EXPENSE_CATEGORIES[:-1]) + sorted(custom, key=str.casefold) + [EXPENSE_CATEGORIES[-1]]
+
+
+def expense_category(conn, user, payload):
+    """Add (cash staff) or remove (administrator) a custom expense category."""
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para administrar categorías de egresos.")
+    name = " ".join(str(payload.get("nombre") or "").split())
+    custom = [c for c in (get_json_key(conn, CUSTOM_CATEGORIES_KEY, []) or []) if isinstance(c, str)]
+    if payload.get("action") == "remove":
+        if user.get("rol") != "admin":
+            raise CashError("Solo el administrador puede eliminar categorías.")
+        if name not in custom:
+            raise CashError("Solo se pueden eliminar categorías agregadas por la clínica.")
+        custom.remove(name)
+        set_json_key(conn, CUSTOM_CATEGORIES_KEY, custom)
+        audit(conn, user, "cash_category_remove", CUSTOM_CATEGORIES_KEY, {"nombre": name})
+        return {"ok": True, "categorias": expense_categories(conn)}
+    if not 2 <= len(name) <= 40:
+        raise CashError("El nombre de la categoría debe tener entre 2 y 40 caracteres.")
+    if any(c.casefold() == name.casefold() for c in list(EXPENSE_CATEGORIES) + custom):
+        raise CashError("Esa categoría ya existe.")
+    if len(custom) >= 60:
+        raise CashError("Se alcanzó el máximo de 60 categorías propias.")
+    custom.append(name)
+    set_json_key(conn, CUSTOM_CATEGORIES_KEY, custom)
+    audit(conn, user, "cash_category_add", CUSTOM_CATEGORIES_KEY, {"nombre": name})
+    return {"ok": True, "categorias": expense_categories(conn), "nombre": name}
 
 
 def _text(payload, key, maxlen, label, required=False):
@@ -265,7 +300,7 @@ def add_expense(conn, user, payload):
         raise CashError("Ingresa un monto mayor a cero.")
     concept = _text(payload, "concepto", 200, "El concepto del pago", required=True)
     category = payload.get("categoria") or "Otros"
-    if category not in EXPENSE_CATEGORIES:
+    if category not in expense_categories(conn):
         raise CashError("Categoría de egreso inválida.")
     method = payload.get("metodo") or "Efectivo"
     if method not in EXPENSE_METHODS:
