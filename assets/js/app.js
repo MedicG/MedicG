@@ -10988,7 +10988,7 @@ function renderFacs(){
 
 
 
-    const hay=[name,f.id,f.serv,f.esp,f.pago,f.claveAcceso,f.autorizacion,f.sriMensaje].join(' ').toLowerCase();
+    const hay=[name,f.id,f.numeroSri,f.serv,f.esp,f.pago,f.claveAcceso,f.autorizacion,f.sriMensaje].join(' ').toLowerCase();
 
 
 
@@ -11044,7 +11044,7 @@ function renderFacs(){
 
 
 
-      <td class="fw5 text-xs">${esc(f.id)}</td><td>${fmtDate(f.fecha)}</td><td>${esc(getPacName(f.pac))}</td><td>${esc(f.esp||'')}</td>
+      <td class="fw5 text-xs">${esc(f.id)}${f.numeroSri&&f.numeroSri!==f.id?`<div class="text-xs" style="color:var(--primary)">SRI ${esc(f.numeroSri)}</div>`:''}</td><td>${fmtDate(f.fecha)}</td><td>${esc(getPacName(f.pac))}</td><td>${esc(f.esp||'')}</td>
 
 
 
@@ -17665,6 +17665,7 @@ function loadConfig(){
 
 
   setVal('cfg-sri-pto',cfg.sriPtoEmi||'001');
+  setVal('cfg-sri-sec',cfg.sriSecuencial||'');
 
 
 
@@ -20561,6 +20562,7 @@ function saveCfg(){
 
 
   cfg.sriPtoEmi=(document.getElementById('cfg-sri-pto')?.value||'001').padStart(3,'0').slice(0,3);
+  {const sec=parseInt(document.getElementById('cfg-sri-sec')?.value||'',10);if(sec>0)cfg.sriSecuencial=sec;else delete cfg.sriSecuencial;}
 
 
 

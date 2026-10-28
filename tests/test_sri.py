@@ -18,6 +18,7 @@ from medicg.entrypoint import ProductionHandler
 
 PASSWORD = 'LocalTest-12345'
 SENT_MAIL, SRI_CALLS = [], []
+TAKEN = {'000000120', '000000121'}  # already used at the SRI (e.g. by its own invoicing tool)
 
 
 def make_p12():
@@ -82,6 +83,9 @@ def verify_sri_signature(signed, cert):
 def fake_reception(signed_xml, ambiente):
     SRI_CALLS.append(('recepcion', ambiente, signed_xml))
     root = ET.fromstring(signed_xml.encode())
+    sec = root.findtext('infoTributaria/secuencial', '')
+    if root.findtext('infoTributaria/ambiente') == '2' and sec in TAKEN:
+        return {'estado': 'DEVUELTA', 'mensajes': [{'identificador': '45', 'mensaje': 'ERROR SECUENCIAL REGISTRADO'}]}
     if 'DEVOLVER' in signed_xml:
         return {'estado': 'DEVUELTA', 'mensajes': [{'identificador': '35', 'mensaje': 'ARCHIVO NO CUMPLE ESTRUCTURA XML'}]}
     return {'estado': 'RECIBIDA', 'mensajes': []}
@@ -145,7 +149,8 @@ def main():
     inv = body['invoice']
     assert inv['sriEstado'] == 'AUTORIZADO' and body['emailSent'] is True, body
     clave = inv['claveAcceso']
-    assert len(clave) == 49 and clave[8:10] == '01' and clave[10:23] == '0929826519001' and clave[23] == '1' and clave[24:30] == '001002', clave
+    assert inv['numeroSri'] == '001-002-000000001', inv  # SRI number: own sequence per emission point
+    assert len(clave) == 49 and clave[8:10] == '01' and clave[10:23] == '0929826519001' and clave[23] == '1' and clave[24:30] == '001002' and clave[30:39] == '000000001', clave
     signed = next(c[2] for c in SRI_CALLS if c[0] == 'recepcion')
     root = ET.fromstring(signed.encode())
     assert root.findtext('infoTributaria/claveAcceso') == clave and root.findtext('infoTributaria/ptoEmi') == '002'
@@ -157,7 +162,7 @@ def main():
     assert root.findtext('infoFactura/importeTotal') == '51.50'
     verify_sri_signature(signed, cert)
     to, subject, attachments = SENT_MAIL[-1]
-    assert to == 'clarissa@example.test' and {a['filename'] for a in attachments} == {f"RIDE-{inv['id']}.html", f"{inv['id']}.xml"}
+    assert to == 'clarissa@example.test' and {a['filename'] for a in attachments} == {"RIDE-001-002-000000001.html", "001-002-000000001.xml"}
     ride = next(a for a in attachments if a['filename'].startswith('RIDE'))['content'].decode()
     for text in ('AMBIENTE:</b> PRUEBAS', 'NÚMERO DE AUTORIZACIÓN', clave, 'SUBTOTAL 0%', 'IVA 15%', '<svg'):
         assert text in ride, text
@@ -174,7 +179,15 @@ def main():
     assert acc['id'].startswith('001-002-') and int(acc['id'][-9:]) == int(inv['id'][-9:]) + 1 and 'claveAcceso' not in acc, acc
     code, body = call(admin, '/api/invoices/sri-retry', {'id': acc['id']})
     assert code == 200 and body['invoice']['sriEstado'] == 'AUTORIZADO', body
-    assert body['invoice']['claveAcceso'][30:39] == acc['id'][-9:]
+    assert body['invoice']['numeroSri'] == '001-002-000000002' and body['invoice']['claveAcceso'][30:39] == '000000002', body['invoice']
+    # Changing the emission point applies to invoices not yet sent (own sequence for the new point)
+    with app.db() as conn:
+        cfg = app.get_json_key(conn, 'config'); cfg['sriPtoEmi'] = '003'; app.set_json_key(conn, 'config', cfg)
+    code, body = call(admin, '/api/invoices', {'pac': 1, 'esp': 'X', 'items': [{'desc': 'Consulta', 'cant': 1, 'unit': 20, 'ivaRate': 0}]})
+    code, body = call(admin, '/api/invoices/sri-retry', {'id': body['invoice']['id']})
+    assert body['invoice']['numeroSri'] == '001-003-000000001' and body['invoice']['claveAcceso'][24:30] == '001003', body['invoice']
+    with app.db() as conn:
+        cfg = app.get_json_key(conn, 'config'); cfg['sriPtoEmi'] = '002'; app.set_json_key(conn, 'config', cfg)
 
     # Validations: consumer final over $50 and invalid cédula are stopped before the SRI
     code, body = call(admin, '/api/invoices', {'pac': 2, 'esp': 'X', 'items': [{'desc': 'Cirugía', 'cant': 1, 'unit': 80, 'ivaRate': 0}]})
@@ -190,9 +203,14 @@ def main():
     pending = body['invoice']
     assert pending['claveAcceso'][23] == '1'
     with app.db() as conn:
-        cfg = app.get_json_key(conn, 'config'); cfg['sriAmbiente'] = '2'; app.set_json_key(conn, 'config', cfg)
+        cfg = app.get_json_key(conn, 'config'); cfg['sriAmbiente'] = '2'; cfg['sriSecuencial'] = 120; app.set_json_key(conn, 'config', cfg)
     code, body = call(admin, '/api/invoices/sri-retry', {'id': pending['id']})
+    # production starts at the configured next number and skips the ones the SRI reports as already used
     assert code == 200 and body['invoice']['claveAcceso'][23] == '2' and SRI_CALLS[-1][1] == '2', body
+    assert body['invoice']['sriEstado'] == 'AUTORIZADO' and body['invoice']['numeroSri'] == '001-002-000000122', body['invoice']
+    code, body = call(admin, '/api/invoices', {'pac': 1, 'esp': 'X', 'items': [{'desc': 'Consulta', 'cant': 1, 'unit': 20, 'ivaRate': 0}]})
+    code, body = call(admin, '/api/invoices/sri-retry', {'id': body['invoice']['id']})
+    assert body['invoice']['numeroSri'] == '001-002-000000123', body['invoice']
     ride = SENT_MAIL[-1][2][0]['content'].decode()
     import re as _re; assert 'AMBIENTE:</b> PRODUCCIÓN' in ride, (len(SENT_MAIL), _re.findall('AMBIENTE:</b> [A-ZÓ]+', ride), SENT_MAIL[-1][1])
 
