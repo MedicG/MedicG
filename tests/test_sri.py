@@ -196,7 +196,7 @@ def main():
     assert code == 400 and 'consumidor final' in body['error'] and len(SRI_CALLS) == calls, body
     code, body = call(admin, '/api/invoices', {'pac': 3, 'esp': 'X', 'items': [{'desc': 'Consulta', 'cant': 1, 'unit': 20, 'ivaRate': 0}]})
     code, body = call(admin, '/api/invoices/sri-retry', {'id': body['invoice']['id']})
-    assert code == 400 and 'cédula' in body['error'], body
+    assert code == 200 and body['invoice']['sriEstado'] == 'AUTORIZADO' and body['invoice'].get('cedulaVerificada') is False, body  # the SRI decides
 
     # Switching to production rebuilds the key of invoices not yet received
     code, body = call(admin, '/api/invoices', {'pac': 1, 'esp': 'X', 'items': [{'desc': 'Consulta', 'cant': 1, 'unit': 20, 'ivaRate': 0}]})

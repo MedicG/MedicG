@@ -1549,8 +1549,8 @@ def sri_prepare(invoice, patient, config, reserve=None):
     tipo_id, _doc = id_type_for_patient(patient)
     if tipo_id == "07" and money_decimal(invoice.get("total")) > Decimal("50.00"):
         raise SRIIntegrationError("Las facturas a consumidor final no pueden superar $50. Registra la cédula o RUC del paciente.")
-    if tipo_id == "05" and not valid_cedula(clean_digits(patient.get("cedula"))):
-        raise SRIIntegrationError("La cédula del paciente no es válida. Corrígela en su ficha antes de enviar al SRI.")
+    # The cédula check digit is informative only: the SRI is the authority on whether an ID is valid.
+    invoice["cedulaVerificada"] = tipo_id != "05" or valid_cedula(clean_digits(patient.get("cedula")))
     previous = invoice.get("sri") or {}
     same = invoice.get("numeroSri") and invoice.get("claveAcceso") and all(str(previous.get(k)) == str(current.get(k)) for k in ("ambiente", "ruc", "estab", "ptoEmi"))
     rate = previous.get("ivaRate") if previous.get("ivaRate") is not None else float(current.get("ivaRate") or 15)
@@ -2471,7 +2471,7 @@ def clinical_file_allowed(conn, user, patient_id):
 
 INVOICE_SRI_FIELDS = (
     "signedXml", "sriRecepcion", "estado", "sriEstado", "sriMensaje", "sriAutorizacion",
-    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial", "claveAcceso", "numeroSri",
+    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial", "claveAcceso", "numeroSri", "cedulaVerificada",
 )
 CLAIM_SECONDS = 180
 
