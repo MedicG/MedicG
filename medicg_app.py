@@ -1360,7 +1360,7 @@ def ride_html(invoice, patient, config, ticket=False):
  <div style='flex:1.2;min-width:280px;{box}'>
   <div><b>R.U.C.:</b> {esc_(sri.get('ruc'))}</div>
   <div style='font-size:16px;font-weight:bold;margin:4px 0'>FACTURA</div>
-  <div><b>No.</b> {esc_(invoice.get('id'))}</div>
+  <div><b>No.</b> {esc_(invoice.get('numeroSri') or invoice.get('id'))}</div>
   <div style='margin-top:6px'><b>NÚMERO DE AUTORIZACIÓN</b><br><span style='word-break:break-all'>{esc_(invoice.get('autorizacion') if authorized else '—')}</span></div>
   <div style='margin-top:6px'><b>FECHA Y HORA DE AUTORIZACIÓN:</b> {esc_(invoice.get('fechaAutorizacion') if authorized else '—')}</div>
   <div><b>AMBIENTE:</b> {ambiente}</div>
@@ -1399,9 +1399,10 @@ def send_invoice_email(invoice, patient, config, mail_config=None, mail_conn=Non
     to_email = (patient.get("email") or "").strip()
     if not to_email:
         return False, "El paciente no tiene correo registrado"
-    subject = f"Factura electronica {invoice.get('id')} - {config.get('nombre','Medic G')}"
+    number = invoice.get("numeroSri") or invoice.get("id")
+    subject = f"Factura electronica {number} - {config.get('nombre','Medic G')}"
     text = (
-        f"Adjuntamos tu factura electronica {invoice.get('id')}\n"
+        f"Adjuntamos tu factura electronica {number}\n"
         f"Estado SRI: {invoice.get('sriEstado') or invoice.get('estado')}\n"
         f"Total: ${money_text(invoice.get('total'))}\n"
         f"Clave de acceso: {invoice.get('claveAcceso') or ''}\n"
@@ -1409,10 +1410,10 @@ def send_invoice_email(invoice, patient, config, mail_config=None, mail_conn=Non
     html = ride_html(invoice, patient, config)
     xml_content = (invoice.get("authorizedXml") or invoice.get("signedXml") or invoice.get("xml") or "").encode("utf-8")
     attachments = [
-        {"filename": f"RIDE-{invoice.get('id')}.html", "content": html.encode("utf-8"), "mime": "text/html"},
+        {"filename": f"RIDE-{number}.html", "content": html.encode("utf-8"), "mime": "text/html"},
     ]
     if xml_content:
-        attachments.append({"filename": f"{invoice.get('id')}.xml", "content": xml_content, "mime": "application/xml"})
+        attachments.append({"filename": f"{number}.xml", "content": xml_content, "mime": "application/xml"})
     return send_transaction_email(to_email, subject, text, html, attachments, mail_config, mail_conn)
 
 
@@ -1493,18 +1494,43 @@ def prepare_invoice_from_payload(conn, user, payload):
 SRI_SENT_STATES = ("RECIBIDA", "EN_PROCESO", "AUTORIZADO")
 
 
-def sri_prepare(invoice, patient, config):
-    """Fill SRI data (environment, access key, XML) from the current configuration.
+def reserve_sri_secuencial(sri):
+    """Next SRI sequence for (environment, establishment, emission point), reserved in its own transaction.
 
-    Invoices already received by the SRI keep their access key; the others are rebuilt so a
-    change of environment (pruebas -> produccion), RUC or patient data is always applied."""
+    Starts at Configuración > "Siguiente secuencial" when that is higher than the counter."""
+    key = f"sri:{sri['ambiente']}:{sri['estab']}:{sri['ptoEmi']}"
+    with db() as conn:
+        ids = get_json_key(conn, "nextIds", {}) or {}
+        cfg = get_json_key(conn, "config", {}) or {}
+        start = int(clean_digits(cfg.get("sriSecuencial")) or 1) if sri["ambiente"] == "2" else 1
+        number = max(int(ids.get(key) or 0), start, 1)
+        if number > 999999999:
+            raise SRIIntegrationError("Se agotó la secuencia de facturas de este punto de emisión.")
+        ids[key] = number + 1
+        set_json_key(conn, "nextIds", ids)
+    return str(number).zfill(9)
+
+
+def sri_assign_number(invoice, current, reserve):
+    secuencial = reserve(current)
+    invoice["numeroSri"] = f"{current['estab']}-{current['ptoEmi']}-{secuencial}"
+    invoice["secuencial"] = secuencial
+    invoice["claveAcceso"] = build_access_key(parse_invoice_date(invoice.get("fecha")), current, secuencial)
+    return secuencial
+
+
+def sri_sequence_taken(invoice):
+    msgs = (invoice.get("sriRecepcion") or {}).get("mensajes", [])
+    return any(str(m.get("identificador")) == "45" or "SECUENCIAL REGISTRADO" in str(m.get("mensaje", "")).upper() for m in msgs)
+
+
+def sri_prepare(invoice, patient, config, reserve=None):
+    """Fill SRI data (environment, number, access key, XML) from the current configuration.
+
+    The SRI number (estab-ptoEmi-secuencial) is independent of the internal account number and is
+    taken from the emission point configured now. Invoices already received by the SRI keep it."""
+    reserve = reserve or reserve_sri_secuencial
     current = sri_config(config)
-    parts = str(invoice.get("id") or "").split("-")
-    if len(parts) == 3 and all(p.isdigit() for p in parts):
-        current["estab"], current["ptoEmi"] = parts[0].zfill(3)[-3:], parts[1].zfill(3)[-3:]
-        secuencial = parts[2].zfill(9)[-9:]
-    else:
-        secuencial = str(invoice.get("secuencial") or clean_digits(invoice.get("id"))[-9:]).zfill(9)[-9:]
     if invoice.get("sriEstado") in SRI_SENT_STATES and invoice.get("claveAcceso") and invoice.get("sri"):
         if not invoice.get("xml"):
             invoice["xml"] = build_invoice_xml(invoice, patient, config)
@@ -1526,12 +1552,13 @@ def sri_prepare(invoice, patient, config):
     if tipo_id == "05" and not valid_cedula(clean_digits(patient.get("cedula"))):
         raise SRIIntegrationError("La cédula del paciente no es válida. Corrígela en su ficha antes de enviar al SRI.")
     previous = invoice.get("sri") or {}
-    same = invoice.get("claveAcceso") and all(str(previous.get(k)) == str(current.get(k)) for k in ("ambiente", "ruc", "estab", "ptoEmi"))
+    same = invoice.get("numeroSri") and invoice.get("claveAcceso") and all(str(previous.get(k)) == str(current.get(k)) for k in ("ambiente", "ruc", "estab", "ptoEmi"))
     rate = previous.get("ivaRate") if previous.get("ivaRate") is not None else float(current.get("ivaRate") or 15)
     invoice["sri"] = {**current, "ivaRate": float(rate)}
-    invoice["secuencial"] = secuencial
-    if not same or str(invoice["claveAcceso"])[:8] != parse_invoice_date(invoice.get("fecha")).strftime("%d%m%Y"):
-        invoice["claveAcceso"] = build_access_key(parse_invoice_date(invoice.get("fecha")), current, secuencial)
+    if not same:
+        sri_assign_number(invoice, current, reserve)
+    elif str(invoice["claveAcceso"])[:8] != parse_invoice_date(invoice.get("fecha")).strftime("%d%m%Y"):
+        invoice["claveAcceso"] = build_access_key(parse_invoice_date(invoice.get("fecha")), current, invoice["secuencial"])
     invoice["xml"] = build_invoice_xml(invoice, patient, config)
     return invoice
 
@@ -2444,7 +2471,7 @@ def clinical_file_allowed(conn, user, patient_id):
 
 INVOICE_SRI_FIELDS = (
     "signedXml", "sriRecepcion", "estado", "sriEstado", "sriMensaje", "sriAutorizacion",
-    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial", "claveAcceso",
+    "autorizacion", "fechaAutorizacion", "authorizedXml", "xml", "sri", "secuencial", "claveAcceso", "numeroSri",
 )
 CLAIM_SECONDS = 180
 
@@ -3119,7 +3146,13 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     return make_response(self, 409, {"error": "Esta factura se está enviando al SRI en este momento. Espera unos segundos y actualiza."})
                 # The SRI web services can take several seconds: never hold the write lock meanwhile.
                 try:
-                    invoice = send_invoice_to_sri(invoice, cert_info)
+                    for _attempt in range(30):
+                        invoice = send_invoice_to_sri(invoice, cert_info)
+                        if invoice.get("sriEstado") != "DEVUELTA" or not sri_sequence_taken(invoice):
+                            break
+                        # Number already used at this emission point (e.g. by the SRI's own invoicing tool): take the next one.
+                        sri_assign_number(invoice, invoice["sri"], reserve_sri_secuencial)
+                        invoice["xml"] = build_invoice_xml(invoice, patient, config)
                 except SRIIntegrationError as exc:
                     invoice["estado"] = "Error SRI"
                     invoice["sriEstado"] = "ERROR"
