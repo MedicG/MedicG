@@ -47,6 +47,9 @@ async function ctLoadList(){
   try{const res=await ctCall({action:'certificate_list',patientId:pid});ctRenderList(pid,res.records);cdCertFillWork(pid);}
   catch(e){box.textContent=e.message;}
 }
+function ctRefreshHce(pid,tab){
+  try{const detail=document.getElementById('hce-detail');if(detail&&detail.offsetParent&&typeof renderHCE==='function'&&detail.textContent.includes('#HCE-'+String(pid).padStart(4,'0'))){renderHCE(+pid);if(typeof cdShowTab==='function')cdShowTab(tab);}}catch(e){}
+}
 function ctCanVoid(c){return c.estado!=='Anulado'&&(currentUser?.rol==='admin'||String(c.emitidoPorId)===String(currentUser?.id));}
 function ctRenderList(pid,rows){
   const box=document.getElementById('ct-list');if(!box)return;
@@ -68,6 +71,7 @@ async function ctSave(){
     ctRenderList(pid,res.records);
     ['cd-c-dx','cd-c-cie','cd-c-texto','cd-c-rec'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     toast('Certificado '+res.records[0].numero+' emitido','ok');
+    ctRefreshHce(pid,'t-certs');
     cdCertPrint(+pid,res.records[0].id);
   }catch(e){toast(e.message,'err');}
   finally{ctBusy=false;if(btn)btn.disabled=false;}
@@ -132,6 +136,7 @@ async function otSave(){
     document.querySelectorAll('#m-ord-desk .cd-o-check:checked').forEach(c=>{c.checked=false;});cdOrderCount();
     ['cd-o-otros','cd-o-dx','cd-o-cie','cd-o-ind','cd-o-q'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});cdOrderFilter('');
     toast('Orden '+res.records[0].numero+' creada','ok');
+    ctRefreshHce(pid,'t-labs');
     cdOrderPrint(+pid,res.records[0].id);
   }catch(e){toast(e.message,'err');}
   finally{otBusy=false;if(btn)btn.disabled=false;}

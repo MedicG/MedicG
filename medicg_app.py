@@ -2935,11 +2935,12 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not data_url:
                 return make_response(self, 404, {"error": "Archivo no encontrado."})
             return make_response(self, 200, {"ok": True, "dataUrl": data_url, "mime": mime or ""})
-        if path in ("/api/cash/expense", "/api/cash/expense-void"):
-            from medicg.cash import add_expense, void_expense, CashError
+        if path in ("/api/cash/expense", "/api/cash/expense-void", "/api/cash/expense-category"):
+            from medicg.cash import add_expense, void_expense, expense_category, CashError
             try:
                 with db() as conn:
-                    result = (add_expense if path.endswith("expense") else void_expense)(conn, user, payload)
+                    handler = {"/api/cash/expense": add_expense, "/api/cash/expense-void": void_expense}.get(path, expense_category)
+                    result = handler(conn, user, payload)
                 return make_response(self, 200, result)
             except CashError as exc:
                 return make_response(self, 409, {"error": str(exc)})

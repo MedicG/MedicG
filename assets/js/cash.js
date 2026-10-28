@@ -154,7 +154,7 @@ function cashExpensesSection(box){
  return `<section class="card mt16" id="cash-expenses"><div class="card-hdr"><h3 class="card-title">Egresos de caja · pagos realizados</h3><span class="text-muted">El efectivo pagado se resta del efectivo que debe haber al cierre</span></div><div class="card-body">
  ${cashCanManageBox()?`<div class="cash-expense-form"><label class="field">Monto ($)<input id="cash-exp-amount" type="number" min="0.01" step="0.01" placeholder="0.00"></label>
  <label class="field" style="flex:2">Concepto<input id="cash-exp-concept" maxlength="200" placeholder="Ej: Pago reactivos laboratorio, taxi muestras…"></label>
- <label class="field">Categoría<select id="cash-exp-cat">${CASH_EXPENSE_CATEGORIES.map(c=>`<option>${c}</option>`).join('')}</select></label>
+ <label class="field">Categoría<select id="cash-exp-cat" onchange="cashCategoryChange(this)">${cashCategoryOptions()}</select></label>
  <label class="field">Pagado con<select id="cash-exp-method"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta débito</option><option>Tarjeta crédito</option></select></label>
  <label class="field">Pagado a<input id="cash-exp-to" maxlength="120" placeholder="Opcional"></label>
  <label class="field">N.º factura / recibo<input id="cash-exp-doc" maxlength="60" placeholder="Opcional"></label>
@@ -163,6 +163,49 @@ function cashExpensesSection(box){
  <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Hora</th><th>Concepto</th><th>Categoría</th><th>Pagado a</th><th>Comprobante</th><th>Forma</th><th class="text-r">Monto</th><th>Registró</th><th></th></tr></thead><tbody>
  ${list.map(e=>`<tr${e.estado==='Anulado'?' style="opacity:.55;text-decoration:line-through"':''}><td>${esc(e.hora||'')}</td><td>${esc(e.concepto)}</td><td>${esc(e.categoria||'')}</td><td>${esc(e.beneficiario||'—')}</td><td>${esc(e.comprobante||'—')}</td><td>${esc(e.metodo||'Efectivo')}</td><td class="text-r">−${fmtMoney(e.monto)}</td><td class="text-sm">${esc(e.registradoPor||'')}</td><td>${e.estado==='Anulado'?`<span class="badge b-red" title="${esc(e.motivoAnulacion||'')}">Anulado</span>`:canVoid(e)?`<button class="btn-s btn-xs" onclick="cashExpenseVoid('${esc(String(box.id))}','${esc(e.id)}')">Anular</button>`:''}</td></tr>`).join('')||'<tr><td colspan="9" class="text-muted">Sin egresos registrados.</td></tr>'}
  </tbody>${s.totalEgresos?`<tfoot><tr><td colspan="6"><strong>Total egresos</strong>${s.egresosOtros?` <span class="text-muted text-sm">(efectivo ${fmtMoney(s.egresosEfectivo)} · otros medios ${fmtMoney(s.egresosOtros)})</span>`:''}</td><td class="text-r"><strong>−${fmtMoney(s.totalEgresos)}</strong></td><td colspan="2"></td></tr></tfoot>`:''}</table></div></div></section>`;
+}
+function cashCategories(){
+ const custom=(DB.get('cajaCategoriasEgreso')||[]).filter(c=>typeof c==='string').sort((a,b)=>a.localeCompare(b,'es'));
+ return [...CASH_EXPENSE_CATEGORIES.slice(0,-1),...custom,'Otros'];
+}
+function cashCategoryOptions(selected){
+ return cashCategories().map(c=>`<option ${c===selected?'selected':''}>${esc(c)}</option>`).join('')+(cashCanManageBox()?'<option value="__new">+ Agregar categoría…</option>':'');
+}
+let cashCategoryPrev='Proveedores';
+function cashCategoryChange(sel){
+ if(sel.value!=='__new'){cashCategoryPrev=sel.value;return;}
+ sel.value=cashCategoryPrev;cashCategoryManager();
+}
+function cashCategoryManager(){
+ const custom=(DB.get('cajaCategoriasEgreso')||[]).slice().sort((a,b)=>a.localeCompare(b,'es'));
+ cashModal('m-cash-cats','Categorías de egresos',`<div class="flex gap8" style="align-items:flex-end"><label class="field" style="flex:1;margin:0">Nueva categoría<input id="cash-cat-name" maxlength="40" placeholder="Ej: Publicidad, Papelería, Arriendo…" onkeydown="if(event.key==='Enter')cashCategoryAdd()"></label><button class="btn-p" id="cash-cat-add" onclick="cashCategoryAdd()"><i class="ti ti-plus"></i> Agregar</button></div>
+ <h4 class="mt16 mb8" style="font-size:14px">Categorías de la clínica</h4>
+ ${custom.length?`<div class="tbl-wrap"><table class="tbl"><tbody>${custom.map(c=>`<tr><td>${esc(c)}</td><td class="text-r">${currentUser?.rol==='admin'?`<button class="btn-s btn-xs" onclick="cashCategoryRemove(this.dataset.name)" data-name="${esc(c)}">Eliminar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="text-muted text-sm">Aún no hay categorías propias.</p>'}
+ <p class="text-xs text-muted mt8">Incluidas siempre: ${CASH_EXPENSE_CATEGORIES.map(esc).join(', ')}.${currentUser?.rol==='admin'?' Al eliminar una categoría, los egresos ya registrados la conservan.':''}</p>`);
+ setTimeout(()=>document.getElementById('cash-cat-name')?.focus(),50);
+}
+function cashSetCategories(list){
+ const custom=list.filter(c=>!CASH_EXPENSE_CATEGORIES.includes(c));
+ DB.cache.cajaCategoriasEgreso=custom;DB.confirmed.cajaCategoriasEgreso=JSON.parse(JSON.stringify(custom));
+}
+async function cashCategoryAdd(){
+ const input=document.getElementById('cash-cat-name');const nombre=(input?.value||'').trim();
+ if(nombre.length<2){toast('Escribe el nombre de la categoría','err');return;}
+ const btn=document.getElementById('cash-cat-add');if(btn)btn.disabled=true;
+ try{
+  const res=await API.post('/api/cash/expense-category',{action:'add',nombre});
+  cashSetCategories(res.categorias);cashCategoryPrev=res.nombre;
+  const sel=document.getElementById('cash-exp-cat');if(sel)sel.innerHTML=cashCategoryOptions(res.nombre);
+  closeM('m-cash-cats');toast('Categoría "'+res.nombre+'" agregada','ok');
+ }catch(e){toast(e.message,'err');}finally{if(btn)btn.disabled=false;}
+}
+async function cashCategoryRemove(nombre){
+ try{
+  const res=await API.post('/api/cash/expense-category',{action:'remove',nombre});
+  cashSetCategories(res.categorias);
+  const sel=document.getElementById('cash-exp-cat');if(sel){const cur=sel.value;sel.innerHTML=cashCategoryOptions(cur);}
+  cashCategoryManager();toast('Categoría eliminada','inf');
+ }catch(e){toast(e.message,'err');}
 }
 function cashApplyBox(box){
  for(const bag of [DB.cache,DB.confirmed]){

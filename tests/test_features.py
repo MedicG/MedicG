@@ -82,6 +82,22 @@ def main():
     exp_cash = body['expense']['id']
     code, body = call(recep, '/api/cash/expense', {'monto': 4, 'concepto': 'Internet', 'categoria': 'Servicios básicos', 'metodo': 'Transferencia'})
     assert code == 200, body
+    # custom expense categories
+    assert call(recep, '/api/cash/expense', {'monto': 1, 'concepto': 'Volantes', 'categoria': 'Publicidad'})[0] == 409
+    code, body = call(recep, '/api/cash/expense-category', {'action': 'add', 'nombre': '  Publicidad '})
+    assert code == 200 and 'Publicidad' in body['categorias'] and body['categorias'][-1] == 'Otros', body
+    assert call(recep, '/api/cash/expense-category', {'action': 'add', 'nombre': 'publicidad'})[0] == 409
+    assert call(recep, '/api/cash/expense-category', {'action': 'add', 'nombre': 'proveedores'})[0] == 409
+    assert call(medgen, '/api/cash/expense-category', {'action': 'add', 'nombre': 'Arriendo'})[0] in (403, 409)
+    assert call(recep, '/api/data')[1]['data']['cajaCategoriasEgreso'] == ['Publicidad']
+    code, body = call(recep, '/api/cash/expense', {'monto': 1, 'concepto': 'Volantes', 'categoria': 'Publicidad'})
+    assert code == 200, body
+    call(recep, '/api/cash/expense-void', {'boxId': box_id, 'id': body['expense']['id'], 'motivo': 'Prueba de categoría'})
+    assert call(recep, '/api/cash/expense-category', {'action': 'remove', 'nombre': 'Publicidad'})[0] == 409
+    assert call(admin, '/api/cash/expense-category', {'action': 'remove', 'nombre': 'Proveedores'})[0] == 409
+    code, body = call(admin, '/api/cash/expense-category', {'action': 'remove', 'nombre': 'Publicidad'})
+    assert code == 200 and 'Publicidad' not in body['categorias'], body
+    assert call(admin, '/api/data', {'key': 'cajaCategoriasEgreso', 'value': ['Hack'], 'baseValue': []})[0] in (400, 403, 409)
     code, body = call(recep, '/api/cash/expense', {'monto': 3, 'concepto': 'Duplicado', 'categoria': 'Otros'})
     dup = body['expense']['id']
     assert call(admin, '/api/cash/expense-void', {'boxId': box_id, 'id': dup, 'motivo': 'x'})[0] == 409  # reason too short
