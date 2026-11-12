@@ -31,7 +31,7 @@ function doctorSpecialties(m){return [...new Set([m.esp,m.esp2,m.esp3,m.esp4].fi
 
 
 
-const DEFAULT_LOGO = 'assets/medicg-logo.jpg';
+const DEFAULT_LOGO = 'assets/medicg-logo.webp';
 
 
 

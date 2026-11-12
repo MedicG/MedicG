@@ -54,3 +54,4 @@ label.flex{justify-content:flex-start;text-align:left}
 .cash-expense-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:6px}
 .cash-expense-form .field{flex:1;min-width:140px;margin:0}
 .cash-expense-form button{white-space:nowrap}
+.confirm-box .ti{margin-left:auto;margin-right:auto}
