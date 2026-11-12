@@ -55,3 +55,15 @@ label.flex{justify-content:flex-start;text-align:left}
 .cash-expense-form .field{flex:1;min-width:140px;margin:0}
 .cash-expense-form button{white-space:nowrap}
 .confirm-box .ti{margin-left:auto;margin-right:auto}
+/* Pediatric growth charts */
+.growth-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.growth-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0 4px}
+.growth-kpi{border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:8px 10px;background:#fff}
+.growth-kpi .badge{margin-top:4px;display:inline-block}
+.growth-tools{display:flex;flex-direction:column;gap:8px;margin:12px 0 8px}
+.growth-seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--border,#cbd5e1);border-radius:9px;overflow:hidden;background:#fff}
+.growth-seg button{border:0;background:transparent;padding:6px 11px;font:inherit;font-size:12.5px;color:#334155;cursor:pointer;border-right:1px solid var(--border,#e2e8f0)}
+.growth-seg button:last-child{border-right:0}
+.growth-seg button.on{background:var(--primary,#1B4F8A);color:#fff;font-weight:600}
+.growth-chart{border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:6px;background:#fff;overflow-x:auto}
+.growth-tbl td{vertical-align:top}

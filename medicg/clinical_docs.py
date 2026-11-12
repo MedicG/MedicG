@@ -22,6 +22,7 @@ VITAL_LIMITS = {
     "talla": (20, 250, "Talla"),
     "glucosa": (10, 1000, "Glucosa capilar"),
     "perimetroAbdominal": (20, 250, "Perímetro abdominal"),
+    "perimetroCefalico": (20, 70, "Perímetro cefálico"),
 }
 
 

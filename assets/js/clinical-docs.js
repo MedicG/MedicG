@@ -1,6 +1,6 @@
 /* Vital signs (editable by doctors with history), medical certificates and lab orders.
    All writes go through /api/clinical/docs; the server validates and audits every change. */
-const CD_VITALS=[['pa','PA','mmHg','text','120/80'],['fc','FC','lpm','number',''],['fr','FR','rpm','number',''],['temp','T°','°C','number',''],['spo2','SpO₂','%','number',''],['peso','Peso','kg','number',''],['talla','Talla','cm','number',''],['glucosa','Glucosa','mg/dL','number',''],['perimetroAbdominal','P. abd.','cm','number','']];
+const CD_VITALS=[['pa','PA','mmHg','text','120/80'],['fc','FC','lpm','number',''],['fr','FR','rpm','number',''],['temp','T°','°C','number',''],['spo2','SpO₂','%','number',''],['peso','Peso','kg','number',''],['talla','Talla','cm','number',''],['glucosa','Glucosa','mg/dL','number',''],['perimetroAbdominal','P. abd.','cm','number',''],['perimetroCefalico','P. cef.','cm','number','']];
 const CD_CERT_TYPES=['Reposo médico','Asistencia a consulta','Certificado de salud','Otro'];
 const CD_ORDER_STATES=['Pendiente','Muestra tomada','Resultados recibidos'];
 let cdBusy=false;
