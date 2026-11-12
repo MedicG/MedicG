@@ -2512,6 +2512,9 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         ".css": "text/css; charset=utf-8",
         ".js": "application/javascript; charset=utf-8",
         ".txt": "text/plain; charset=utf-8",
+        ".webp": "image/webp",
+        ".svg": "image/svg+xml",
+        ".woff2": "font/woff2",
     }
 
     def __init__(self, *args, **kwargs):
@@ -2522,7 +2525,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         requested = (BASE_DIR / path.lstrip("/")).resolve()
         assets = (BASE_DIR / "assets").resolve()
-        if path not in ("/", "/index.html", "/config.js", "/favicon.ico") and not requested.is_relative_to(assets):
+        if path not in ("/", "/index.html", "/config.js", "/favicon.ico", "/robots.txt") and not requested.is_relative_to(assets):
             self.send_error(404, "Not found")
             return None
         if requested.is_dir() and path != "/":
