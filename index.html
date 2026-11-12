@@ -31,6 +31,8 @@
 
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="description" content="Centro de Especialidades Medic G en Guayaquil: reserva tu cita médica en línea y consulta tus citas, recetas, resultados y facturas en el portal del paciente."/>
+<meta name="theme-color" content="#1B4F8A"/>
 
 
 
@@ -38,7 +40,6 @@
 
 
 
-<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0"/>
 
 
 
@@ -46,7 +47,6 @@
 
 
 
-<meta http-equiv="Pragma" content="no-cache"/>
 
 
 
@@ -54,7 +54,6 @@
 
 
 
-<meta http-equiv="Expires" content="0"/>
 
 
 
@@ -86,7 +85,11 @@
 
 
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'"/>
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/></noscript>
 
 
 
@@ -94,7 +97,7 @@
 
 
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<link rel="stylesheet" href="assets/css/icons.css?v=8fa9c0cb53"/>
 
 
 
@@ -102,7 +105,15 @@
 
 
 
-<script src="config.js"></script>
+<script>
+// Backend de produccion en Vercel.
+// Si cambias el dominio del proyecto en Vercel, cambia solo esta linea.
+const MEDICG_VERCEL_BACKEND = "https://medic-g-git-main-medicgs-projects.vercel.app";
+
+// En GitHub Pages se usa Vercel como backend. En Vercel se usa /api del mismo dominio.
+window.MEDICG_API_BASE = location.hostname.endsWith("github.io") ? MEDICG_VERCEL_BACKEND : "";
+window.MEDICG_REQUIRE_BACKEND = true;
+</script>
 
 
 
@@ -110,7 +121,7 @@
 
 
 
-<script>window.APP_BUILD="20261028-sri3";</script>
+<script>window.APP_BUILD="20261112-perf1";</script>
 
 
 
@@ -118,8 +129,8 @@
 
 
 
-<link rel="stylesheet" href="assets/css/app.css?v=20260909"/>
-<link rel="stylesheet" href="assets/css/refinements.css?v=20260917-time1"/>
+<link rel="stylesheet" href="assets/css/app.css?v=919891cd7e"/>
+<link rel="stylesheet" href="assets/css/refinements.css?v=59333a2753"/>
 
 
 
@@ -127,10 +138,10 @@
 
 
 
-<link rel="stylesheet" href="assets/css/telehealth.css?v=20260912-native2">
-<link rel="stylesheet" href="assets/css/clinical.css?v=20260920-1">
-<link rel="stylesheet" href="assets/css/pharmacy.css?v=20261027-farm1">
-<link rel="stylesheet" href="assets/css/pro.css?v=20261028-sri3">
+<link rel="stylesheet" href="assets/css/telehealth.css?v=befd494a3f">
+<link rel="stylesheet" href="assets/css/clinical.css?v=065498a460">
+<link rel="stylesheet" href="assets/css/pharmacy.css?v=aebb2cb225">
+<link rel="stylesheet" href="assets/css/pro.css?v=e33657515f">
 </head>
 
 
@@ -187,7 +198,7 @@
 
 
 
-      <div class="landing-logo"><img src="assets/medicg-logo.jpg" alt="Medic G"/> <span id="landing-brand">Medic G</span></div>
+      <div class="landing-logo"><img src="assets/medicg-logo-128.webp" alt="Medic G" width="40" height="40" fetchpriority="high"/> <span id="landing-brand">Medic G</span></div>
 
 
 
@@ -435,7 +446,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input id="pub-name" placeholder="Nombre"/></div>
+          <div class="field"><label class="field-lbl" for="pub-name">Nombre <span class="req">*</span></label><input id="pub-name" placeholder="Nombre"/></div>
 
 
 
@@ -443,39 +454,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input id="pub-last" placeholder="Apellido"/></div>
-
-
-
-
-
-
-
-        </div>
-
-
-
-
-
-
-
-        <div class="form-row">
-
-
-
-
-
-
-
-          <div class="field"><label class="field-lbl">Correo <span class="req">*</span></label><input id="pub-email" type="email" placeholder="correo@ejemplo.com"/></div>
-
-
-
-
-
-
-
-          <div class="field"><label class="field-lbl">Teléfono <span class="req">*</span></label><input id="pub-tel" placeholder="0999999999"/></div>
+          <div class="field"><label class="field-lbl" for="pub-last">Apellido <span class="req">*</span></label><input id="pub-last" placeholder="Apellido"/></div>
 
 
 
@@ -499,7 +478,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Cédula / ID</label><input id="pub-cedula" placeholder="Opcional"/></div>
+          <div class="field"><label class="field-lbl" for="pub-email">Correo <span class="req">*</span></label><input id="pub-email" type="email" placeholder="correo@ejemplo.com"/></div>
 
 
 
@@ -507,7 +486,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="pub-esp" onchange="fillPublicDoctors('pub')"></select></div>
+          <div class="field"><label class="field-lbl" for="pub-tel">Teléfono <span class="req">*</span></label><input id="pub-tel" placeholder="0999999999"/></div>
 
 
 
@@ -516,14 +495,6 @@
 
 
         </div>
-
-
-
-
-
-
-
-        <div class="field"><label class="field-lbl">Médico</label><select id="pub-med"></select></div>
 
 
 
@@ -539,7 +510,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Fecha <span class="req">*</span></label><input id="pub-fecha" type="date" onchange="loadPublicAvailability('pub')"/></div>
+          <div class="field"><label class="field-lbl" for="pub-cedula">Cédula / ID</label><input id="pub-cedula" placeholder="Opcional"/></div>
 
 
 
@@ -547,7 +518,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Hora <span class="req">*</span></label><select id="pub-hora"></select></div>
+          <div class="field"><label class="field-lbl" for="pub-esp">Especialidad <span class="req">*</span></label><select id="pub-esp" onchange="fillPublicDoctors('pub')"></select></div>
 
 
 
@@ -563,7 +534,47 @@
 
 
 
-        <div class="field"><label class="field-lbl">Motivo de consulta</label><textarea id="pub-motivo" rows="2" placeholder="Cuéntanos brevemente qué necesitas"></textarea></div>
+        <div class="field"><label class="field-lbl" for="pub-med">Médico</label><select id="pub-med"></select></div>
+
+
+
+
+
+
+
+        <div class="form-row">
+
+
+
+
+
+
+
+          <div class="field"><label class="field-lbl" for="pub-fecha">Fecha <span class="req">*</span></label><input id="pub-fecha" type="date" onchange="loadPublicAvailability('pub')"/></div>
+
+
+
+
+
+
+
+          <div class="field"><label class="field-lbl" for="pub-hora">Hora <span class="req">*</span></label><select id="pub-hora"></select></div>
+
+
+
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+        <div class="field"><label class="field-lbl" for="pub-motivo">Motivo de consulta</label><textarea id="pub-motivo" rows="2" placeholder="Cuéntanos brevemente qué necesitas"></textarea></div>
 
 
 
@@ -763,7 +774,7 @@
 
 
 
-            <div class="field"><label class="field-lbl">Correo electrónico</label><input type="email" id="l-email" placeholder="usuario@medicg.com" autocomplete="username"/></div>
+            <div class="field"><label class="field-lbl" for="l-email">Correo electrónico</label><input type="email" id="l-email" placeholder="usuario@medicg.com" autocomplete="username"/></div>
 
 
 
@@ -771,7 +782,7 @@
 
 
 
-            <div class="field"><label class="field-lbl">Contraseña</label><input type="password" id="l-pass" placeholder="Contraseña" autocomplete="current-password"/></div>
+            <div class="field"><label class="field-lbl" for="l-pass">Contraseña</label><input type="password" id="l-pass" placeholder="Contraseña" autocomplete="current-password"/></div>
 
 
 
@@ -875,7 +886,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Nombre <span class="req">*</span></label><input type="text" id="r-name" placeholder="Tu nombre"/></div>
+              <div class="field"><label class="field-lbl" for="r-name">Nombre <span class="req">*</span></label><input type="text" id="r-name" placeholder="Tu nombre"/></div>
 
 
 
@@ -883,7 +894,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Apellido <span class="req">*</span></label><input type="text" id="r-last" placeholder="Tu apellido"/></div>
+              <div class="field"><label class="field-lbl" for="r-last">Apellido <span class="req">*</span></label><input type="text" id="r-last" placeholder="Tu apellido"/></div>
 
 
 
@@ -907,7 +918,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Cédula / ID</label><input type="text" id="r-cedula" placeholder="Opcional"/></div>
+              <div class="field"><label class="field-lbl" for="r-cedula">Cédula / ID</label><input type="text" id="r-cedula" placeholder="Opcional"/></div>
 
 
 
@@ -915,7 +926,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Teléfono</label><input type="text" id="r-tel" placeholder="0999999999"/></div>
+              <div class="field"><label class="field-lbl" for="r-tel">Teléfono</label><input type="text" id="r-tel" placeholder="0999999999"/></div>
 
 
 
@@ -931,7 +942,7 @@
 
 
 
-            <div class="field"><label class="field-lbl">Correo electrónico <span class="req">*</span></label><input type="email" id="r-email" placeholder="correo@ejemplo.com"/></div>
+            <div class="field"><label class="field-lbl" for="r-email">Correo electrónico <span class="req">*</span></label><input type="email" id="r-email" placeholder="correo@ejemplo.com"/></div>
 
 
 
@@ -947,7 +958,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Contraseña <span class="req">*</span></label><input type="password" id="r-pass" placeholder="Mín. 6 caracteres"/></div>
+              <div class="field"><label class="field-lbl" for="r-pass">Contraseña <span class="req">*</span></label><input type="password" id="r-pass" placeholder="Mín. 6 caracteres"/></div>
 
 
 
@@ -955,7 +966,7 @@
 
 
 
-              <div class="field"><label class="field-lbl">Confirmar contraseña</label><input type="password" id="r-pass2" placeholder="Repetir contraseña"/></div>
+              <div class="field"><label class="field-lbl" for="r-pass2">Confirmar contraseña</label><input type="password" id="r-pass2" placeholder="Repetir contraseña"/></div>
 
 
 
@@ -1099,7 +1110,7 @@
 
 
 
-      <img class="patient-logo" src="assets/medicg-logo.jpg" alt="Medic G"/>
+      <img class="patient-logo" src="assets/medicg-logo-128.webp" alt="Medic G" width="42" height="42" loading="lazy"/>
 
 
 
@@ -2839,7 +2850,7 @@
 
 
 
-            <div class="field"><label class="field-lbl">Nombre</label><input id="qx-nombre" placeholder="Quirófano 1"/></div>
+            <div class="field"><label class="field-lbl" for="qx-nombre">Nombre</label><input id="qx-nombre" placeholder="Quirófano 1"/></div>
 
 
 
@@ -2847,7 +2858,7 @@
 
 
 
-            <div class="field"><label class="field-lbl">Estado</label><select id="qx-estado"><option>Disponible</option><option>Ocupado</option><option>Limpieza</option><option>Mantenimiento</option></select></div>
+            <div class="field"><label class="field-lbl" for="qx-estado">Estado</label><select id="qx-estado"><option>Disponible</option><option>Ocupado</option><option>Limpieza</option><option>Mantenimiento</option></select></div>
 
 
 
@@ -2919,7 +2930,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Equipo</label><input id="eq-nombre" placeholder="Torre laparoscópica"/></div>
+          <div class="field"><label class="field-lbl" for="eq-nombre">Equipo</label><input id="eq-nombre" placeholder="Torre laparoscópica"/></div>
 
 
 
@@ -2927,7 +2938,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Disponibilidad</label><select id="eq-estado"><option>Disponible</option><option>En uso</option><option>Mantenimiento</option><option>Fuera de servicio</option></select></div>
+          <div class="field"><label class="field-lbl" for="eq-estado">Disponibilidad</label><select id="eq-estado"><option>Disponible</option><option>En uso</option><option>Mantenimiento</option><option>Fuera de servicio</option></select></div>
 
 
 
@@ -2991,7 +3002,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Material</label><input id="st-nombre" placeholder="Guantes estériles"/></div>
+          <div class="field"><label class="field-lbl" for="st-nombre">Material</label><input id="st-nombre" placeholder="Guantes estériles"/></div>
 
 
 
@@ -2999,7 +3010,7 @@
 
 
 
-          <div class="form-row"><div class="field"><label class="field-lbl">Cantidad</label><input id="st-cant" type="number" value="0"/></div><div class="field"><label class="field-lbl">Mínimo</label><input id="st-min" type="number" value="5"/></div></div>
+          <div class="form-row"><div class="field"><label class="field-lbl" for="st-cant">Cantidad</label><input id="st-cant" type="number" value="0"/></div><div class="field"><label class="field-lbl" for="st-min">Mínimo</label><input id="st-min" type="number" value="5"/></div></div>
 
 
 
@@ -3111,7 +3122,7 @@
 
 
 
-          <div class="form-row"><div class="field"><label class="field-lbl">Servicio</label><input id="srv-nombre" placeholder="Consulta ginecológica"/></div><div class="field"><label class="field-lbl">Categoría</label><input id="srv-cat" placeholder="Consulta, terapia, procedimiento"/></div></div>
+          <div class="form-row"><div class="field"><label class="field-lbl" for="srv-nombre">Servicio</label><input id="srv-nombre" placeholder="Consulta ginecológica"/></div><div class="field"><label class="field-lbl" for="srv-cat">Categoría</label><input id="srv-cat" placeholder="Consulta, terapia, procedimiento"/></div></div>
 
 
 
@@ -3119,7 +3130,7 @@
 
 
 
-          <div class="form-row"><div class="field"><label class="field-lbl">Precio ($)</label><input id="srv-precio" type="number" step="0.01" value="0"/></div><div class="field" style="align-self:end;"><input type="hidden" id="srv-edit-id"/><button class="btn-p btn-sm" id="srv-save-btn" onclick="addServicio()"><i class="ti ti-plus"></i> Agregar servicio</button><button class="btn-s btn-sm mt8" id="srv-cancel-btn" onclick="resetServicioForm()" style="display:none;">Cancelar edición</button></div></div>
+          <div class="form-row"><div class="field"><label class="field-lbl" for="srv-precio">Precio ($)</label><input id="srv-precio" type="number" step="0.01" value="0"/></div><div class="field" style="align-self:end;"><input type="hidden" id="srv-edit-id"/><button class="btn-p btn-sm" id="srv-save-btn" onclick="addServicio()"><i class="ti ti-plus"></i> Agregar servicio</button><button class="btn-s btn-sm mt8" id="srv-cancel-btn" onclick="resetServicioForm()" style="display:none;">Cancelar edición</button></div></div>
 
 
 
@@ -3280,7 +3291,7 @@
 
 
 
-          <div class="form-row"><div class="field"><label class="field-lbl">Examen</label><input id="ex-nombre" placeholder="Hemograma completo"/></div><div class="field"><label class="field-lbl">Categoría</label><input id="ex-cat" placeholder="Laboratorio, imagen, cardiología"/></div></div>
+          <div class="form-row"><div class="field"><label class="field-lbl" for="ex-nombre">Examen</label><input id="ex-nombre" placeholder="Hemograma completo"/></div><div class="field"><label class="field-lbl" for="ex-cat">Categoría</label><input id="ex-cat" placeholder="Laboratorio, imagen, cardiología"/></div></div>
 
 
 
@@ -3288,7 +3299,7 @@
 
 
 
-          <div class="form-row c3"><div class="field"><label class="field-lbl">Precio ($)</label><input id="ex-precio" type="number" step="0.01" value="0"/></div><div class="field"><label class="field-lbl">Descuento (%)</label><input id="ex-desc" type="number" min="0" max="100" value="0"/></div><div class="field" style="align-self:end;"><input type="hidden" id="ex-edit-id"/><button class="btn-p btn-sm" id="ex-save-btn" onclick="addExamen()"><i class="ti ti-plus"></i> Agregar examen</button><button class="btn-s btn-sm mt8" id="ex-cancel-btn" onclick="resetExamenForm()" style="display:none;">Cancelar edición</button></div></div>
+          <div class="form-row c3"><div class="field"><label class="field-lbl" for="ex-precio">Precio ($)</label><input id="ex-precio" type="number" step="0.01" value="0"/></div><div class="field"><label class="field-lbl" for="ex-desc">Descuento (%)</label><input id="ex-desc" type="number" min="0" max="100" value="0"/></div><div class="field" style="align-self:end;"><input type="hidden" id="ex-edit-id"/><button class="btn-p btn-sm" id="ex-save-btn" onclick="addExamen()"><i class="ti ti-plus"></i> Agregar examen</button><button class="btn-s btn-sm mt8" id="ex-cancel-btn" onclick="resetExamenForm()" style="display:none;">Cancelar edición</button></div></div>
 
 
 
@@ -3344,16 +3355,16 @@
 
 
 
-                <div class="field"><label class="field-lbl" for="cot-pac">Paciente</label><select id="cot-pac" ></select></div><div class="field"><label class="field-lbl" for="cot-item">Servicio o examen</label><select id="cot-item" ></select></div><div class="form-row"><div class="field"><label class="field-lbl" for="cot-cant">Cantidad</label><input id="cot-cant" type="number" min="1" value="1"></div><div class="field"><label class="field-lbl" for="cot-extra">Descuento adicional (%)</label><input id="cot-extra" type="number" min="0" max="100" value="0"></div></div><button class="btn-p" onclick="addCotItem()">Agregar</button><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Detalle</th><th>Cantidad</th><th>Precio</th><th>Descuento</th><th>Total</th><th></th></tr></thead><tbody id="cot-tbody"></tbody></table></div><p>Total: <strong id="cot-total">$0.00</strong></p><button class="btn-p" onclick="saveCotizacion(false)">Guardar cotización</button></div></div></div></div></div></div></div><div class="modal-bg" id="m-cita"><div class="modal lg"><div class="modal-hdr"><span class="modal-title" id="m-cita-title">Cita</span><button class="btn-ic" onclick="closeM('m-cita')">Cerrar</button></div><div class="modal-body"><div class="form-row"><div class="field"><label class="field-lbl">Paciente <span class="req">*</span></label><div class="flex gap8"><select id="c-pac"></select><button type="button" class="btn-s btn-sm" style="white-space:nowrap;" onclick="openPacFromCita()"><i class="ti ti-user-plus"></i> Nuevo paciente</button></div></div><div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="c-esp" onchange="fillMeds();renderCitaHours();"></select></div></div>
+                <div class="field"><label class="field-lbl" for="cot-pac">Paciente</label><select id="cot-pac" ></select></div><div class="field"><label class="field-lbl" for="cot-item">Servicio o examen</label><select id="cot-item" ></select></div><div class="form-row"><div class="field"><label class="field-lbl" for="cot-cant">Cantidad</label><input id="cot-cant" type="number" min="1" value="1"></div><div class="field"><label class="field-lbl" for="cot-extra">Descuento adicional (%)</label><input id="cot-extra" type="number" min="0" max="100" value="0"></div></div><button class="btn-p" onclick="addCotItem()">Agregar</button><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Detalle</th><th>Cantidad</th><th>Precio</th><th>Descuento</th><th>Total</th><th></th></tr></thead><tbody id="cot-tbody"></tbody></table></div><p>Total: <strong id="cot-total">$0.00</strong></p><button class="btn-p" onclick="saveCotizacion(false)">Guardar cotización</button></div></div></div></div></div></div></div><div class="modal-bg" id="m-cita"><div class="modal lg"><div class="modal-hdr"><span class="modal-title" id="m-cita-title">Cita</span><button class="btn-ic" onclick="closeM('m-cita')">Cerrar</button></div><div class="modal-body"><div class="form-row"><div class="field"><label class="field-lbl" for="c-pac">Paciente <span class="req">*</span></label><div class="flex gap8"><select id="c-pac"></select><button type="button" class="btn-s btn-sm" style="white-space:nowrap;" onclick="openPacFromCita()"><i class="ti ti-user-plus"></i> Nuevo paciente</button></div></div><div class="field"><label class="field-lbl" for="c-esp">Especialidad <span class="req">*</span></label><select id="c-esp" onchange="fillMeds();renderCitaHours();"></select></div></div>
 
-      <div class="field"><label class="field-lbl">Modalidad</label><select id="c-modalidad"><option value="presencial">Presencial</option><option value="online">Consulta online</option></select></div>
-      <div class="form-row"><div class="field"><label class="field-lbl">Medico <span class="req">*</span></label><select id="c-med" onchange="renderCitaHours()"></select></div><div class="field"><label class="field-lbl">Tipo</label><select id="c-tipo"><option>Primera vez</option><option>Control</option><option>Seguimiento</option><option>Urgencia</option><option>Procedimiento</option><option>Eventual</option></select></div></div>
+      <div class="field"><label class="field-lbl" for="c-modalidad">Modalidad</label><select id="c-modalidad"><option value="presencial">Presencial</option><option value="online">Consulta online</option></select></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="c-med">Medico <span class="req">*</span></label><select id="c-med" onchange="renderCitaHours()"></select></div><div class="field"><label class="field-lbl" for="c-tipo">Tipo</label><select id="c-tipo"><option>Primera vez</option><option>Control</option><option>Seguimiento</option><option>Urgencia</option><option>Procedimiento</option><option>Eventual</option></select></div></div>
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Fecha <span class="req">*</span></label><input type="date" id="c-fecha" onchange="renderCitaHours()"/></div><div class="field"><label class="field-lbl">Hora disponible <span class="req">*</span></label><select id="c-hora"></select><div id="c-slot-msg" class="text-xs text-muted mt4"></div></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="c-fecha">Fecha <span class="req">*</span></label><input type="date" id="c-fecha" onchange="renderCitaHours()"/></div><div class="field"><label class="field-lbl" for="c-hora">Hora disponible <span class="req">*</span></label><select id="c-hora"></select><div id="c-slot-msg" class="text-xs text-muted mt4"></div></div></div>
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Estado</label><select id="c-estado"><option>Solicitada online</option><option>Pendiente</option><option>Confirmada</option><option>Pospuesta</option><option>Cancelada</option><option>Atendida</option></select></div><div class="field"><label class="field-lbl">Recordatorio</label><select id="c-notif" onchange="remContactHint()"><option>WhatsApp + Correo (24h antes)</option><option>WhatsApp + Correo (24h y 2h antes)</option><option>Solo WhatsApp (24h antes)</option><option>Solo WhatsApp (2h antes)</option><option>Solo correo (24h antes)</option><option>Sin recordatorio</option></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="c-estado">Estado</label><select id="c-estado"><option>Solicitada online</option><option>Pendiente</option><option>Confirmada</option><option>Pospuesta</option><option>Cancelada</option><option>Atendida</option></select></div><div class="field"><label class="field-lbl" for="c-notif">Recordatorio</label><select id="c-notif" onchange="remContactHint()"><option>WhatsApp + Correo (24h antes)</option><option>WhatsApp + Correo (24h y 2h antes)</option><option>Solo WhatsApp (24h antes)</option><option>Solo WhatsApp (2h antes)</option><option>Solo correo (24h antes)</option><option>Sin recordatorio</option></select></div></div>
 
-      <div class="field"><label class="field-lbl">Motivo</label><textarea id="c-motivo" rows="2" placeholder="Describe el motivo..."></textarea></div>
+      <div class="field"><label class="field-lbl" for="c-motivo">Motivo</label><textarea id="c-motivo" rows="2" placeholder="Describe el motivo..."></textarea></div>
 
       <input type="hidden" id="c-edit-id"/>
 
@@ -3455,7 +3466,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Paciente <span class="req">*</span></label><select id="f-pac"></select></div><div class="field"><label class="field-lbl">Fecha</label><input type="date" id="f-fecha"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="f-pac">Paciente <span class="req">*</span></label><select id="f-pac"></select></div><div class="field"><label class="field-lbl" for="f-fecha">Fecha</label><input type="date" id="f-fecha"/></div></div>
 
 
 
@@ -3463,7 +3474,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Especialidad</label><select id="f-esp"></select></div><div class="field"><label class="field-lbl">Forma de pago</label><select id="f-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="f-esp">Especialidad</label><select id="f-esp"></select></div><div class="field"><label class="field-lbl" for="f-pago">Forma de pago</label><select id="f-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div></div>
 
 
 
@@ -3639,7 +3650,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Nombres <span class="req">*</span></label><input type="text" id="p-nombres"/></div><div class="field"><label class="field-lbl">Apellidos <span class="req">*</span></label><input type="text" id="p-apellidos"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="p-nombres">Nombres <span class="req">*</span></label><input type="text" id="p-nombres"/></div><div class="field"><label class="field-lbl" for="p-apellidos">Apellidos <span class="req">*</span></label><input type="text" id="p-apellidos"/></div></div>
 
 
 
@@ -3647,7 +3658,7 @@
 
 
 
-      <div class="form-row c3"><div class="field"><label class="field-lbl">Cédula <span class="req">*</span></label><input type="text" id="p-cedula"/></div><div class="field"><label class="field-lbl">Fecha nacimiento</label><input type="date" id="p-fnac" onchange="syncPatientAge()"/><label class="field-lbl" style="margin-top:8px" for="p-edad">Edad declarada (años), si no conoce la fecha</label><input type="number" id="p-edad" min="0" max="130" step="1" placeholder="Ej. 35"/><small id="p-edad-help">No es necesario inventar una fecha de nacimiento.</small></div><div class="field"><label class="field-lbl">Género</label><select id="p-genero"><option>Masculino</option><option>Femenino</option><option>Otro</option></select></div></div>
+      <div class="form-row c3"><div class="field"><label class="field-lbl" for="p-cedula">Cédula <span class="req">*</span></label><input type="text" id="p-cedula"/></div><div class="field"><label class="field-lbl" for="p-fnac">Fecha nacimiento</label><input type="date" id="p-fnac" onchange="syncPatientAge()"/><label class="field-lbl" style="margin-top:8px" for="p-edad">Edad declarada (años), si no conoce la fecha</label><input type="number" id="p-edad" min="0" max="130" step="1" placeholder="Ej. 35"/><small id="p-edad-help">No es necesario inventar una fecha de nacimiento.</small></div><div class="field"><label class="field-lbl" for="p-genero">Género</label><select id="p-genero"><option>Masculino</option><option>Femenino</option><option>Otro</option></select></div></div>
 
 
 
@@ -3655,7 +3666,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Teléfono / WhatsApp</label><input type="tel" id="p-tel"/></div><div class="field"><label class="field-lbl">Correo</label><input type="email" id="p-email"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="p-tel">Teléfono / WhatsApp</label><input type="tel" id="p-tel"/></div><div class="field"><label class="field-lbl" for="p-email">Correo</label><input type="email" id="p-email"/></div></div>
 
 
 
@@ -3663,7 +3674,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Dirección</label><input type="text" id="p-dir"/></div>
+      <div class="field"><label class="field-lbl" for="p-dir">Dirección</label><input type="text" id="p-dir"/></div>
 
 
 
@@ -3671,7 +3682,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Especialidad principal</label><select id="p-esp"></select></div><div class="field"><label class="field-lbl">Seguro médico</label><select id="p-seg"><option value="">Ninguno</option></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="p-esp">Especialidad principal</label><select id="p-esp"></select></div><div class="field"><label class="field-lbl" for="p-seg">Seguro médico</label><select id="p-seg"><option value="">Ninguno</option></select></div></div>
 
 
 
@@ -3679,7 +3690,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Tipo de sangre</label><select id="p-sangre"><option>Desconocido</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div><div class="field"><label class="field-lbl">Alergias</label><input type="text" id="p-alergias" placeholder="Penicilina, látex..."/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="p-sangre">Tipo de sangre</label><select id="p-sangre"><option>Desconocido</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div><div class="field"><label class="field-lbl" for="p-alergias">Alergias</label><input type="text" id="p-alergias" placeholder="Penicilina, látex..."/></div></div>
 
 
 
@@ -3687,7 +3698,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Antecedentes médicos</label><textarea id="p-antec" rows="2" placeholder="Enfermedades crónicas, cirugías, medicación..."></textarea></div>
+      <div class="field"><label class="field-lbl" for="p-antec">Antecedentes médicos</label><textarea id="p-antec" rows="2" placeholder="Enfermedades crónicas, cirugías, medicación..."></textarea></div>
 
 
 
@@ -3783,7 +3794,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Nombre completo <span class="req">*</span></label><input type="text" id="md-nombre" placeholder="Dr./Dra. Nombres Apellidos"/></div><div class="field"><label class="field-lbl">Especialidad <span class="req">*</span></label><select id="md-esp"></select><label class="field-lbl" style="margin-top:10px">Segunda especialidad (opcional)</label><select id="md-esp2"></select><label class="field-lbl" style="margin-top:10px">Tercera especialidad (opcional)</label><select id="md-esp3"></select><label class="field-lbl" style="margin-top:10px">Cuarta especialidad (opcional)</label><select id="md-esp4"></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="md-nombre">Nombre completo <span class="req">*</span></label><input type="text" id="md-nombre" placeholder="Dr./Dra. Nombres Apellidos"/></div><div class="field"><label class="field-lbl" for="md-esp">Especialidad <span class="req">*</span></label><select id="md-esp"></select><label class="field-lbl" for="md-esp2" style="margin-top:10px">Segunda especialidad (opcional)</label><select id="md-esp2"></select><label class="field-lbl" for="md-esp3" style="margin-top:10px">Tercera especialidad (opcional)</label><select id="md-esp3"></select><label class="field-lbl" for="md-esp4" style="margin-top:10px">Cuarta especialidad (opcional)</label><select id="md-esp4"></select></div></div>
 
 
 
@@ -3791,7 +3802,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Cédula</label><input type="text" id="md-ced"/></div><div class="field"><label class="field-lbl">Reg. SENESCYT</label><input type="text" id="md-sen"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="md-ced">Cédula</label><input type="text" id="md-ced"/></div><div class="field"><label class="field-lbl" for="md-sen">Reg. SENESCYT</label><input type="text" id="md-sen"/></div></div>
 
 
 
@@ -3799,7 +3810,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Horario de atención</label><input type="text" id="md-horario" placeholder="Ej: Lun-Vie 08:00-13:00"/></div>
+      <div class="field"><label class="field-lbl" for="md-horario">Horario de atención</label><input type="text" id="md-horario" placeholder="Ej: Lun-Vie 08:00-13:00"/></div>
 
 
 
@@ -3807,7 +3818,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Teléfono</label><input type="tel" id="md-tel"/></div><div class="field"><label class="field-lbl">Correo</label><input type="email" id="md-email"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="md-tel">Teléfono</label><input type="tel" id="md-tel"/></div><div class="field"><label class="field-lbl" for="md-email">Correo</label><input type="email" id="md-email"/></div></div>
 
 
 
@@ -3903,7 +3914,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Nombre de la especialidad <span class="req">*</span></label><input type="text" id="esp-nombre" placeholder="Ej: Cardiología"/></div>
+      <div class="field"><label class="field-lbl" for="esp-nombre">Nombre de la especialidad <span class="req">*</span></label><input type="text" id="esp-nombre" placeholder="Ej: Cardiología"/></div>
 
 
 
@@ -3911,7 +3922,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Color de identificación</label>
+      <div class="field"><label class="field-lbl" for="esp-color">Color de identificación</label>
 
 
 
@@ -3935,7 +3946,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Descripción</label><textarea id="esp-desc" rows="2" placeholder="Descripción breve..."></textarea></div>
+      <div class="field"><label class="field-lbl" for="esp-desc">Descripción</label><textarea id="esp-desc" rows="2" placeholder="Descripción breve..."></textarea></div>
 
 
 
@@ -3943,7 +3954,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Estado</label><select id="esp-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
+      <div class="field"><label class="field-lbl" for="esp-estado">Estado</label><select id="esp-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
 
 
 
@@ -4039,7 +4050,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Aseguradora <span class="req">*</span></label><input type="text" id="sg-nombre" placeholder="Nombre de la aseguradora"/></div>
+      <div class="field"><label class="field-lbl" for="sg-nombre">Aseguradora <span class="req">*</span></label><input type="text" id="sg-nombre" placeholder="Nombre de la aseguradora"/></div>
 
 
 
@@ -4047,7 +4058,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Tipo</label><select id="sg-tipo"><option>Público (IESS)</option><option>Privado</option><option>Empresarial</option><option>Internacional</option></select></div><div class="field"><label class="field-lbl">Copago (%)</label><input type="number" id="sg-copago" value="0" min="0" max="100"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="sg-tipo">Tipo</label><select id="sg-tipo"><option>Público (IESS)</option><option>Privado</option><option>Empresarial</option><option>Internacional</option></select></div><div class="field"><label class="field-lbl" for="sg-copago">Copago (%)</label><input type="number" id="sg-copago" value="0" min="0" max="100"/></div></div>
 
 
 
@@ -4055,7 +4066,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Servicios cubiertos</label><textarea id="sg-cobertura" rows="2" placeholder="Consultas, procedimientos..."></textarea></div>
+      <div class="field"><label class="field-lbl" for="sg-cobertura">Servicios cubiertos</label><textarea id="sg-cobertura" rows="2" placeholder="Consultas, procedimientos..."></textarea></div>
 
 
 
@@ -4063,7 +4074,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Contacto</label><input type="text" id="sg-contacto" placeholder="Nombre y teléfono"/></div>
+      <div class="field"><label class="field-lbl" for="sg-contacto">Contacto</label><input type="text" id="sg-contacto" placeholder="Nombre y teléfono"/></div>
 
 
 
@@ -4071,7 +4082,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Estado</label><select id="sg-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
+      <div class="field"><label class="field-lbl" for="sg-estado">Estado</label><select id="sg-estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
 
 
 
@@ -4183,7 +4194,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Prescriptor</label><input id="rx-medico"/></div><div class="field"><label class="field-lbl">Registro profesional ACESS/SENESCYT</label><input id="rx-registro" placeholder="Numero de registro profesional"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="rx-medico">Prescriptor</label><input id="rx-medico"/></div><div class="field"><label class="field-lbl" for="rx-registro">Registro profesional ACESS/SENESCYT</label><input id="rx-registro" placeholder="Numero de registro profesional"/></div></div>
 
 
 
@@ -4191,7 +4202,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Diagnostico / CIE-10 <span class="req">*</span></label><input id="rx-dx" placeholder="Ej: J03.9 - Amigdalitis aguda"/></div><div class="field"><label class="field-lbl">Antecedentes de alergias</label><input id="rx-alergias" placeholder="Sin alergias conocidas"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="rx-dx">Diagnostico / CIE-10 <span class="req">*</span></label><input id="rx-dx" placeholder="Ej: J03.9 - Amigdalitis aguda"/></div><div class="field"><label class="field-lbl" for="rx-alergias">Antecedentes de alergias</label><input id="rx-alergias" placeholder="Sin alergias conocidas"/></div></div>
 
 
 
@@ -4199,7 +4210,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Medicamentos prescritos <span class="req">*</span></label><textarea id="rx-meds" rows="6" placeholder="Una linea por medicamento: DCI/nombre generico | forma farmaceutica | concentracion | via | dosis | frecuencia | duracion | cantidad"></textarea><div class="text-xs text-muted mt4">Evita abreviaturas o textos ambiguos. Incluye dosis, frecuencia, via de administracion y duracion.</div></div>
+      <div class="field"><label class="field-lbl" for="rx-meds">Medicamentos prescritos <span class="req">*</span></label><textarea id="rx-meds" rows="6" placeholder="Una linea por medicamento: DCI/nombre generico | forma farmaceutica | concentracion | via | dosis | frecuencia | duracion | cantidad"></textarea><div class="text-xs text-muted mt4">Evita abreviaturas o textos ambiguos. Incluye dosis, frecuencia, via de administracion y duracion.</div></div>
 
 
 
@@ -4207,7 +4218,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Indicaciones para el paciente</label><textarea id="rx-ind" rows="3" placeholder="Indicaciones claras para administracion, cuidados, signos de alarma y control."></textarea></div>
+      <div class="field"><label class="field-lbl" for="rx-ind">Indicaciones para el paciente</label><textarea id="rx-ind" rows="3" placeholder="Indicaciones claras para administracion, cuidados, signos de alarma y control."></textarea></div>
 
 
 
@@ -4215,7 +4226,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Validez / observacion</label><input id="rx-validez" placeholder="Ej: Valida por 72 horas, salvo medicamentos sujetos a fiscalizacion."/></div>
+      <div class="field"><label class="field-lbl" for="rx-validez">Validez / observacion</label><input id="rx-validez" placeholder="Ej: Valida por 72 horas, salvo medicamentos sujetos a fiscalizacion."/></div>
 
 
 
@@ -4303,7 +4314,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Especialidad</label><select id="n-esp"></select></div><div class="field"><label class="field-lbl">Profesional responsable</label><select id="n-med"></select></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="n-esp">Especialidad</label><select id="n-esp"></select></div><div class="field"><label class="field-lbl" for="n-med">Profesional responsable</label><select id="n-med"></select></div></div>
 
 
 
@@ -4319,7 +4330,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Motivo de consulta <span class="req">*</span></label><input type="text" id="n-motivo" placeholder="Motivo principal referido por el paciente"/></div>
+        <div class="field"><label class="field-lbl" for="n-motivo">Motivo de consulta <span class="req">*</span></label><input type="text" id="n-motivo" placeholder="Motivo principal referido por el paciente"/></div>
 
 
 
@@ -4327,7 +4338,7 @@
 
 
 
-        <div class="form-row"><div class="field"><label class="field-lbl">Antecedentes personales</label><textarea id="n-ap" rows="2" placeholder="Clinicos, quirurgicos, gineco-obstetricos, traumaticos, farmacologicos, alergicos..."></textarea></div><div class="field"><label class="field-lbl">Antecedentes familiares</label><textarea id="n-af" rows="2" placeholder="HTA, diabetes, cancer, cardiopatias, otros..."></textarea></div></div>
+        <div class="form-row"><div class="field"><label class="field-lbl" for="n-ap">Antecedentes personales</label><textarea id="n-ap" rows="2" placeholder="Clinicos, quirurgicos, gineco-obstetricos, traumaticos, farmacologicos, alergicos..."></textarea></div><div class="field"><label class="field-lbl" for="n-af">Antecedentes familiares</label><textarea id="n-af" rows="2" placeholder="HTA, diabetes, cancer, cardiopatias, otros..."></textarea></div></div>
 
 
 
@@ -4335,7 +4346,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Enfermedad o problema actual</label><textarea id="n-enf" rows="3" placeholder="Inicio, evolucion cronologica, sintomas asociados, tratamientos previos..."></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-enf">Enfermedad o problema actual</label><textarea id="n-enf" rows="3" placeholder="Inicio, evolucion cronologica, sintomas asociados, tratamientos previos..."></textarea></div>
 
 
 
@@ -4375,7 +4386,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">PA (mmHg)</label><input type="text" id="n-pa" placeholder="120/80"/></div>
+          <div class="field"><label class="field-lbl" for="n-pa">PA (mmHg)</label><input type="text" id="n-pa" placeholder="120/80"/></div>
 
 
 
@@ -4383,7 +4394,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">FC (lpm)</label><input type="number" id="n-fc" placeholder="75"/></div>
+          <div class="field"><label class="field-lbl" for="n-fc">FC (lpm)</label><input type="number" id="n-fc" placeholder="75"/></div>
 
 
 
@@ -4391,7 +4402,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">FR (rpm)</label><input type="number" id="n-fr" placeholder="18"/></div>
+          <div class="field"><label class="field-lbl" for="n-fr">FR (rpm)</label><input type="number" id="n-fr" placeholder="18"/></div>
 
 
 
@@ -4399,7 +4410,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Temp (C)</label><input type="number" id="n-temp" step="0.1" placeholder="36.5"/></div>
+          <div class="field"><label class="field-lbl" for="n-temp">Temp (C)</label><input type="number" id="n-temp" step="0.1" placeholder="36.5"/></div>
 
 
 
@@ -4423,7 +4434,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">SpO2 (%)</label><input type="number" id="n-spo2" placeholder="98"/></div>
+          <div class="field"><label class="field-lbl" for="n-spo2">SpO2 (%)</label><input type="number" id="n-spo2" placeholder="98"/></div>
 
 
 
@@ -4431,7 +4442,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Peso (kg)</label><input type="number" id="n-peso" step="0.1" oninput="calcNotaImc()"/></div>
+          <div class="field"><label class="field-lbl" for="n-peso">Peso (kg)</label><input type="number" id="n-peso" step="0.1" oninput="calcNotaImc()"/></div>
 
 
 
@@ -4439,7 +4450,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">Talla (cm)</label><input type="number" id="n-talla" step="0.1" oninput="calcNotaImc()"/></div>
+          <div class="field"><label class="field-lbl" for="n-talla">Talla (cm)</label><input type="number" id="n-talla" step="0.1" oninput="calcNotaImc()"/></div>
 
 
 
@@ -4447,7 +4458,7 @@
 
 
 
-          <div class="field"><label class="field-lbl">IMC</label><input type="text" id="n-imc" readonly/></div>
+          <div class="field"><label class="field-lbl" for="n-imc">IMC</label><input type="text" id="n-imc" readonly/></div>
 
 
 
@@ -4479,7 +4490,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Examen fisico general</label><textarea id="n-explora" rows="3" placeholder="Estado general, conciencia, hidratacion, piel, mucosas..."></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-explora">Examen fisico general</label><textarea id="n-explora" rows="3" placeholder="Estado general, conciencia, hidratacion, piel, mucosas..."></textarea></div>
 
 
 
@@ -4487,7 +4498,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Organos, aparatos y regiones</label><textarea id="n-organos" rows="3" placeholder="Cabeza, cuello, torax, abdomen, pelvis, extremidades, neurologico, otros hallazgos."></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-organos">Organos, aparatos y regiones</label><textarea id="n-organos" rows="3" placeholder="Cabeza, cuello, torax, abdomen, pelvis, extremidades, neurologico, otros hallazgos."></textarea></div>
 
 
 
@@ -4511,7 +4522,7 @@
 
 
 
-        <div class="form-row"><div class="field"><label class="field-lbl">Buscar diagnostico</label><input type="text" id="n-cie-search" placeholder="Buscar por codigo o diagnostico..." oninput="fillCie10Select()"/></div><div class="field"><label class="field-lbl">Codigo CIE-10</label><select id="n-cie" onchange="applyCie10Selection()"></select></div></div>
+        <div class="form-row"><div class="field"><label class="field-lbl" for="n-cie-search">Buscar diagnostico</label><input type="text" id="n-cie-search" placeholder="Buscar por codigo o diagnostico..." oninput="fillCie10Select()"/></div><div class="field"><label class="field-lbl" for="n-cie">Codigo CIE-10</label><select id="n-cie" onchange="applyCie10Selection()"></select></div></div>
 
 
 
@@ -4527,7 +4538,7 @@
 
 
 
-        <div class="form-row"><div class="field"><label class="field-lbl">Tipo</label><select id="n-dx-tipo"><option>Presuntivo</option><option>Definitivo</option></select></div><div class="field"><label class="field-lbl">Diagnostico principal</label><input type="text" id="n-dx" placeholder="Diagnostico seleccionado o escrito manualmente"/></div></div>
+        <div class="form-row"><div class="field"><label class="field-lbl" for="n-dx-tipo">Tipo</label><select id="n-dx-tipo"><option>Presuntivo</option><option>Definitivo</option></select></div><div class="field"><label class="field-lbl" for="n-dx">Diagnostico principal</label><input type="text" id="n-dx" placeholder="Diagnostico seleccionado o escrito manualmente"/></div></div>
 
 
 
@@ -4535,7 +4546,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Diagnosticos adicionales</label><textarea id="n-dx-add" rows="2" placeholder="Otros codigos CIE-10 o diagnosticos relacionados, si aplica."></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-dx-add">Diagnosticos adicionales</label><textarea id="n-dx-add" rows="2" placeholder="Otros codigos CIE-10 o diagnosticos relacionados, si aplica."></textarea></div>
 
 
 
@@ -4559,7 +4570,7 @@
 
 
 
-        <div class="form-row"><div class="field"><label class="field-lbl">Plan diagnostico</label><textarea id="n-plan-dx" rows="2" placeholder="Laboratorio, imagenes, interconsultas..."></textarea></div><div class="field"><label class="field-lbl">Plan terapeutico</label><textarea id="n-plan-tx" rows="2" placeholder="Tratamiento, procedimientos, medicacion..."></textarea></div></div>
+        <div class="form-row"><div class="field"><label class="field-lbl" for="n-plan-dx">Plan diagnostico</label><textarea id="n-plan-dx" rows="2" placeholder="Laboratorio, imagenes, interconsultas..."></textarea></div><div class="field"><label class="field-lbl" for="n-plan-tx">Plan terapeutico</label><textarea id="n-plan-tx" rows="2" placeholder="Tratamiento, procedimientos, medicacion..."></textarea></div></div>
 
 
 
@@ -4567,7 +4578,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Plan educacional / indicaciones</label><textarea id="n-plan-edu" rows="2" placeholder="Educacion, signos de alarma, control, recomendaciones."></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-plan-edu">Plan educacional / indicaciones</label><textarea id="n-plan-edu" rows="2" placeholder="Educacion, signos de alarma, control, recomendaciones."></textarea></div>
 
 
 
@@ -4575,7 +4586,7 @@
 
 
 
-        <div class="field"><label class="field-lbl">Observaciones</label><textarea id="n-observaciones" rows="2"></textarea></div>
+        <div class="field"><label class="field-lbl" for="n-observaciones">Observaciones</label><textarea id="n-observaciones" rows="2"></textarea></div>
 
 
 
@@ -4663,7 +4674,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Tipo de archivo</label><select id="ar-tipo"><option>Laboratorio</option><option>Imagen</option><option>Estudio</option><option>Documento</option><option>Otro</option></select></div><div class="field"><label class="field-lbl">Archivo <span class="req">*</span></label><input type="file" id="ar-file" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.txt,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="ar-tipo">Tipo de archivo</label><select id="ar-tipo"><option>Laboratorio</option><option>Imagen</option><option>Estudio</option><option>Documento</option><option>Otro</option></select></div><div class="field"><label class="field-lbl" for="ar-file">Archivo <span class="req">*</span></label><input type="file" id="ar-file" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.txt,.doc,.docx,.xls,.xlsx,image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain"/></div></div>
 
 
 
@@ -4671,7 +4682,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Descripción / observación opcional</label><textarea id="ar-desc" rows="3" placeholder="Ej: Biometría hemática, ecografía, informe de laboratorio..."></textarea></div>
+      <div class="field"><label class="field-lbl" for="ar-desc">Descripción / observación opcional</label><textarea id="ar-desc" rows="3" placeholder="Ej: Biometría hemática, ecografía, informe de laboratorio..."></textarea></div>
 
 
 
@@ -4855,7 +4866,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Paciente</label><select id="cb-pac"></select></div>
+      <div class="field"><label class="field-lbl" for="cb-pac">Paciente</label><select id="cb-pac"></select></div>
 
 
 
@@ -4863,7 +4874,7 @@
 
 
 
-      <div class="field"><label class="field-lbl">Servicio</label><select id="cb-serv" onchange="updateMontoFromService(this,document.getElementById('cb-monto'))"></select></div>
+      <div class="field"><label class="field-lbl" for="cb-serv">Servicio</label><select id="cb-serv" onchange="updateMontoFromService(this,document.getElementById('cb-monto'))"></select></div>
 
 
 
@@ -4871,7 +4882,7 @@
 
 
 
-      <div class="form-row"><div class="field"><label class="field-lbl">Forma de pago</label><select id="cb-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div><div class="field"><label class="field-lbl">Monto ($)</label><input type="number" id="cb-monto" value="60"/></div></div>
+      <div class="form-row"><div class="field"><label class="field-lbl" for="cb-pago">Forma de pago</label><select id="cb-pago"><option>Efectivo</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Transferencia</option><option>IESS</option><option>Seguro privado</option></select></div><div class="field"><label class="field-lbl" for="cb-monto">Monto ($)</label><input type="number" id="cb-monto" value="60"/></div></div>
 
 
 
@@ -4935,19 +4946,19 @@
 
 
 
-<script src="assets/js/app.js?v=20261028-sri3"></script>
-<script src="assets/js/cash.js?v=20261028-sri3"></script>
-<script src="assets/js/clinical.js?v=20260920-1"></script>
-<script src="assets/js/clinical-docs.js?v=20261028-sri3"></script>
-<script src="assets/js/email.js?v=20261028-sri3"></script>
-<script src="assets/js/walkin.js?v=20260918-care1"></script>
-<script src="assets/js/patient-picker.js?v=20261028-sri3"></script>
-<script src="assets/js/pharmacy.js?v=20261028-sri3"></script>
-<script src="assets/js/ui-pro.js?v=20261028-sri3"></script>
-<script src="assets/js/reminders.js?v=20261028-sri3"></script>
-<script src="assets/js/certificates-desk.js?v=20261028-sri3"></script>
-<script src="assets/js/sri-test.js?v=20261028-sri3"></script>
-<script src="assets/js/telehealth.js?v=20260912-native2"></script>
+<script defer src="assets/js/app.js?v=27a0131268"></script>
+<script defer src="assets/js/cash.js?v=e5388a44f8"></script>
+<script defer src="assets/js/clinical.js?v=6412bfb194"></script>
+<script defer src="assets/js/clinical-docs.js?v=d33cea5c7e"></script>
+<script defer src="assets/js/email.js?v=7c6f16a7b1"></script>
+<script defer src="assets/js/walkin.js?v=d0601eb25f"></script>
+<script defer src="assets/js/patient-picker.js?v=4087a026f3"></script>
+<script defer src="assets/js/pharmacy.js?v=d8713926ba"></script>
+<script defer src="assets/js/ui-pro.js?v=2833c1f40e"></script>
+<script defer src="assets/js/reminders.js?v=8c548cbb1a"></script>
+<script defer src="assets/js/certificates-desk.js?v=8c1c7a541d"></script>
+<script defer src="assets/js/sri-test.js?v=b5c05bb1dc"></script>
+<script defer src="assets/js/telehealth.js?v=8e30aff0e6"></script>
 
 
 
@@ -4955,7 +4966,8 @@
 
 
 
-<script src="assets/js/version-check.js?v=20260922-1"></script>
+<script defer src="assets/js/a11y.js?v=47dc9f8ebb"></script>
+<script defer src="assets/js/version-check.js?v=5f2424dadc"></script>
 </body>
 
 
