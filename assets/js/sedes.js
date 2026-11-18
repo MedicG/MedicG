@@ -4,26 +4,60 @@ function sedesList(){const c=DB.get('config')||{};return (Array.isArray(c.sedes)
 function sedesActive(){return sedesList().filter(s=>s.estado!=='inactivo');}
 function sedeMainId(){const l=sedesList();return String((l.find(s=>s.principal)||l[0]||{}).id||'');}
 function sedeName(id){return (sedesList().find(s=>String(s.id)===String(id))||{}).nombre||'';}
-function mySede(){return currentUser&&currentUser.rol!=='admin'?String(currentUser.sede||''):'';}
+/* mySede: sede the user is LIMITED to ('' = sees all). homeSede: sede where the user works. */
+function mySede(){return currentUser&&currentUser.rol!=='admin'&&currentUser.sede&&currentUser.sedeSolo!==false?String(currentUser.sede):'';}
+function homeSede(){const s=String(currentUser?.sede||'');return sedesList().some(x=>String(x.id)===s)?s:sedeMainId();}
 function patientSedeId(p){return String(p?.sede||sedeMainId());}
 function sedesEnabled(){return sedesList().length>1;}
 function sedeBadge(p){if(!sedesEnabled()||mySede())return '';const n=sedeName(patientSedeId(p));return n?`<span class="badge sede-badge" title="Establecimiento">${esc(n)}</span> `:'';}
 function sedePatientValue(){const sel=document.getElementById('p-sede');if(!sedesList().length||!sel)return {};return {sede:mySede()||sel.value||sedeMainId()};}
 function sedeOptions(selected,withAll){return (withAll?`<option value="">${esc(withAll)}</option>`:'')+sedesActive().map(s=>`<option value="${esc(s.id)}" ${String(s.id)===String(selected)?'selected':''}>${esc(s.nombre)}${s.principal?' (principal)':''}</option>`).join('');}
+function sedeAccessOptions(solo){return `<option value="solo" ${solo?'selected':''}>Solo pacientes de su sede</option><option value="todas" ${!solo?'selected':''}>Pacientes de todas las sedes</option>`;}
 function sedeUserSelect(u){
   if(!sedesEnabled())return '';
-  return `<div class="mt8"><label class="field-lbl" for="edit-u-sede-${u.id}">Establecimiento</label><select id="edit-u-sede-${u.id}" ${u.rol==='admin'?'disabled title="El administrador ve todos los establecimientos"':''}>${sedeOptions(u.sede||'','Todos los establecimientos')}</select></div>`;
+  const admin=u.rol==='admin';
+  return `<div class="mt8"><label class="field-lbl" for="edit-u-sede-${u.id}">Sede de trabajo</label><select id="edit-u-sede-${u.id}" ${admin?'disabled title="El administrador ve todos los establecimientos"':''} onchange="document.getElementById('edit-u-sedeacc-${u.id}').disabled=!this.value">${sedeOptions(u.sede||'','Sin sede fija (todas)')}</select>
+  <label class="field-lbl mt8" for="edit-u-sedeacc-${u.id}">Acceso a pacientes</label><select id="edit-u-sedeacc-${u.id}" ${admin||!u.sede?'disabled':''}>${sedeAccessOptions(u.sede&&u.sedeSolo!==false)}</select></div>`;
 }
-function sedeUserLabel(u){if(!sedesEnabled()||u.rol==='admin'||u.rol==='paciente')return '';return `<div class="text-xs mt4">${u.sede?`<span class="badge sede-badge">${esc(sedeName(u.sede)||u.sede)}</span>`:'<span class="text-muted">Todos los establecimientos</span>'}</div>`;}
+function sedeUserLabel(u){if(!sedesEnabled()||u.rol==='admin'||u.rol==='paciente')return '';return `<div class="text-xs mt4">${u.sede?`<span class="badge sede-badge">${esc(sedeName(u.sede)||u.sede)}</span> ${u.sedeSolo!==false?'solo su sede':'ve todas las sedes'}`:'<span class="text-muted">Todas las sedes</span>'}</div>`;}
+/* ---------- cash box per sede ---------- */
+function cashSedeId(){if(!sedesEnabled())return '';const mine=mySede();if(mine)return mine;let v='';try{v=localStorage.getItem('mg_cash_sede')||'';}catch(e){}return sedesActive().some(s=>String(s.id)===v)?v:homeSede();}
+function sedeBoxMatch(box){return !sedesEnabled()||String(box?.sede||sedeMainId())===cashSedeId();}
+function cashCurrentBox(boxes){return (boxes||DB.get('cajas')||[]).find(c=>c.estado==='abierta'&&sedeBoxMatch(c));}
+function cashSedeBar(){
+  if(!sedesEnabled())return '';
+  const mine=mySede(),cur=cashSedeId();
+  return `<div class="caja-sede-bar"><i class="ti ti-building-hospital"></i> ${mine?`Caja de <b>${esc(sedeName(mine))}</b>`:`<label for="cash-sede-sel">Caja de</label> <select id="cash-sede-sel" onchange="cashSedeChange(this.value)">${sedeOptions(cur)}</select>`}<span class="text-xs text-muted">Cada sede abre, cobra y cierra su propia caja.</span></div>`;
+}
+function cashSedeChange(v){try{localStorage.setItem('mg_cash_sede',v);}catch(e){}if(typeof renderCaja==='function')renderCaja();}
+function sedesPublicFill(list){
+  const wrap=document.getElementById('pub-sede-wrap'),sel=document.getElementById('pub-sede');if(!wrap||!sel)return;
+  const items=(list||[]).filter(s=>s&&s.id);wrap.hidden=items.length<2;if(wrap.hidden)return;
+  sel.innerHTML='<option value="">Elige la sede…</option>'+items.map(s=>`<option value="${esc(s.id)}">${esc(s.nombre)}</option>`).join('');
+  const dir=document.getElementById('pub-sede-dir');sel.onchange=()=>{const s=items.find(x=>String(x.id)===sel.value);if(dir)dir.textContent=s?.dir||'';};
+}
+function sedeFillCitaForm(){
+  const wrap=document.getElementById('c-sede-wrap'),sel=document.getElementById('c-sede');if(!wrap||!sel)return;
+  wrap.hidden=!sedesEnabled();if(wrap.hidden)return;
+  const id=+(document.getElementById('c-edit-id')?.value||0);const cita=(DB.get('citas')||[]).find(c=>+c.id===id);
+  const pac=(DB.get('pacientes')||[]).find(p=>String(p.id)===String(document.getElementById('c-pac')?.value));
+  const mine=mySede();const value=mine||cita?.sede||(pac?patientSedeId(pac):homeSede());
+  sel.innerHTML=sedeOptions(value);sel.value=value;sel.disabled=!!mine;
+}
 /* ---------- patient form ---------- */
 function sedeFillPatientForm(p){
   const row=document.getElementById('p-sede-row'),sel=document.getElementById('p-sede'),hint=document.getElementById('p-sede-hint');if(!row||!sel)return;
   row.hidden=!sedesEnabled();if(row.hidden)return;
-  const mine=mySede();const value=p?patientSedeId(p):(mine||sedeMainId());
+  const mine=mySede();const value=p?patientSedeId(p):(mine||homeSede());
   sel.innerHTML=sedeOptions(value);sel.value=value;sel.disabled=!!mine;
   if(hint)hint.textContent=mine?`Tu usuario registra pacientes en ${sedeName(mine)}.`:'Sede donde se atiende el paciente.';
 }
 (function(){
+  // Every cash-desk request (and pharmacy charges, which go to the box) carries the selected sede.
+  if(window.API&&typeof API.post==='function'){const post=API.post.bind(API);API.post=function(path,payload){if(sedesEnabled()&&payload&&typeof payload==='object'&&!payload.sede&&(/^\/api\/cash\/(open|close|charge|payment|expense|expense-void)$/.test(path)||(path==='/api/pharmacy'&&/dispense|sell|venta|cobr/.test(String(payload.action||'')))))payload={...payload,sede:cashSedeId()};return post(path,payload);};}
+  for(const name of ['openNewCita','editCita']){const fn=window[name];if(typeof fn==='function')window[name]=function(){const r=fn.apply(this,arguments);setTimeout(()=>{try{sedeFillCitaForm();}catch(e){}},120);return r;};}
+  document.addEventListener('change',e=>{if(e.target&&e.target.id==='c-pac'&&!(+(document.getElementById('c-edit-id')?.value||0)))try{sedeFillCitaForm();}catch(_){}});
+  const rc=window.renderCaja;if(typeof rc==='function')window.renderCaja=function(){const r=rc.apply(this,arguments);try{const el=document.getElementById('caja-content');if(el&&sedesEnabled()&&!el.querySelector('.caja-sede-bar'))el.insertAdjacentHTML('afterbegin',cashSedeBar());}catch(e){}return r;};
   const fill=window.fillPacModalSelects;
   if(typeof fill==='function')window.fillPacModalSelects=function(){const r=fill.apply(this,arguments);try{sedeFillPatientForm(null);}catch(e){}return r;};
   const edit=window.editPacModal;
@@ -39,9 +73,9 @@ function sedesInstall(){
     espF.insertAdjacentElement('afterend',s);
   }
   const uw=document.getElementById('u-sede-wrap'),us=document.getElementById('u-sede');
-  if(uw&&us){uw.hidden=!enabled;if(enabled&&!us.options.length)us.innerHTML=sedeOptions('','Todos los establecimientos');}
+  if(uw&&us){uw.hidden=!enabled;if(enabled&&!us.options.length)us.innerHTML=sedeOptions('','Sin sede fija (todas)');}
   const who=document.getElementById('sb-urole');
-  if(who&&currentUser){const base=(typeof ROLE_LABELS!=='undefined'&&ROLE_LABELS[userRoleKey(currentUser)])||currentUser.rol;who.textContent=mine&&sedeName(mine)?base+' · '+sedeName(mine):base;}
+  if(who&&currentUser){const base=(typeof ROLE_LABELS!=='undefined'&&ROLE_LABELS[userRoleKey(currentUser)])||currentUser.rol;const work=enabled&&currentUser.rol!=='admin'&&currentUser.sede?sedeName(currentUser.sede):'';who.textContent=work?base+' · '+work:base;}
   sedesConfigCard();
 }
 /* ---------- Configuración: establishments ---------- */

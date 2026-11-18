@@ -26,18 +26,45 @@ def main_sede(config):
 
 
 def user_sede(user):
-    """Sede a user is limited to ('' = all). Administrators are never limited."""
-    if not user or user.get("rol") == "admin":
+    """Sede a user is limited to ('' = sees every sede). Administrators are never limited.
+
+    user.sede is the sede where the user works; user.sedeSolo=False lets them see every sede
+    (e.g. Guayaquil reception also attends Balzar patients). Older users with a sede are limited."""
+    if not user or user.get("rol") == "admin" or user.get("sedeSolo") is False:
         return ""
     return str(user.get("sede") or "").strip()
+
+
+def home_sede(user, config):
+    """Sede where the user works: default for new patients, appointments and the cash box."""
+    sede = str((user or {}).get("sede") or "")
+    return sede if any(str(s.get("id")) == sede for s in sedes_of(config)) else main_sede(config)
+
+
+def valid_or_default(config, wanted, fallback):
+    wanted = str(wanted or "")
+    if not sedes_of(config):
+        return ""
+    if wanted:
+        if not any(str(s.get("id")) == wanted and s.get("estado") != "inactivo" for s in sedes_of(config)):
+            raise SedeError("Establecimiento no válido.")
+        return wanted
+    return fallback or main_sede(config)
 
 
 def patient_sede(patient, default):
     return str((patient or {}).get("sede") or default or "")
 
 
-def own_ids(patients, sede, default):
-    return {str(p.get("id")) for p in patients or [] if isinstance(p, dict) and patient_sede(p, default) == sede}
+def own_ids(patients, sede, default, citas=None):
+    """Patients of a sede, plus patients who have an appointment at that sede."""
+    ids = {str(p.get("id")) for p in patients or [] if isinstance(p, dict) and patient_sede(p, default) == sede}
+    ids.update(str(c.get("pac")) for c in citas or [] if isinstance(c, dict) and str(c.get("sede") or "") == sede)
+    return ids
+
+
+def box_sede(box, default):
+    return str((box or {}).get("sede") or default or "")
 
 
 def filter_data(data, user):
@@ -49,8 +76,10 @@ def filter_data(data, user):
     patients = data.get("pacientes")
     if patients is None:
         return result
-    ids = own_ids(patients, sede, default)
+    ids = own_ids(patients, sede, default, data.get("citas"))
     result["pacientes"] = [p for p in patients if str(p.get("id")) in ids]
+    if isinstance(data.get("cajas"), list):
+        result["cajas"] = [c for c in data["cajas"] if not isinstance(c, dict) or box_sede(c, default) == sede]
     for key in PATIENT_MAPS:
         if isinstance(data.get(key), dict):
             result[key] = {k: v for k, v in data[key].items() if str(k) in ids}
@@ -77,7 +106,11 @@ def merge_write(conn, user, key, value, current):
     from medicg_app import get_json_key
     default = main_sede(get_json_key(conn, "config", {}) or {})
     patients = get_json_key(conn, "pacientes", []) or []
-    ids = own_ids(patients, sede, default)
+    ids = own_ids(patients, sede, default, get_json_key(conn, "citas", []) or [])
+    if key == "cajas" and isinstance(value, list):
+        if any(isinstance(c, dict) and box_sede(c, default) != sede for c in value):
+            raise SedeError("Solo puedes usar la caja de tu establecimiento.")
+        return keep_positions(value, current, lambda c: box_sede(c, default) != sede)
     if key == "pacientes":
         known = {str(p.get("id")): p for p in patients if isinstance(p, dict)}
         out = []
@@ -109,7 +142,7 @@ def check_patient(conn, user, patient_id):
         return
     from medicg_app import get_json_key
     default = main_sede(get_json_key(conn, "config", {}) or {})
-    if str(patient_id) not in own_ids(get_json_key(conn, "pacientes", []) or [], sede, default):
+    if str(patient_id) not in own_ids(get_json_key(conn, "pacientes", []) or [], sede, default, get_json_key(conn, "citas", []) or []):
         raise ValueError("Paciente de otro establecimiento.")
 
 

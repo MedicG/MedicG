@@ -50,9 +50,10 @@ def cash_operation(conn, user, payload, action):
         invoice = next((f for f in invoices if f.get("id") == previous["invoice_id"]), None)
         return {"ok": True, "invoice": invoice, "replayed": True}
     boxes = get_json_key(conn, "cajas", []) or []
-    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    sede = cash_sede(conn, user, payload)
+    box = open_box_in(conn, boxes, sede)
     if not box:
-        raise CashError("Abre caja antes de registrar cobros o abonos.")
+        raise CashError("Abre caja" + (f" de {sede_label(conn, sede)}" if sede else "") + " antes de registrar cobros o abonos.")
     stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5))).isoformat(timespec="seconds")
     if action == "charge":
         patients = get_json_key(conn, "pacientes", []) or []
@@ -202,6 +203,41 @@ def delete_movement(conn, user, payload):
 CASH_STAFF = ("admin", "recepcion", "secretaria")
 
 
+def cash_sede(conn, user, payload):
+    """Sede whose cash box is used ('' when no establishments are configured).
+
+    Users limited to a sede always use their own box; others choose (payload.sede) or use the sede where they work."""
+    from medicg_app import get_json_key
+    from medicg.sedes import sedes_of, user_sede, home_sede, valid_or_default, SedeError
+    config = get_json_key(conn, "config", {}) or {}
+    if not sedes_of(config):
+        return ""
+    wanted = str((payload or {}).get("sede") or "")
+    limited = user_sede(user)
+    if limited:
+        if wanted and wanted != limited:
+            raise CashError("Solo puedes usar la caja de tu establecimiento.")
+        return limited
+    try:
+        return valid_or_default(config, wanted, home_sede(user, config))
+    except SedeError as exc:
+        raise CashError(str(exc))
+
+
+def open_box_in(conn, boxes, sede):
+    """Open box of a sede; boxes opened before establishments existed belong to the main sede."""
+    from medicg_app import get_json_key
+    from medicg.sedes import main_sede, box_sede
+    default = main_sede(get_json_key(conn, "config", {}) or {})
+    return next((c for c in boxes if c.get("estado") == "abierta" and (not sede or box_sede(c, default) == sede)), None)
+
+
+def sede_label(conn, sede):
+    from medicg_app import get_json_key
+    from medicg.sedes import sedes_of
+    return next((s.get("nombre") for s in sedes_of(get_json_key(conn, "config", {}) or {}) if str(s.get("id")) == str(sede)), "")
+
+
 def _staff_name(user):
     return (str(user.get("name", "")) + " " + str(user.get("last", ""))).strip() or user.get("email", "")
 
@@ -217,8 +253,9 @@ def open_box(conn, user, payload):
     if not can_manage_box(user):
         raise CashError("No tienes permiso para abrir caja.")
     boxes = get_json_key(conn, "cajas", []) or []
-    if any(c.get("estado") == "abierta" for c in boxes):
-        raise CashError("Ya hay una caja abierta. Ciérrala antes de abrir otra.")
+    sede = cash_sede(conn, user, payload)
+    if open_box_in(conn, boxes, sede):
+        raise CashError("Ya hay una caja abierta" + (f" en {sede_label(conn, sede)}" if sede else "") + ". Ciérrala antes de abrir otra.")
     opening = amount(payload.get("montoApertura") or 0)
     stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
     ids = get_json_key(conn, "nextIds", {}) or {}
@@ -226,6 +263,8 @@ def open_box(conn, user, payload):
     ids["caja"] = number + 1
     box = {"id": number, "fecha": stamp.date().isoformat(), "horaApertura": stamp.strftime("%H:%M"), "estado": "abierta",
            "cajero": _staff_name(user), "cajeroId": user.get("id"), "montoApertura": float(opening), "movimientos": []}
+    if sede:
+        box["sede"] = sede
     boxes.append(box)
     set_json_key(conn, "nextIds", ids)
     set_json_key(conn, "cajas", boxes)
@@ -295,7 +334,7 @@ def add_expense(conn, user, payload):
     if not can_manage_box(user):
         raise CashError("No tienes permiso para registrar egresos de caja.")
     boxes = get_json_key(conn, "cajas", []) or []
-    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    box = open_box_in(conn, boxes, cash_sede(conn, user, payload))
     if not box:
         raise CashError("No hay una caja abierta.")
     if payload.get("boxId") is not None and str(payload.get("boxId")) != str(box.get("id")):
@@ -334,6 +373,10 @@ def void_expense(conn, user, payload):
     box = next((c for c in boxes if c.get("estado") == "abierta" and str(c.get("id")) == str(payload.get("boxId"))), None)
     if not box:
         raise CashError("Solo se anulan egresos de la caja abierta.")
+    from medicg.sedes import user_sede, main_sede, box_sede
+    limited = user_sede(user)
+    if limited and box_sede(box, main_sede(get_json_key(conn, "config", {}) or {})) != limited:
+        raise CashError("Solo puedes usar la caja de tu establecimiento.")
     expense = next((e for e in box.get("egresos", []) if e.get("id") == payload.get("id")), None)
     if not expense or expense.get("estado") == "Anulado":
         raise CashError("El egreso no existe o ya fue anulado.")
@@ -375,7 +418,7 @@ def close_box(conn, user, payload):
     if not can_manage_box(user):
         raise CashError("No tienes permiso para cerrar caja.")
     boxes = get_json_key(conn, "cajas", []) or []
-    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    box = open_box_in(conn, boxes, cash_sede(conn, user, payload))
     if not box:
         raise CashError("No hay una caja abierta.")
     if str(payload.get("boxId")) != str(box.get("id")):
@@ -422,7 +465,7 @@ def clean_payments(payments, user, box, stamp):
     return clean
 
 
-def create_account(conn, user, patient, items, payments, concept, esp="Farmacia"):
+def create_account(conn, user, patient, items, payments, concept, esp="Farmacia", payload=None):
     """Create a patient account (cobroVersion 1) with per-line VAT and optional payments.
 
     ``items`` need nombre, cantidad, unit (net unit price), ivaRate and may carry kind/id/codigo.
@@ -432,7 +475,7 @@ def create_account(conn, user, patient, items, payments, concept, esp="Farmacia"
     stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5))).isoformat(timespec="seconds")
     invoices = get_json_key(conn, "facturas", []) or []
     boxes = get_json_key(conn, "cajas", []) or []
-    box = next((c for c in boxes if c.get("estado") == "abierta"), None)
+    box = open_box_in(conn, boxes, cash_sede(conn, user, payload or {}))
     lines, subtotal, tax = [], Decimal(0), Decimal(0)
     for item in items:
         quantity = Decimal(str(item["cantidad"]))

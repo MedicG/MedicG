@@ -1837,21 +1837,8 @@ async function initPublicLanding(){
 
 
   fillPublicSpecialties('pub');
-
-
-
-
-
-
-
   loadPublicAvailability('pub');
-
-
-
-
-
-
-
+  if(typeof sedesPublicFill==='function')sedesPublicFill(publicOptions.sedes||[]);
 }
 
 
@@ -2538,14 +2525,9 @@ async function bookPublicAppointment(){
 
 
     motivo:document.getElementById('pub-motivo').value.trim(),
-
-
-
-
-
-
-
+    sede:document.getElementById('pub-sede')?.value||'',
   };
+  if(!document.getElementById('pub-sede-wrap')?.hidden&&!payload.sede){showInlineMsg('pub-msg','Elige la sede donde quieres tu cita.','d');return;}
 
 
 
@@ -7233,6 +7215,7 @@ async function saveCita(){
   const payload={};
   for(const key of ['pac','esp','med','fecha','hora','tipo','motivo','estado','notif','modalidad'])payload[key]=document.getElementById('c-'+key).value;
   payload.id=+(document.getElementById('c-edit-id').value||0);
+  if(!document.getElementById('c-sede-wrap')?.hidden&&document.getElementById('c-sede')?.value)payload.sede=document.getElementById('c-sede').value;
   const original=(DB.get('citas')||[]).find(c=>+c.id===payload.id);
   if(original&&['Cancelada','Atendida'].includes(payload.estado)){payload.hora=payload.hora||original.hora;}
   if(!payload.pac||!payload.esp||!payload.med||!payload.fecha||!payload.hora){toast('Completa paciente, especialidad, médico y horario disponible.','err');return;}
@@ -18691,7 +18674,7 @@ async function saveUserEdit(userId){
 
 
     medicoId:document.getElementById(`edit-u-medico-${userId}`)?.value||'',
-    ...(document.getElementById(`edit-u-sede-${userId}`)?{sede:document.getElementById(`edit-u-sede-${userId}`).value}:{}),
+    ...(document.getElementById(`edit-u-sede-${userId}`)?{sede:document.getElementById(`edit-u-sede-${userId}`).value,sedeSolo:document.getElementById(`edit-u-sedeacc-${userId}`)?.value!=='todas'}:{}),
 
 
 
@@ -19109,6 +19092,7 @@ async function createSystemUser(){
 
     medicoId:document.getElementById('u-medico-link')?.value||'',
     sede:document.getElementById('u-sede')?.value||'',
+    sedeSolo:document.getElementById('u-sede-acc')?.value!=='todas',
 
 
 

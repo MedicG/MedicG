@@ -87,3 +87,5 @@ label.flex{justify-content:flex-start;text-align:left}
 /* Establishments (sedes) */
 .sede-badge{background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;margin:1px 0}
 #sedes-card input,#sedes-card select{min-width:0;width:100%}
+.caja-sede-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#eef2ff;border:1px solid #c7d2fe;color:#312e81;border-radius:10px;padding:8px 12px;margin-bottom:12px}
+.caja-sede-bar select{width:auto;min-width:160px}
