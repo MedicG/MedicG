@@ -59,6 +59,11 @@ def cash_operation(conn, user, payload, action):
         patient = next((p for p in patients if str(p.get("id")) == str(payload.get("patientId"))), None)
         if not patient:
             raise CashError("Selecciona un paciente válido.")
+        from medicg.sedes import check_patient as sede_check
+        try:
+            sede_check(conn, user, patient.get("id"))
+        except ValueError as exc:
+            raise CashError(str(exc))
         raw_items = payload.get("items")
         if not isinstance(raw_items, list) or not 1 <= len(raw_items) <= 100:
             raise CashError("Agrega entre 1 y 100 servicios o exámenes.")
