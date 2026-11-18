@@ -1335,6 +1335,9 @@ function isAllowedClinicalFile(file){
 
 
 
+/* Patient specialties: esp is the main one (kept for compatibility), esps lists all of them. */
+function patientEsps(p){const out=[];[p?.esp,...(Array.isArray(p?.esps)?p.esps:[])].forEach(e=>{const v=String(e||'').trim();if(v&&!out.includes(v))out.push(v);});return out;}
+function patientEspsHtml(p,max=3){const list=patientEsps(p);if(!list.length)return '<span class="text-muted">Sin especialidad</span>';return list.slice(0,max).map((e,i)=>`<span class="badge esp-badge${i===0?' main':''}" style="background:${getEspColor(e)}22;color:${getEspColor(e)};" title="${i===0?'Especialidad principal':'Especialidad adicional'}">${esc(e)}</span>`).join(' ')+(list.length>max?` <span class="text-xs text-muted">+${list.length-max}</span>`:'');}
 function patientAge(p){return p.fnac?calcEdad(p.fnac):(Number.isInteger(p.edadDeclarada)?p.edadDeclarada:'—');}
 function syncPatientAge(){const date=document.getElementById('p-fnac').value;const input=document.getElementById('p-edad');input.disabled=!!date;if(date)input.value=calcEdad(date);document.getElementById('p-edad-help').textContent=date?'La edad se calcula con la fecha de nacimiento.':'Edad declarada por el paciente; no se inventará una fecha de nacimiento.';}
 function calcEdad(fnac){if(!fnac)return'—';const diff=Date.now()-new Date(fnac).getTime();return Math.floor(diff/31557600000);}
@@ -6530,7 +6533,7 @@ function initDashboard(){
 
 
 
-  pacs.forEach(p=>{pacsByEsp[p.esp]=(pacsByEsp[p.esp]||0)+1;});
+  pacs.forEach(p=>{patientEsps(p).forEach(e=>{pacsByEsp[e]=(pacsByEsp[e]||0)+1;});});
 
 
 
@@ -7608,7 +7611,7 @@ function renderPatList(){
 
 
 
-      <div class="pat-meta">${patientAge(p)} años · ${p.esp}</div>
+      <div class="pat-meta">${patientAge(p)} años · ${esc(patientEsps(p).join(', ')||'Sin especialidad')}</div>
 
 
 
@@ -7784,7 +7787,7 @@ function renderHCE(id){
 
 
 
-        <div class="text-xs text-muted">HCU #HCE-${String(id).padStart(4,'0')} - ${esc(p.esp||'Consulta externa')}</div>
+        <div class="text-xs text-muted">HCU #HCE-${String(id).padStart(4,'0')} - ${esc(patientEsps(p).join(' · ')||'Consulta externa')}</div>
 
 
 
@@ -12288,7 +12291,7 @@ function renderPacs(){
 
 
 
-    return n.includes(q)&&(!espF||p.esp===espF);
+    return n.includes(q)&&(!espF||patientEsps(p).includes(espF));
 
 
 
@@ -12344,7 +12347,7 @@ function renderPacs(){
 
 
 
-      <td><span class="badge" style="background:${getEspColor(p.esp)}22;color:${getEspColor(p.esp)};">${p.esp}</span></td>
+      <td>${patientEspsHtml(p)}</td>
 
 
 
@@ -12794,7 +12797,7 @@ function editPacModal(id){
 
 
 
-    document.getElementById('p-esp').value=p.esp||'';
+    espPickerSet(patientEsps(p));
 
 
 
@@ -12869,31 +12872,34 @@ function editPacModal(id){
 
 
 
+let pacEspSel=[];
+function espPickerAll(){return (DB.get('especialidades')||[]).filter(e=>e.estado!=='inactivo').map(e=>e.nombre).filter(Boolean);}
+function espPickerSet(list){pacEspSel=[...new Set((list||[]).filter(Boolean))];espPickerRender();}
+function espNorm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function espPickerRender(){
+  const box=document.getElementById('p-esp-picker');if(!box)return;
+  if(!box.dataset.ready){box.dataset.ready='1';box.innerHTML=`<div class="esp-chips" id="p-esp-chips"></div><div class="esp-search"><i class="ti ti-search" aria-hidden="true"></i><input id="p-esp-q" type="search" autocomplete="off" placeholder="Buscar y agregar especialidad…" aria-label="Buscar especialidad" oninput="espPickerOptions()" onkeydown="espPickerKey(event)"></div><div class="esp-options" id="p-esp-options" role="listbox" aria-label="Especialidades disponibles"></div>`;}
+  const chips=document.getElementById('p-esp-chips');
+  chips.innerHTML=pacEspSel.length?pacEspSel.map((n,i)=>`<span class="esp-chip${i===0?' main':''}" style="--c:${getEspColor(n)}"><button type="button" class="esp-star" title="${i===0?'Especialidad principal':'Marcar como principal'}" aria-label="${i===0?'Especialidad principal':'Marcar '+esc(n)+' como principal'}" onclick="espPickerMain(${i})">${i===0?'★':'☆'}</button><span>${esc(n)}</span><button type="button" class="esp-x" aria-label="Quitar ${esc(n)}" onclick="espPickerRemove(${i})">×</button></span>`).join(''):'<span class="text-xs text-muted">Sin especialidades. Elige una o varias; la primera (★) es la principal.</span>';
+  const sel=document.getElementById('p-esp');if(sel){sel.innerHTML=espPickerAll().map(e=>`<option>${esc(e)}</option>`).join('');sel.value=pacEspSel[0]||'';}
+  espPickerOptions();
+}
+function espPickerOptions(){
+  const q=espNorm(document.getElementById('p-esp-q')?.value);
+  const list=espPickerAll().filter(e=>!pacEspSel.includes(e)&&espNorm(e).includes(q)).sort((a,b)=>a.localeCompare(b,'es'));
+  const box=document.getElementById('p-esp-options');if(!box)return;
+  box.innerHTML=list.length?list.map(e=>`<button type="button" role="option" class="esp-opt" style="--c:${getEspColor(e)}" onclick="espPickerAdd(this.dataset.v)" data-v="${esc(e)}"><span class="esp-dot"></span>${esc(e)}</button>`).join(''):`<div class="text-xs text-muted" style="padding:6px 4px">${q?'Sin coincidencias.':'Todas las especialidades ya están agregadas.'}</div>`;
+}
+function espPickerKey(ev){if(ev.key==='Enter'){ev.preventDefault();const first=document.querySelector('#p-esp-options .esp-opt');if(first)espPickerAdd(first.dataset.v);}else if(ev.key==='Backspace'&&!ev.target.value&&pacEspSel.length){espPickerRemove(pacEspSel.length-1);}}
+function espPickerAdd(name){if(!name||pacEspSel.includes(name))return;pacEspSel.push(name);const q=document.getElementById('p-esp-q');if(q)q.value='';espPickerRender();document.getElementById('p-esp-q')?.focus();}
+function espPickerRemove(i){pacEspSel.splice(i,1);espPickerRender();}
+function espPickerMain(i){if(i<=0)return;const [n]=pacEspSel.splice(i,1);pacEspSel.unshift(n);espPickerRender();}
 function fillPacModalSelects(){
-
-
-
-
-
-
-
   const esps=DB.get('especialidades')||[];
-
-
-
-
-
-
-
   const segs=DB.get('seguros')||[];
-
-
-
-
-
-
-
   document.getElementById('p-esp').innerHTML=esps.map(e=>`<option>${e.nombre}</option>`).join('');
+  const fromCita=returnToCitaAfterPac?document.getElementById('c-esp')?.value:'';
+  espPickerSet(fromCita?[fromCita]:[]);
 
 
 
@@ -12976,9 +12982,10 @@ async function savePacInternal(){
 
 
 
+  if(!pacEspSel.length){toast('Agrega al menos una especialidad al paciente.','err');document.getElementById('p-esp-q')?.focus();return;}
   const ageInput=document.getElementById('p-edad').value;
   if(!document.getElementById('p-fnac').value&&ageInput!==''&&(!Number.isInteger(Number(ageInput))||Number(ageInput)<0||Number(ageInput)>130)){toast('Ingresa una edad entera entre 0 y 130 años.','err');return;}
-  const obj={nombres,apellidos,cedula,fnac:document.getElementById('p-fnac').value,genero:document.getElementById('p-genero').value,tel:document.getElementById('p-tel').value,email:document.getElementById('p-email').value,dir:document.getElementById('p-dir').value,esp:document.getElementById('p-esp').value,seguro:document.getElementById('p-seg').value,sangre:document.getElementById('p-sangre').value,alergias:document.getElementById('p-alergias').value,antec:document.getElementById('p-antec').value,ultima:today()};
+  const obj={nombres,apellidos,cedula,fnac:document.getElementById('p-fnac').value,genero:document.getElementById('p-genero').value,tel:document.getElementById('p-tel').value,email:document.getElementById('p-email').value,dir:document.getElementById('p-dir').value,esp:pacEspSel[0]||'',esps:pacEspSel.slice(),seguro:document.getElementById('p-seg').value,sangre:document.getElementById('p-sangre').value,alergias:document.getElementById('p-alergias').value,antec:document.getElementById('p-antec').value,ultima:today()};
 
 
 
@@ -13723,7 +13730,7 @@ function renderEsps(){
 
 
 
-      <td>${pacs.filter(p=>p.esp===e.nombre).length} paciente(s)</td>
+      <td>${pacs.filter(p=>patientEsps(p).includes(e.nombre)).length} paciente(s)</td>
 
 
 
