@@ -202,7 +202,7 @@ async function growthPrint(pid){
 function growthApplies(p){
   if(!p)return false;
   if(p.fnac){const age=growthAgeMonths(p.fnac,new Date().toISOString().slice(0,10));return age>=0&&age<=228;}
-  return /pediatr|neonat/i.test(String(p.esp||''));
+  return /pediatr|neonat/i.test((typeof patientEsps==='function'?patientEsps(p):[p.esp]).join(' '));
 }
 (function(){
   if(typeof renderHCE!=='function')return;

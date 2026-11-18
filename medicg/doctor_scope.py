@@ -7,10 +7,15 @@ def norm(value):
 def specialties(doctor):
  return list(dict.fromkeys(s for s in [doctor.get('esp',''),doctor.get('esp2',''),doctor.get('esp3',''),doctor.get('esp4','')] if isinstance(s,str) and s.strip()))
 
+def patient_specialties(patient):
+ """Main specialty (esp) plus additional ones (esps)."""
+ values=[patient.get('esp')]+(patient.get('esps') if isinstance(patient.get('esps'),list) else [])
+ return list(dict.fromkeys(v.strip() for v in values if isinstance(v,str) and v.strip()))
+
 def scope(data,user):
  doctor=next((m for m in data.get('medicos',[]) if str(m.get('id'))==str(user.get('medicoId')) and m.get('estado')!='inactivo'),{})
  allowed={norm(s) for s in specialties(doctor)}
- ids={str(p.get('id')) for p in data.get('pacientes',[]) if norm(p.get('esp')) in allowed}
+ ids={str(p.get('id')) for p in data.get('pacientes',[]) if any(norm(e) in allowed for e in patient_specialties(p))}
  ids.update(str(c.get('pac')) for c in data.get('citas',[]) if norm(c.get('esp')) in allowed and norm(c.get('estado')) not in ('cancelada','cancelado','anulada','anulado'))
  active={str(p['id']) for p in data.get('pacientes',[]) if not p.get('deletedAt')}
  return ids & active,allowed
