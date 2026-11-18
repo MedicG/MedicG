@@ -1727,6 +1727,7 @@ def public_user(user):
         "patientId": user.get("patientId"),
         "medicoId": user.get("medicoId"),
         "sede": user.get("sede") or "",
+        "sedeSolo": bool(user.get("sede")) and user.get("sedeSolo") is not False and user.get("rol") != "admin",
         "superadminMedico": bool(user.get("superadminMedico")) and user.get("rol") == "admin",
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
@@ -2149,6 +2150,8 @@ def upsert_patient_from_payload(conn, payload):
             "origen": payload.get("origen") or "Landing pública",
             "createdAt": now_iso(),
         }
+        if payload.get("sede"):
+            patient["sede"] = str(payload["sede"])
         patients.append(patient)
         created = True
     else:
@@ -2310,6 +2313,7 @@ def create_online_appointment(conn, patient, payload, user=None):
         "estado": "Solicitada online",
         "notif": "Sistema",
         "origen": payload.get("origen") or "Landing publica",
+        **({"sede": str(payload.get("sede") or patient.get("sede") or "")} if (payload.get("sede") or patient.get("sede")) else {}),
         "createdAt": now_iso(),
         "createdBy": user.get("email") if user else "paciente-web",
     }
@@ -2366,6 +2370,8 @@ def public_catalog_payload(conn):
         "especialidades": [e for e in (get_json_key(conn, "especialidades", []) or []) if e.get("estado", "activo") == "activo"],
         "medicos": get_json_key(conn, "medicos", []) or [],
         "servicios": get_json_key(conn, "servicios", []) or [],
+        "sedes": [{"id": s.get("id"), "nombre": s.get("nombre", ""), "dir": s.get("dir", ""), "principal": bool(s.get("principal"))}
+                  for s in (config.get("sedes") or []) if isinstance(s, dict) and s.get("id") and s.get("estado") != "inactivo"],
     }
 
 
@@ -2883,6 +2889,11 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 400, {"error": "Completa paciente, correo, teléfono, especialidad, fecha y hora"})
             try:
                 with db() as conn:
+                    from medicg.sedes import valid_or_default, SedeError
+                    try:
+                        payload["sede"] = valid_or_default(get_json_key(conn, "config", {}) or {}, payload.get("sede"), "")
+                    except SedeError as exc:
+                        return make_response(self, 400, {"error": str(exc)})
                     patient, patient_created = upsert_patient_from_payload(conn, {**payload, "origen": "Landing publica"})
                     appointment = create_online_appointment(conn, patient, payload)
                     audit(conn, None, "public_appointment", "citas", {"appointmentId": appointment["id"], "patientId": patient.get("id")})
@@ -3374,10 +3385,18 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         raise AppointmentError("Modalidad inválida.")
                     item["pac"] = int(item.get("pac") or 0)
                     item["med"] = int(item.get("med") or 0)
-                    from medicg.sedes import check_patient as sede_check
+                    from medicg.sedes import check_patient as sede_check, valid_or_default, user_sede, home_sede, SedeError
+                    cfg_sedes = get_json_key(conn, "config", {}) or {}
                     try:
+                        patient_row = next((p for p in patients if int(p.get("id") or 0) == item["pac"]), {})
+                        fallback = (previous or {}).get("sede") or patient_row.get("sede") or home_sede(user, cfg_sedes)
+                        item["sede"] = valid_or_default(cfg_sedes, payload.get("sede"), fallback)
+                        if not item["sede"]:
+                            item.pop("sede")
+                        elif user_sede(user) and item["sede"] != user_sede(user):
+                            raise AppointmentError("Solo puedes agendar citas en tu establecimiento.")
                         sede_check(conn, user, item["pac"])
-                    except ValueError as exc:
+                    except (ValueError, SedeError) as exc:
                         raise AppointmentError(str(exc))
                     if user.get("rol") == "medico":
                         from medicg.doctor_scope import check_patient, specialties
@@ -3681,8 +3700,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                             return make_response(self, 400, {"error": str(exc)})
                         if sede_value:
                             target["sede"] = sede_value
+                            target["sedeSolo"] = payload.get("sedeSolo") is not False
                         else:
                             target.pop("sede", None)
+                            target.pop("sedeSolo", None)
                     if rol != "paciente":
                         target.pop("patientId", None)
                     target.update({
@@ -3759,7 +3780,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "estado": "activo",
                     "emailVerified": True,
                     "patientId": patient_id,
-                    **({"sede": new_sede} if new_sede else {}),
+                    **({"sede": new_sede, "sedeSolo": payload.get("sedeSolo") is not False} if new_sede else {}),
                     "medicoId": medico_id,
                     "createdAt": now_iso(),
                 }

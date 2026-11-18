@@ -54,7 +54,7 @@ function cashAccountHtml(patientId){
 }
 function renderCaja(){
  if(!hasPerm('caja'))return;
- const boxes=DB.get('cajas')||[],box=boxes.find(c=>c.estado==='abierta');
+ const boxes=DB.get('cajas')||[],box=typeof cashCurrentBox==='function'?cashCurrentBox(boxes):boxes.find(c=>c.estado==='abierta');
  if(!box){renderCajaClosed();return;}
  const movs=(box.movimientos||[]).filter(m=>m.pago!=='Pendiente');
  const sum=filter=>movs.filter(filter).reduce((s,m)=>s+Number(m.monto||0),0);
@@ -80,7 +80,7 @@ function cashModal(id,title,body){
 }
 function openPatientAccount(id){if(currentUser?.rol==='medico')return;cashHistoryPatient=id;cashModal('m-patient-account','Cuenta de '+getPacName(+id),cashAccountHtml(id));}
 function cashOpenAbono(id){
- if(!(DB.get('cajas')||[]).some(c=>c.estado==='abierta')){toast('Abre caja antes de registrar un abono.','err');return;}
+ if(!(typeof cashCurrentBox==='function'?cashCurrentBox():(DB.get('cajas')||[]).some(c=>c.estado==='abierta'))){toast('Abre caja antes de registrar un abono.','err');return;}
  cashAbono={invoiceId:id,payments:[]};const invoice=(DB.get('facturas')||[]).find(f=>f.id===id);if(!invoice)return;
  cashModal('m-cash-abono','Registrar abono · '+getPacName(invoice.pac),`<p>${esc(id)} · ${esc(invoice.serv)}</p><div id="cash-abono-summary" class="cash-summary"></div><div id="cash-abono-payments"></div><button class="btn-s mt8" onclick="cashAddPayment('abono')">+ Agregar forma de pago</button><button class="btn-g w100 mt16 cash-submit" onclick="cashPay()">Guardar abono</button>`);cashAddPayment('abono');
 }
@@ -242,7 +242,7 @@ function cashExpenseRows(s,printMode){
  return `<tr><td colspan="2"${printMode?'':' class="text-sm text-muted"'}><b>(−) Egresos pagados en efectivo</b></td></tr>${s.egresos.filter(e=>(e.metodo||'Efectivo')==='Efectivo').map(e=>`<tr><td style="padding-left:22px">${esc(e.hora||'')} · ${esc(e.concepto)}${e.beneficiario?' · '+esc(e.beneficiario):''}</td>${td}−${fmtMoney(e.monto)}</td></tr>`).join('')}<tr><td><b>Total egresos en efectivo</b></td>${td}<b>−${fmtMoney(s.egresosEfectivo)}</b></td></tr>${s.egresosOtros?`<tr><td>Egresos con otros medios (no afectan el efectivo)</td>${td}−${fmtMoney(s.egresosOtros)}</td></tr>`:''}`;
 }
 function cashClosingsHtml(){
- const closed=(DB.get('cajas')||[]).filter(c=>c.estado==='cerrada').slice().reverse().slice(0,30);
+ const closed=(DB.get('cajas')||[]).filter(c=>c.estado==='cerrada'&&(typeof sedeBoxMatch!=='function'||sedeBoxMatch(c))).slice().reverse().slice(0,30);
  if(!closed.length)return '<p class="text-muted">Aún no hay cierres registrados.</p>';
  return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Caja</th><th>Fecha</th><th>Abrió</th><th>Cerró</th><th>Total recibido</th><th>Egresos</th><th>Efectivo esperado</th><th>Contado</th><th>Diferencia</th><th></th></tr></thead><tbody>${closed.map(c=>{const k=c.cierre||{};const total=k.totalRecibido??(c.movimientos||[]).filter(m=>m.pago!=='Pendiente').reduce((s,m)=>s+Number(m.monto||0),0);const diff=k.diferencia;return `<tr><td>#${esc(c.id)}</td><td>${fmtDate(c.fecha)}</td><td>${esc(c.cajero||'—')} ${esc(c.horaApertura||'')}</td><td>${esc(k.cerradoPor||c.cerradoPor||'—')} ${esc(k.hora||c.horaCierre||'')}</td><td>${fmtMoney(total)}</td><td>${k.totalEgresos?'−'+fmtMoney(k.totalEgresos):'—'}</td><td>${k.efectivoEsperado!=null?fmtMoney(k.efectivoEsperado):'—'}</td><td>${k.efectivoContado!=null?fmtMoney(k.efectivoContado):'—'}</td><td>${diff==null?'<span class="text-muted">Sin arqueo</span>':`<span class="badge ${diff===0?'b-green':'b-red'}">${fmtMoney(diff)}</span>`}</td><td><button class="btn-s btn-sm" onclick="printCierreCaja('${esc(String(c.id))}')"><i class="ti ti-printer"></i> Imprimir</button></td></tr>`;}).join('')}</tbody></table></div>`;
 }
@@ -264,7 +264,7 @@ async function abrirCaja(){
 }
 function cerrarCaja(){
  if(!cashCanManageBox()){toast('No tienes permiso para cerrar caja','err');return;}
- const box=(DB.get('cajas')||[]).find(c=>c.estado==='abierta');if(!box){toast('No hay una caja abierta','inf');return;}
+ const box=typeof cashCurrentBox==='function'?cashCurrentBox():(DB.get('cajas')||[]).find(c=>c.estado==='abierta');if(!box){toast('No hay una caja abierta','inf');return;}
  const s=cashBoxSummary(box);
  cashModal('m-cash-close','Cierre de caja del día',`<p class="text-sm text-muted">Caja #${esc(box.id)} · abierta el ${fmtDate(box.fecha)} ${esc(box.horaApertura||'')} por ${esc(box.cajero||'—')} · ${s.movimientos} pagos recibidos.</p>
  <div class="tbl-wrap"><table class="tbl"><tbody>${Object.entries(s.totales).filter(([k,v])=>v||k!=='Otros').map(([k,v])=>`<tr><td>${esc(k)}</td><td class="text-r">${fmtMoney(v)}</td></tr>`).join('')}<tr><td><strong>Total recibido</strong></td><td class="text-r"><strong>${fmtMoney(s.totalRecibido)}</strong></td></tr><tr><td>Fondo inicial</td><td class="text-r">${fmtMoney(box.montoApertura||0)}</td></tr><tr><td>(+) Efectivo recibido</td><td class="text-r">${fmtMoney(s.totales['Efectivo'])}</td></tr>${cashExpenseRows(s,false)}<tr><td><strong>Efectivo que debe haber en caja</strong></td><td class="text-r"><strong>${fmtMoney(s.efectivoEsperado)}</strong></td></tr></tbody></table></div>

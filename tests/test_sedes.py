@@ -102,8 +102,44 @@ def main():
     assert [p['id'] for p in got] == [1], ('patients without sede belong to the main sede', [(p['id'], p.get('sede')) for p in got])
     code, body = call(admin, '/api/users', {'name': 'Nuevo', 'last': 'B', 'email': 'nuevo@localhost.test', 'password': PASSWORD, 'rol': 'recepcion', 'sede': 'balzar'})
     assert code in (200, 201) and body['user']['sede'] == 'balzar', body
+    # Guayaquil reception works in Guayaquil but sees every sede (sedeSolo=False)
+    code, body = call(admin, '/api/users', {'action': 'update', 'userId': 3, 'name': 'Recep', 'last': '3', 'email': 'todas@localhost.test', 'rol': 'recepcion',
+                                            'sede': 'gye', 'sedeSolo': False, 'permissions': ['dashboard', 'agenda', 'caja', 'pacientes', 'hce']})
+    assert code == 200 and body['user']['sede'] == 'gye' and body['user']['sedeSolo'] is False, body
+    gye = login('todas@localhost.test')
+    assert {p['id'] for p in call(gye, '/api/data')[1]['data']['pacientes']} == {1, 2, 3}
+    # cash box per sede: Balzar's box is already open; Guayaquil opens its own at the same time
+    code, body = call(gye, '/api/cash/open', {'montoApertura': 50})
+    assert code == 200 and body['box']['sede'] == 'gye', body
+    assert call(gye, '/api/cash/open', {})[0] == 409  # one open box per sede
+    code, body = call(gye, '/api/cash/charge', {'requestId': 'req-sede-gye-0000001', 'patientId': 2, 'items': [{'kind': 'servicio', 'id': 1, 'quantity': 1}],
+                                               'expectedTotal': 20, 'payments': [{'method': 'Efectivo', 'amount': 20}]})
+    assert code == 200, body
+    code, body = call(bz, '/api/cash/charge', {'requestId': 'req-sede-bz-00000001', 'patientId': 2, 'items': [{'kind': 'servicio', 'id': 1, 'quantity': 1}],
+                                              'expectedTotal': 20, 'payments': [{'method': 'Efectivo', 'amount': 15}]})
+    assert code == 200, body
+    boxes = {b['sede']: b for b in call(admin, '/api/data')[1]['data']['cajas'] if b['estado'] == 'abierta'}
+    assert set(boxes) == {'gye', 'balzar'} and sum(m['monto'] for m in boxes['gye']['movimientos']) == 20 and sum(m['monto'] for m in boxes['balzar']['movimientos']) == 15, boxes
+    assert [b['sede'] for b in call(bz, '/api/data')[1]['data']['cajas']] == ['balzar'], 'Balzar only sees its own box'
+    assert call(bz, '/api/cash/open', {'sede': 'gye'})[0] == 409
+    code, body = call(gye, '/api/cash/close', {'boxId': boxes['gye']['id'], 'expectedTotal': 20, 'expectedCash': 70, 'efectivoContado': 70})
+    assert code == 200 and body['box']['sede'] == 'gye', body
+    assert any(b['sede'] == 'balzar' and b['estado'] == 'abierta' for b in call(admin, '/api/data')[1]['data']['cajas']), 'closing Guayaquil keeps Balzar open'
+    # appointments carry the sede; a Guayaquil patient booked in Balzar becomes visible to Balzar
+    appt_gye = dict(appt, pac=1, hora='12:00', sede='balzar')
+    code, body = call(gye, '/api/appointments', appt_gye)
+    assert code == 200, body
+    assert 1 in {p['id'] for p in call(bz, '/api/data')[1]['data']['pacientes']}
+    # online booking: the patient chooses the sede
+    options = call('', '/api/public/options')[1]
+    assert [s['id'] for s in options['sedes']] == ['gye', 'balzar'], options.get('sedes')
+    pub = {'name': 'Web', 'last': 'Balzar', 'email': 'web@example.test', 'tel': '0999999999', 'esp': 'Medicina General', 'fecha': appt['fecha'], 'hora': '15:00', 'sede': 'balzar'}
+    code, body = call('', '/api/public/appointment', pub)
+    assert code == 201 and body['appointment']['sede'] == 'balzar', body
+    assert call('', '/api/public/appointment', dict(pub, sede='quito', email='x@example.test'))[0] == 400
+    assert any(p['nombres'] == 'Web' and p.get('sede') == 'balzar' for p in call(bz, '/api/data')[1]['data']['pacientes'])
     server.shutdown(); server.server_close(); tmp.cleanup()
-    print('PASS sedes: patients per establishment, staff limited to their sede on reads and writes, clinical docs, appointments, cash and users')
+    print('PASS sedes: patients per establishment, staff limited to their sede on reads and writes, clinical docs, appointments, cash and users; work sede with access to all sedes, cash box and close per sede, appointments and online booking per sede')
 
 
 if __name__ == '__main__':

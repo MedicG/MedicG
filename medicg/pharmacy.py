@@ -400,7 +400,7 @@ def dispense(conn, user, payload):
                              "lotes": [t["lote"] for t in taken]})
     try:
         invoice = create_account(conn, user, patient, charge_items, payload.get("payments") or [],
-                                 "Farmacia" + (" · " + receta["numero"] if receta else ""))
+                                 "Farmacia" + (" · " + receta["numero"] if receta else ""), payload=payload)
     except CashError as exc:
         raise PharmacyError(str(exc))
     if receta is not None:
