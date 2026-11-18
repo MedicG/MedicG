@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Turnos · Medic G</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+:root{--bg:#0b1b33;--panel:#11284a;--panel2:#16335d;--ink:#fff;--muted:#a9bcd8;--accent:#22c55e;--accent2:#38bdf8;--warn:#f59e0b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
+.wrap{display:grid;grid-template-rows:auto 1fr auto;height:100vh;padding:2vh 2.4vw;gap:2vh}
+header{display:flex;align-items:center;gap:1.4vw}
+header img{height:7vh;max-width:16vw;object-fit:contain;background:#fff;border-radius:10px;padding:4px}
+.brand{flex:1;min-width:0}
+.brand h1{margin:0;font-size:clamp(18px,3.2vh,40px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand div{color:var(--muted);font-size:clamp(13px,2vh,24px)}
+.clock{text-align:right}
+.clock b{display:block;font-size:clamp(24px,5.4vh,64px);font-variant-numeric:tabular-nums;line-height:1}
+.clock span{color:var(--muted);font-size:clamp(12px,1.8vh,22px)}
+main{display:grid;grid-template-columns:1.6fr 1fr;gap:2vw;min-height:0}
+.now{background:linear-gradient(160deg,var(--panel2),var(--panel));border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3vh 2vw;position:relative;overflow:hidden}
+.now .lbl{font-size:clamp(18px,4vh,48px);letter-spacing:.3em;color:var(--muted);font-weight:600}
+.now .code{font-size:clamp(72px,24vh,300px);font-weight:800;line-height:1;letter-spacing:.02em;margin:1vh 0;font-variant-numeric:tabular-nums}
+.now .dest{font-size:clamp(26px,7vh,90px);font-weight:700;color:var(--accent)}
+.now .dest small{display:block;font-size:.45em;color:var(--muted);font-weight:500;letter-spacing:.1em}
+.now .name{font-size:clamp(20px,4.4vh,54px);margin-top:1.2vh;color:#e2ecfa}
+.now .empty{font-size:clamp(22px,5vh,60px);color:var(--muted)}
+.now.flash{animation:flash 1s ease-in-out 4}
+@keyframes flash{0%,100%{box-shadow:inset 0 0 0 0 rgba(34,197,94,0)}50%{box-shadow:inset 0 0 0 12px rgba(34,197,94,.85);background:#1b4a2e}}
+.side{background:var(--panel);border-radius:24px;padding:2.4vh 1.6vw;display:flex;flex-direction:column;min-height:0}
+.side h2{margin:0 0 1.6vh;font-size:clamp(16px,3vh,36px);color:var(--muted);font-weight:600;letter-spacing:.08em}
+.list{display:flex;flex-direction:column;gap:1.2vh;min-height:0;overflow:hidden}
+.row{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:1.2vw;background:var(--panel2);border-radius:16px;padding:1.4vh 1.2vw}
+.row b{font-size:clamp(22px,5vh,62px);font-variant-numeric:tabular-nums;min-width:4.2em}
+.row div{font-size:clamp(14px,2.8vh,34px);color:#dbe7f7;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row div small{display:block;color:var(--muted);font-size:.7em}
+footer{display:flex;gap:1.2vw;flex-wrap:wrap;align-items:center}
+.wait{background:var(--panel);border-radius:14px;padding:1vh 1.2vw;font-size:clamp(13px,2.4vh,28px)}
+.wait b{color:var(--warn);font-size:1.15em;margin-left:.4em}
+.status{margin-left:auto;color:var(--muted);font-size:clamp(11px,1.6vh,18px)}
+.status.off{color:#fca5a5}
+#unlock{position:fixed;inset:0;background:rgba(5,12,25,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;z-index:5;cursor:pointer;text-align:center;padding:24px}
+#unlock button{font:inherit;font-size:clamp(20px,4vh,44px);font-weight:700;background:var(--accent);color:#04210f;border:0;border-radius:18px;padding:2.4vh 4vw;cursor:pointer}
+#unlock p{color:var(--muted);font-size:clamp(14px,2.4vh,26px);max-width:900px;margin:0}
+#error{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:clamp(18px,3vh,34px);background:var(--bg);z-index:6}
+@media (max-width:800px),(orientation:portrait){html,body{overflow:auto}.wrap{height:auto;min-height:100vh}main{grid-template-columns:1fr}.now{min-height:50vh}}
+@media (prefers-reduced-motion:reduce){.now.flash{animation:none;outline:10px solid var(--accent)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img id="logo" alt="" hidden>
+    <div class="brand"><h1 id="clinic">Turnos</h1><div id="sede"></div></div>
+    <div class="clock"><b id="hora">--:--</b><span id="fecha"></span></div>
+  </header>
+  <main>
+    <section class="now" id="now" aria-live="assertive" aria-atomic="true"><div class="empty">Espere su turno</div></section>
+    <aside class="side"><h2>ÚLTIMOS LLAMADOS</h2><div class="list" id="recent"></div></aside>
+  </main>
+  <footer><div id="waits" style="display:flex;gap:1.2vw;flex-wrap:wrap"></div><div class="status" id="status">Conectando…</div></footer>
+</div>
+<div id="unlock" role="button" tabindex="0" aria-label="Activar sonido"><button type="button">🔊 Activar sonido y pantalla</button><p>Toca una vez para que la pantalla pueda sonar el timbre y anunciar los turnos. Presiona F11 para pantalla completa.</p></div>
+<div id="error"></div>
+<script>
+(function(){
+  const qs=new URLSearchParams(location.search);
+  const sede=qs.get('sede')||'',key=qs.get('k')||'';
+  let token='';try{token=localStorage.getItem('mg_token')||'';}catch(e){}
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let audio=null,unlocked=false,voices=[],voiceOn=true,lastSeen=null,first=true,queue=[],speaking=false,offset=0,fails=0,wake=null;
+
+  function tick(){const d=new Date(Date.now()+offset);$('hora').textContent=d.toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});const f=d.toLocaleDateString('es-EC',{weekday:'long',day:'numeric',month:'long'});$('fecha').textContent=f.charAt(0).toUpperCase()+f.slice(1);}
+  setInterval(tick,1000);tick();
+
+  function pickVoice(){
+    voices=(window.speechSynthesis&&speechSynthesis.getVoices())||[];
+    const es=voices.filter(v=>/^es/i.test(v.lang));
+    return es.find(v=>/EC|419|MX|US|CO|PE/i.test(v.lang))||es.find(v=>/google|natural|online/i.test(v.name))||es[0]||null;
+  }
+  if(window.speechSynthesis){speechSynthesis.onvoiceschanged=pickVoice;pickVoice();}
+
+  function chime(){
+    try{
+      audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+      if(audio.state==='suspended')audio.resume();
+      const t0=audio.currentTime+.05;
+      [[880,0],[660,.42],[523.25,.84]].forEach(([f,dt])=>{
+        const o=audio.createOscillator(),g=audio.createGain();
+        o.type='sine';o.frequency.value=f;o.connect(g);g.connect(audio.destination);
+        g.gain.setValueAtTime(0,t0+dt);g.gain.linearRampToValueAtTime(.55,t0+dt+.03);g.gain.exponentialRampToValueAtTime(.001,t0+dt+1.1);
+        o.start(t0+dt);o.stop(t0+dt+1.2);
+      });
+    }catch(e){}
+    return new Promise(r=>setTimeout(r,1900));
+  }
+  function spokenCode(code){const m=String(code).match(/^([A-Z]+)-0*(\d+)$/i);return m?m[1].split('').join(' ')+' '+m[2]:String(code);}
+  function say(text){
+    return new Promise(res=>{
+      if(!voiceOn||!window.speechSynthesis){res();return;}
+      try{
+        const u=new SpeechSynthesisUtterance(text);const v=pickVoice();if(v)u.voice=v;u.lang=v?v.lang:'es-ES';u.rate=.92;u.volume=1;
+        let done=false;const fin=()=>{if(!done){done=true;res();}};u.onend=fin;u.onerror=fin;setTimeout(fin,9000);
+        speechSynthesis.cancel();speechSynthesis.speak(u);
+      }catch(e){res();}
+    });
+  }
+  async function announce(t){
+    queue.push(t);if(speaking)return;speaking=true;
+    while(queue.length){
+      const c=queue.shift();
+      showNow(c,true);
+      if(unlocked){
+        await chime();
+        const txt=`Turno ${spokenCode(c.codigo)}${c.nombre?', '+c.nombre:''}. Pase a ${c.destino}.`;
+        await say(txt);await new Promise(r=>setTimeout(r,600));await say(txt);
+      }else await new Promise(r=>setTimeout(r,3000));
+    }
+    speaking=false;
+  }
+  function showNow(c,flash){
+    const el=$('now');
+    if(!c){el.innerHTML='<div class="empty">Espere su turno</div>';return;}
+    el.innerHTML=`<div class="lbl">TURNO</div><div class="code">${esc(c.codigo)}</div><div class="dest"><small>PASE A</small>${esc(c.destino)}</div>${c.nombre?`<div class="name">${esc(c.nombre)}</div>`:''}`;
+    if(flash){el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+  }
+  function render(d){
+    $('clinic').textContent=d.clinica||'Turnos';document.title='Turnos · '+(d.clinica||'Medic G');
+    $('sede').textContent=d.sedeNombre?'Sede '+d.sedeNombre:'';
+    if(d.logo){$('logo').src=d.logo;$('logo').hidden=false;}
+    voiceOn=d.voz!==false;
+    const areaName=l=>((d.areas||[]).find(a=>a.letra===l)||{}).nombre||l;
+    $('recent').innerHTML=(d.recientes||[]).map(r=>`<div class="row"><b>${esc(r.codigo)}</b><div>${esc(r.destino)}${r.nombre?`<small>${esc(r.nombre)}</small>`:''}</div></div>`).join('')||'<div class="row" style="grid-template-columns:1fr"><div style="text-align:center;color:var(--muted)">Sin llamados todavía</div></div>';
+    $('waits').innerHTML=(d.areas||[]).map(a=>`<div class="wait">${esc(a.nombre)}<b>${d.espera?.[a.letra]||0}</b> <span style="color:var(--muted);font-size:.8em">en espera</span></div>`).join('');
+    const c=d.actual,sig=c?c.codigo+'|'+c.llamadas+'|'+c.llamadoEn:'';
+    if(first){first=false;lastSeen=sig;showNow(c,false);return;}
+    if(sig&&sig!==lastSeen){lastSeen=sig;announce(c);}
+    else if(!speaking&&!queue.length){lastSeen=sig||lastSeen;showNow(c,false);}
+  }
+  async function poll(withLogo){
+    const p=new URLSearchParams();if(sede)p.set('sede',sede);if(key)p.set('k',key);if(withLogo)p.set('logo','1');
+    try{
+      const r=await fetch('/api/turnos/pantalla?'+p,{cache:'no-store',headers:token&&!key?{Authorization:'Bearer '+token}:{}});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok){if(r.status===403){$('error').style.display='flex';$('error').textContent=d.error||'Enlace de pantalla no válido.';}throw new Error(d.error||r.status);}
+      $('error').style.display='none';
+      if(d.now)offset=d.now*1000-Date.now();
+      fails=0;$('status').textContent='En línea';$('status').className='status';
+      render(d);return true;
+    }catch(e){fails++;if(fails>2){$('status').textContent='Sin conexión — reintentando…';$('status').className='status off';}return false;}
+  }
+  async function loop(){
+    let ok=await poll(true);
+    while(!ok){await new Promise(r=>setTimeout(r,4000));ok=await poll(true);}
+    setInterval(()=>{if(!document.hidden)poll(false);},2000);
+  }
+  async function keepAwake(){try{if('wakeLock' in navigator){wake=await navigator.wakeLock.request('screen');}}catch(e){}}
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&unlocked)keepAwake();});
+  function unlock(){
+    unlocked=true;$('unlock').style.display='none';
+    try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();audio.resume();}catch(e){}
+    if(window.speechSynthesis){try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch(e){}}
+    keepAwake();
+    try{if(document.documentElement.requestFullscreen&&!document.fullscreenElement)document.documentElement.requestFullscreen().catch(()=>{});}catch(e){}
+  }
+  $('unlock').addEventListener('click',unlock);
+  $('unlock').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' ')unlock();});
+  loop();
+})();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ import datetime as dt
 import gzip
 import logging
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -592,7 +593,7 @@ MOJIBAKE_REPLACEMENTS = {
 from medicg.storage import DatabaseConnection, connect as connect_database
 
 
-SCHEMA_VERSION = "2026-10-reminders-v1"
+SCHEMA_VERSION = "2026-11-turnos-v1"
 LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "8"))
 LOGIN_WINDOW_SECONDS = int(os.environ.get("LOGIN_WINDOW_SECONDS", "900"))
 log = logging.getLogger("medicg")
@@ -1937,6 +1938,9 @@ def init_db():
         from medicg.reminders import table_sql as reminder_table
         conn.execute(reminder_table())
         conn.execute("create index if not exists reminder_log_cita_idx on reminder_log(cita_id, channel, kind)")
+        from medicg.turnos import table_sql as turnos_table, index_sql as turnos_index
+        conn.execute(turnos_table())
+        conn.execute(turnos_index())
         conn.execute("create table if not exists login_attempts(attempt_key text primary key, failures integer not null, first_at double precision not null, locked_until double precision not null)")
         conn.execute("create index if not exists sessions_expires_idx on sessions(expires_at)")
         conn.execute("create index if not exists sessions_user_idx on sessions(user_id)")
@@ -2535,7 +2539,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         requested = (BASE_DIR / path.lstrip("/")).resolve()
         assets = (BASE_DIR / "assets").resolve()
-        if path not in ("/", "/index.html", "/config.js", "/favicon.ico", "/robots.txt") and not requested.is_relative_to(assets):
+        if path not in ("/", "/index.html", "/config.js", "/favicon.ico", "/robots.txt", "/turnos.html") and not requested.is_relative_to(assets):
             self.send_error(404, "Not found")
             return None
         if requested.is_dir() and path != "/":
@@ -2664,6 +2668,43 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     return make_response(self, 403, {"error": "Sin permiso de agenda."})
                 ids = [i for i in (parse_qs(parsed_url.query).get("ids", [""])[0] or "").split(",") if i][:300]
                 return make_response(self, 200, {"status": reminder_status(conn, ids)})
+        if path == "/api/turnos/pantalla":
+            from medicg import turnos as turnos_mod
+            params = parse_qs(parsed_url.query)
+            with db(read_only=True) as conn:
+                config = get_json_key(conn, "config", {}) or {}
+                key = turnos_mod.settings(config)["displayKey"]
+                user = auth_user(self)
+                given = params.get("k", [""])[0]
+                if not (user and turnos_mod.can_use(user)) and not (key and given and hmac.compare_digest(key, given)):
+                    return make_response(self, 403, {"error": "Enlace de pantalla no válido. Ábrelo de nuevo desde el módulo Turnos."})
+                from medicg.sedes import sedes_of, main_sede
+                sede = params.get("sede", [""])[0]
+                if sedes_of(config) and not any(str(s.get("id")) == sede for s in sedes_of(config)):
+                    sede = main_sede(config)
+                if not sedes_of(config):
+                    sede = ""
+                payload = turnos_mod.display_payload(conn, config, sede)
+                if params.get("logo", [""])[0] != "1":
+                    payload["logo"] = ""  # the screen polls every few seconds: send the (large) logo only on the first load
+                return make_response(self, 200, payload)
+        if path == "/api/turnos":
+            user = auth_user(self)
+            if not user:
+                return make_response(self, 401, {"error": "Sesión no válida"})
+            from medicg import turnos as turnos_mod
+            if not turnos_mod.can_use(user):
+                return make_response(self, 403, {"error": "No tienes permiso para el sistema de turnos."})
+            try:
+                with db(read_only=True) as conn:
+                    config = get_json_key(conn, "config", {}) or {}
+                    sede = turnos_mod.resolve_sede(conn, user, parse_qs(parsed_url.query).get("sede", [""])[0])
+                    cfg = turnos_mod.settings(config)
+                    return make_response(self, 200, {"ok": True, "sede": sede, "fecha": turnos_mod.today(), "turnos": turnos_mod.list_day(conn, sede),
+                                                     "areas": cfg["areas"], "mostrarNombre": cfg["mostrarNombre"], "voz": cfg["voz"],
+                                                     "displayKey": cfg["displayKey"]})
+            except turnos_mod.TurnoError as exc:
+                return make_response(self, 403, {"error": str(exc)})
         if path in ("/api/pharmacy/queue", "/api/pharmacy/kardex"):
             user = auth_user(self)
             if not user:
@@ -2980,6 +3021,47 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             if not data_url:
                 return make_response(self, 404, {"error": "Archivo no encontrado."})
             return make_response(self, 200, {"ok": True, "dataUrl": data_url, "mime": mime or ""})
+        if path == "/api/turnos":
+            from medicg import turnos as turnos_mod
+            if not turnos_mod.can_use(user):
+                return make_response(self, 403, {"error": "No tienes permiso para el sistema de turnos."})
+            action = payload.get("action")
+            try:
+                if action == "config":
+                    if user.get("rol") != "admin":
+                        return make_response(self, 403, {"error": "Solo el administrador configura los turnos."})
+                    areas = []
+                    for area in payload.get("areas") or []:
+                        letra = str((area or {}).get("letra") or "").strip().upper()[:2]
+                        nombre = str((area or {}).get("nombre") or "").strip()[:40]
+                        if not letra.isalpha() or not nombre:
+                            return make_response(self, 400, {"error": "Cada área necesita una letra y un nombre."})
+                        if any(a["letra"] == letra for a in areas):
+                            return make_response(self, 400, {"error": f"La letra {letra} está repetida."})
+                        areas.append({"letra": letra, "nombre": nombre})
+                    if not areas:
+                        return make_response(self, 400, {"error": "Agrega al menos un área."})
+                    with db() as conn:
+                        config = get_json_key(conn, "config", {}) or {}
+                        current = turnos_mod.settings(config)
+                        key = turnos_mod.new_display_key() if payload.get("nuevaClave") or not current["displayKey"] else current["displayKey"]
+                        config["turnos"] = {"areas": areas, "mostrarNombre": bool(payload.get("mostrarNombre")), "voz": payload.get("voz") is not False, "displayKey": key}
+                        set_json_key(conn, "config", config)
+                        audit(conn, user, "turnos_config", "config", {"areas": [a["letra"] for a in areas], "nuevaClave": bool(payload.get("nuevaClave"))})
+                    return make_response(self, 200, {"ok": True, "turnos": config["turnos"]})
+                with db(lock="turnos") as conn:
+                    config = get_json_key(conn, "config", {}) or {}
+                    if action == "crear":
+                        result = turnos_mod.create(conn, user, payload, config)
+                    elif action == "llamar":
+                        result = turnos_mod.call(conn, user, payload)
+                    elif action == "estado":
+                        result = turnos_mod.close(conn, user, payload)
+                    else:
+                        return make_response(self, 400, {"error": "Acción inválida."})
+                return make_response(self, 200, {"ok": True, "turno": result})
+            except turnos_mod.TurnoError as exc:
+                return make_response(self, 409, {"error": str(exc)})
         if path in ("/api/cash/expense", "/api/cash/expense-void", "/api/cash/expense-category"):
             from medicg.cash import add_expense, void_expense, expense_category, CashError
             try:
