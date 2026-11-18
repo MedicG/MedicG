@@ -1726,6 +1726,7 @@ def public_user(user):
         "permissions": clean_permissions(user.get("permissions"), user.get("rol", "recepcion")),
         "patientId": user.get("patientId"),
         "medicoId": user.get("medicoId"),
+        "sede": user.get("sede") or "",
         "superadminMedico": bool(user.get("superadminMedico")) and user.get("rol") == "admin",
         "createdAt": user.get("createdAt", ""),
         "estado": user.get("estado", "activo"),
@@ -2380,6 +2381,9 @@ def sanitize_app_data_for_user(data, user=None):
     if user and user.get("rol") == "medico":
         from medicg.doctor_scope import filter_data
         data = filter_data(data, user)
+    if user:
+        from medicg.sedes import filter_data as sede_filter
+        data = sede_filter(data, user)
     data.pop("outgoingEmailPrivate", None)
     data.pop("remindersPrivate", None)
     data.pop("outlookPendingPrivate", None)
@@ -3370,6 +3374,11 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         raise AppointmentError("Modalidad inválida.")
                     item["pac"] = int(item.get("pac") or 0)
                     item["med"] = int(item.get("med") or 0)
+                    from medicg.sedes import check_patient as sede_check
+                    try:
+                        sede_check(conn, user, item["pac"])
+                    except ValueError as exc:
+                        raise AppointmentError(str(exc))
                     if user.get("rol") == "medico":
                         from medicg.doctor_scope import check_patient, specialties
                         check_patient(conn, user, item["pac"])
@@ -3482,7 +3491,10 @@ class MedicGHandler(SimpleHTTPRequestHandler):
             with db() as conn:
                 current = get_json_key(conn, key)
                 from medicg.doctor_scope import context, merge_write
+                from medicg.sedes import user_sede, merge_write as sede_merge_write, SedeError
                 scope_data = context(conn) if user.get("rol") == "medico" else {}
+                if user_sede(user):
+                    scope_data = {**scope_data, "pacientes": get_json_key(conn, "pacientes", []) or [], "config": get_json_key(conn, "config", {}) or {}}
                 visible = sanitize_app_data_for_user({**scope_data, key: current}, user).get(key) if current is not None else None
                 if visible is None:
                     visible = {} if key in object_keys else []
@@ -3504,6 +3516,11 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     try:
                         value = merge_write(conn, user, key, value)
                     except ValueError as exc:
+                        return make_response(self, 403, {"error": str(exc)})
+                if user_sede(user):
+                    try:
+                        value = sede_merge_write(conn, user, key, value, current)
+                    except SedeError as exc:
                         return make_response(self, 403, {"error": str(exc)})
                 if key == "recetas":
                     def electronic(data):
@@ -3656,6 +3673,16 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                         target["superadminMedico"] = True
                     else:
                         target.pop("superadminMedico", None)
+                    if "sede" in payload:
+                        from medicg.sedes import valid_sede, SedeError
+                        try:
+                            sede_value = "" if rol in ("admin", "paciente") else valid_sede(conn, str(payload.get("sede") or ""))
+                        except SedeError as exc:
+                            return make_response(self, 400, {"error": str(exc)})
+                        if sede_value:
+                            target["sede"] = sede_value
+                        else:
+                            target.pop("sede", None)
                     if rol != "paciente":
                         target.pop("patientId", None)
                     target.update({
@@ -3713,6 +3740,11 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     medico_id = resolve_medico_id(conn, payload, name, last, email)
                     if not medico_id:
                         return make_response(self, 400, {"error": "Selecciona el perfil medico vinculado para este usuario"})
+                from medicg.sedes import valid_sede, SedeError
+                try:
+                    new_sede = "" if rol in ("admin", "paciente") else valid_sede(conn, str(payload.get("sede") or ""))
+                except SedeError as exc:
+                    return make_response(self, 400, {"error": str(exc)})
                 next_ids = get_json_key(conn, "nextIds", {})
                 new_id = max(int(next_ids.get("user", len(users) + 1)), max((int(u.get("id") or 0) for u in users), default=0) + 1)
                 next_ids["user"] = new_id + 1
@@ -3727,6 +3759,7 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                     "estado": "activo",
                     "emailVerified": True,
                     "patientId": patient_id,
+                    **({"sede": new_sede} if new_sede else {}),
                     "medicoId": medico_id,
                     "createdAt": now_iso(),
                 }

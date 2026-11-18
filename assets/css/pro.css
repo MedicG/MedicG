@@ -84,3 +84,6 @@ label.flex{justify-content:flex-start;text-align:left}
 .esp-opt:hover,.esp-opt:focus-visible{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,#fff)}
 .esp-dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .esp-badge{margin:1px 0}
+/* Establishments (sedes) */
+.sede-badge{background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;margin:1px 0}
+#sedes-card input,#sedes-card select{min-width:0;width:100%}

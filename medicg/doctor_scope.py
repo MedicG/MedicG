@@ -48,5 +48,7 @@ def merge_write(conn,user,key,value):
  return value
 
 def check_patient(conn,user,patient_id):
+ from medicg.sedes import check_patient as sede_check
+ sede_check(conn,user,patient_id)
  if user.get('rol')!='medico':return
  if str(patient_id) not in scope(context(conn),user)[0]:raise ValueError('Paciente fuera de tus especialidades.')

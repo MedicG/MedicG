@@ -12291,7 +12291,8 @@ function renderPacs(){
 
 
 
-    return n.includes(q)&&(!espF||patientEsps(p).includes(espF));
+    const sedeF=document.getElementById('pac-sede-f')?.value||'';
+    return n.includes(q)&&(!espF||patientEsps(p).includes(espF))&&(!sedeF||(typeof patientSedeId==='function'&&patientSedeId(p)===sedeF));
 
 
 
@@ -12347,7 +12348,7 @@ function renderPacs(){
 
 
 
-      <td>${patientEspsHtml(p)}</td>
+      <td>${typeof sedeBadge==='function'?sedeBadge(p):''}${patientEspsHtml(p)}</td>
 
 
 
@@ -12985,7 +12986,7 @@ async function savePacInternal(){
   if(!pacEspSel.length){toast('Agrega al menos una especialidad al paciente.','err');document.getElementById('p-esp-q')?.focus();return;}
   const ageInput=document.getElementById('p-edad').value;
   if(!document.getElementById('p-fnac').value&&ageInput!==''&&(!Number.isInteger(Number(ageInput))||Number(ageInput)<0||Number(ageInput)>130)){toast('Ingresa una edad entera entre 0 y 130 años.','err');return;}
-  const obj={nombres,apellidos,cedula,fnac:document.getElementById('p-fnac').value,genero:document.getElementById('p-genero').value,tel:document.getElementById('p-tel').value,email:document.getElementById('p-email').value,dir:document.getElementById('p-dir').value,esp:pacEspSel[0]||'',esps:pacEspSel.slice(),seguro:document.getElementById('p-seg').value,sangre:document.getElementById('p-sangre').value,alergias:document.getElementById('p-alergias').value,antec:document.getElementById('p-antec').value,ultima:today()};
+  const obj={nombres,apellidos,cedula,fnac:document.getElementById('p-fnac').value,genero:document.getElementById('p-genero').value,tel:document.getElementById('p-tel').value,email:document.getElementById('p-email').value,dir:document.getElementById('p-dir').value,esp:pacEspSel[0]||'',esps:pacEspSel.slice(),...(typeof sedePatientValue==='function'?sedePatientValue():{}),seguro:document.getElementById('p-seg').value,sangre:document.getElementById('p-sangre').value,alergias:document.getElementById('p-alergias').value,antec:document.getElementById('p-antec').value,ultima:today()};
 
 
 
@@ -18024,7 +18025,7 @@ function renderUserRow(u){
 
 
 
-    <td><span class="badge b-blue">${ROLE_LABELS[userRoleKey(u)]||esc(u.rol)}</span>${roleExtra}</td>
+    <td><span class="badge b-blue">${ROLE_LABELS[userRoleKey(u)]||esc(u.rol)}</span>${roleExtra}${typeof sedeUserLabel==='function'?sedeUserLabel(u):''}</td>
 
 
 
@@ -18273,6 +18274,7 @@ function renderUserEditRow(u){
 
 
         <select id="edit-u-medico-${u.id}" ${(u.rol==='medico'||u.superadminMedico)?'':'disabled'}>${renderMedicoLinkOptions(linkedId)}</select>
+        ${typeof sedeUserSelect==='function'?sedeUserSelect(u):''}
 
 
 
@@ -18689,6 +18691,7 @@ async function saveUserEdit(userId){
 
 
     medicoId:document.getElementById(`edit-u-medico-${userId}`)?.value||'',
+    ...(document.getElementById(`edit-u-sede-${userId}`)?{sede:document.getElementById(`edit-u-sede-${userId}`).value}:{}),
 
 
 
@@ -19105,6 +19108,7 @@ async function createSystemUser(){
 
 
     medicoId:document.getElementById('u-medico-link')?.value||'',
+    sede:document.getElementById('u-sede')?.value||'',
 
 
 
