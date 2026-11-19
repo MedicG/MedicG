@@ -60,7 +60,7 @@ function renderCaja(){
  const sum=filter=>movs.filter(filter).reduce((s,m)=>s+Number(m.monto||0),0);
  const cs=cashBoxSummary(box);
  const totals=[['Total recibido en esta caja',sum(()=>true)],['Efectivo recibido',sum(m=>m.pago==='Efectivo')],['Egresos pagados',cs.totalEgresos],['Efectivo en caja ahora',cs.efectivoEsperado],['Tarjeta',sum(m=>String(m.pago).startsWith('Tarjeta'))],['Transferencia',sum(m=>m.pago==='Transferencia')],['Seguros (registros anteriores)',sum(m=>m.pago==='IESS'||m.pago==='Seguro privado')]];
- document.getElementById('caja-content').innerHTML=`<div class="caja-status-bar caja-open caja-pro-bar"><div class="caja-pro-info"><span class="caja-dot"></span><div><strong>Caja #${esc(box.id)} abierta</strong><div class="text-xs">Desde ${fmtDate(box.fecha)} ${esc(box.horaApertura||'')} · ${esc(box.cajero||'')}${box.montoApertura?` · Fondo inicial ${fmtMoney(box.montoApertura)}`:''}</div></div></div><div class="caja-pro-actions"><button class="btn-s btn-sm" onclick="cashRefresh()"><i class="ti ti-refresh"></i> Actualizar</button><button class="btn-s btn-sm" onclick="printCierreCaja('${esc(String(box.id))}')"><i class="ti ti-printer"></i> Resumen parcial</button>${cashCanManageBox()?'<button class="btn-d btn-sm" onclick="cerrarCaja()"><i class="ti ti-lock"></i> Cierre de caja del día</button>':''}</div></div>${box.fecha&&box.fecha<today()?`<div class="alert alert-w"><i class="ti ti-alert-triangle"></i><span>Esta caja es del ${fmtDate(box.fecha)} y sigue abierta. Haz el cierre de ese día antes de seguir cobrando.</span></div>`:''}
+ document.getElementById('caja-content').innerHTML=`<div class="caja-status-bar caja-open caja-pro-bar"><div class="caja-pro-info"><span class="caja-dot"></span><div><strong>Caja #${esc(box.id)} abierta</strong><div class="text-xs">Desde ${fmtDate(box.fecha)} ${esc(box.horaApertura||'')} · ${esc(box.cajero||'')} · Fondo inicial ${fmtMoney(box.montoApertura||0)}${(box.aperturaCambios||[]).length?' <span class="badge b-amber" title="Valor inicial corregido">corregido</span>':''}${cashCanManageBox()?` <button class="btn-s btn-xs" onclick="cashFixOpening('${esc(String(box.id))}')"><i class="ti ti-pencil"></i> Corregir valor inicial</button>`:''}</div></div></div><div class="caja-pro-actions"><button class="btn-s btn-sm" onclick="cashRefresh()"><i class="ti ti-refresh"></i> Actualizar</button><button class="btn-s btn-sm" onclick="printCierreCaja('${esc(String(box.id))}')"><i class="ti ti-printer"></i> Resumen parcial</button>${cashCanManageBox()?'<button class="btn-d btn-sm" onclick="cerrarCaja()"><i class="ti ti-lock"></i> Cierre de caja del día</button>':''}</div></div>${box.fecha&&box.fecha<today()?`<div class="alert alert-w"><i class="ti ti-alert-triangle"></i><span>Esta caja es del ${fmtDate(box.fecha)} y sigue abierta. Haz el cierre de ese día antes de seguir cobrando.</span></div>`:''}
  ${cashPending()?'<div class="alert alert-w">Hay una operación pendiente de confirmar. <button class="btn-p" onclick="cashRetry()">Reintentar la misma operación</button></div>':''}
  <div class="stats-row">${totals.map(([name,total])=>`<div class="stat-box"><div class="stat-lbl">${name}</div><div class="stat-val">${fmtMoney(total)}</div></div>`).join('')}</div>
  <div class="cash-layout"><section class="card"><div class="card-hdr"><h3 class="card-title">Cobrar servicios y exámenes</h3></div><div class="card-body">
@@ -261,6 +261,24 @@ async function abrirCaja(){
   await API.post('/api/cash/open',{montoApertura:amount});
   await cashRefresh();toast('Caja del día abierta','ok');
  }catch(e){toast(e.message,'err');}finally{cashBusy=false;}
+}
+function cashFixOpening(id){
+ const box=(DB.get('cajas')||[]).find(c=>String(c.id)===String(id)&&c.estado==='abierta');if(!box){toast('No hay una caja abierta','inf');return;}
+ const hist=(box.aperturaCambios||[]).map(h=>`<li>${esc(String(h.en||'').slice(0,16).replace('T',' '))} · ${esc(h.por||'')}: ${fmtMoney(h.antes)} → ${fmtMoney(h.despues)} <span class="text-muted">(${esc(h.motivo||'')})</span></li>`).join('');
+ cashModal('m-cash-opening','Corregir valor inicial de caja',`<p class="text-sm text-muted">Caja #${esc(box.id)} · valor inicial actual <b>${fmtMoney(box.montoApertura||0)}</b>. El efectivo esperado del cierre se recalcula con el nuevo valor.</p>
+ <label class="field">Nuevo valor inicial (USD)<input id="cash-fix-amount" type="number" min="0" step="0.01" inputmode="decimal" value="${Number(box.montoApertura||0).toFixed(2)}"></label>
+ <label class="field">Motivo de la corrección<input id="cash-fix-reason" maxlength="300" placeholder="Ej: se digitó 10 en vez de 100"></label>
+ ${hist?`<div class="text-sm mt8"><b>Correcciones anteriores</b><ul class="mt8">${hist}</ul></div>`:''}
+ <button class="btn-p mt12" onclick="cashSaveOpening('${esc(String(box.id))}')">Guardar corrección</button>`);
+ setTimeout(()=>document.getElementById('cash-fix-amount')?.select(),50);
+}
+async function cashSaveOpening(id){
+ const value=document.getElementById('cash-fix-amount')?.value,motivo=(document.getElementById('cash-fix-reason')?.value||'').trim();
+ if(value===''||Number(value)<0){toast('Escribe un valor válido.','err');return;}
+ if(!motivo){toast('Escribe el motivo de la corrección.','err');document.getElementById('cash-fix-reason')?.focus();return;}
+ if(cashBusy)return;cashBusy=true;
+ try{await API.post('/api/cash/opening',{boxId:id,montoApertura:value,motivo});closeM('m-cash-opening');await cashRefresh();toast('Valor inicial corregido','ok');}
+ catch(e){toast(e.message,'err');}finally{cashBusy=false;}
 }
 function cerrarCaja(){
  if(!cashCanManageBox()){toast('No tienes permiso para cerrar caja','err');return;}
