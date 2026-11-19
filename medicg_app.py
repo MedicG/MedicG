@@ -3071,6 +3071,13 @@ class MedicGHandler(SimpleHTTPRequestHandler):
                 return make_response(self, 200, result)
             except CashError as exc:
                 return make_response(self, 409, {"error": str(exc)})
+        if path == "/api/cash/opening":
+            from medicg.cash import set_opening, CashError
+            try:
+                with db() as conn:
+                    return make_response(self, 200, set_opening(conn, user, payload))
+            except CashError as exc:
+                return make_response(self, 409, {"error": str(exc)})
         if path in ("/api/cash/open", "/api/cash/close"):
             from medicg.cash import open_box, close_box, CashError
             try:

@@ -272,6 +272,35 @@ def open_box(conn, user, payload):
     return {"ok": True, "box": box}
 
 
+def set_opening(conn, user, payload):
+    """Correct the opening float of the open cash box; keeps who changed it, when, from/to and why."""
+    from medicg_app import get_json_key, set_json_key, audit
+    if not can_manage_box(user):
+        raise CashError("No tienes permiso para corregir la caja.")
+    boxes = get_json_key(conn, "cajas", []) or []
+    box = next((c for c in boxes if c.get("estado") == "abierta" and str(c.get("id")) == str(payload.get("boxId"))), None)
+    if not box:
+        raise CashError("Solo se corrige el valor inicial de una caja abierta.")
+    from medicg.sedes import user_sede, main_sede, box_sede
+    limited = user_sede(user)
+    if limited and box_sede(box, main_sede(get_json_key(conn, "config", {}) or {})) != limited:
+        raise CashError("Solo puedes usar la caja de tu establecimiento.")
+    if user.get("rol") != "admin" and str(box.get("cajeroId")) != str(user.get("id")):
+        raise CashError("Solo quien abrió la caja o el administrador puede corregir el valor inicial.")
+    new = amount(payload.get("montoApertura") or 0)
+    old = amount(box.get("montoApertura") or 0)
+    if new == old:
+        raise CashError("El valor inicial ya es ese.")
+    reason = _text(payload, "motivo", 300, "El motivo de la corrección", required=True)
+    stamp = dt.datetime.now(dt.timezone(dt.timedelta(hours=-5)))
+    box.setdefault("aperturaCambios", []).append({"antes": float(old), "despues": float(new), "motivo": reason,
+                                                   "por": _staff_name(user), "porId": user.get("id"), "en": stamp.isoformat(timespec="seconds")})
+    box["montoApertura"] = float(new)
+    set_json_key(conn, "cajas", boxes)
+    audit(conn, user, "cash_opening_fix", "cajas", {"boxId": box["id"], "antes": float(old), "despues": float(new), "motivo": reason})
+    return {"ok": True, "box": box}
+
+
 EXPENSE_CATEGORIES = ("Proveedores", "Insumos médicos", "Laboratorio externo", "Honorarios médicos", "Sueldos y anticipos",
                       "Servicios básicos", "Movilización", "Alimentación", "Limpieza y mantenimiento", "Retiro del dueño", "Otros")
 EXPENSE_METHODS = ("Efectivo", "Transferencia", "Tarjeta débito", "Tarjeta crédito")
