@@ -142,5 +142,12 @@ def main():
     print('PASS sedes: patients per establishment, staff limited to their sede on reads and writes, clinical docs, appointments, cash and users; work sede with access to all sedes, cash box and close per sede, appointments and online booking per sede')
 
 
+def test_cash_sede_wrapper():
+    # API is a top-level const in app.js (not a window property): the wrapper must not test window.API.
+    js = (Path(__file__).resolve().parents[1] / 'assets/js/sedes.js').read_text(encoding='utf-8')
+    assert 'window.API' not in js and "typeof API!=='undefined'" in js
+
+
 if __name__ == '__main__':
+    test_cash_sede_wrapper()
     main()

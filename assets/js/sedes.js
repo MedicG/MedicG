@@ -54,7 +54,7 @@ function sedeFillPatientForm(p){
 }
 (function(){
   // Every cash-desk request (and pharmacy charges, which go to the box) carries the selected sede.
-  if(window.API&&typeof API.post==='function'){const post=API.post.bind(API);API.post=function(path,payload){if(sedesEnabled()&&payload&&typeof payload==='object'&&!payload.sede&&(/^\/api\/cash\/(open|close|charge|payment|expense|expense-void)$/.test(path)||(path==='/api/pharmacy'&&/dispense|sell|venta|cobr/.test(String(payload.action||'')))))payload={...payload,sede:cashSedeId()};return post(path,payload);};}
+  if(typeof API!=='undefined'&&typeof API.post==='function'){const post=API.post.bind(API);API.post=function(path,payload){if(sedesEnabled()&&payload&&typeof payload==='object'&&!payload.sede&&(/^\/api\/cash\/(open|close|charge|payment|expense|expense-void)$/.test(path)||(path==='/api/pharmacy'&&/dispense|sell|venta|cobr/.test(String(payload.action||'')))))payload={...payload,sede:cashSedeId()};return post(path,payload);};}
   for(const name of ['openNewCita','editCita']){const fn=window[name];if(typeof fn==='function')window[name]=function(){const r=fn.apply(this,arguments);setTimeout(()=>{try{sedeFillCitaForm();}catch(e){}},120);return r;};}
   document.addEventListener('change',e=>{if(e.target&&e.target.id==='c-pac'&&!(+(document.getElementById('c-edit-id')?.value||0)))try{sedeFillCitaForm();}catch(_){}});
   const rc=window.renderCaja;if(typeof rc==='function')window.renderCaja=function(){const r=rc.apply(this,arguments);try{const el=document.getElementById('caja-content');if(el&&sedesEnabled()&&!el.querySelector('.caja-sede-bar'))el.insertAdjacentHTML('afterbegin',cashSedeBar());}catch(e){}return r;};
